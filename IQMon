@@ -1,0 +1,2 @@
+watchmedo shell-command --patterns="*.fits;*.fts" --recursive --command='/usr/stsci/pyssg/Python-2.7.3/bin/python /Users/vysosuser/bin/IQMon/MeasureImage.py -p --input="${watch_src_path}"' .
+
