@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>currentDocument</key>
-	<string>MeasureImage.py</string>
+	<string>VYSOS_MakeNightlyPlots.py</string>
 	<key>documents</key>
 	<array>
 		<dict>
@@ -16,9 +16,7 @@
 			<key>filename</key>
 			<string>MeasureImage.py</string>
 			<key>lastUsed</key>
-			<date>2013-07-08T14:06:54Z</date>
-			<key>selected</key>
-			<true/>
+			<date>2013-07-12T14:13:11Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
@@ -42,7 +40,9 @@
 			<key>filename</key>
 			<string>VYSOS_MakeNightlyPlots.py</string>
 			<key>lastUsed</key>
-			<date>2013-06-23T05:46:25Z</date>
+			<date>2013-07-14T01:19:45Z</date>
+			<key>selected</key>
+			<true/>
 		</dict>
 		<dict>
 			<key>filename</key>
@@ -198,14 +198,30 @@
 			<key>caret</key>
 			<dict>
 				<key>column</key>
-				<integer>1</integer>
+				<integer>87</integer>
 				<key>line</key>
-				<integer>1095</integer>
+				<integer>699</integer>
 			</dict>
+			<key>columnSelection</key>
+			<false/>
 			<key>firstVisibleColumn</key>
 			<integer>0</integer>
 			<key>firstVisibleLine</key>
-			<integer>1204</integer>
+			<integer>673</integer>
+			<key>selectFrom</key>
+			<dict>
+				<key>column</key>
+				<integer>31</integer>
+				<key>line</key>
+				<integer>699</integer>
+			</dict>
+			<key>selectTo</key>
+			<dict>
+				<key>column</key>
+				<integer>87</integer>
+				<key>line</key>
+				<integer>699</integer>
+			</dict>
 		</dict>
 		<key>SimulateFocus.py</key>
 		<dict>
@@ -240,14 +256,30 @@
 			<key>caret</key>
 			<dict>
 				<key>column</key>
-				<integer>0</integer>
+				<integer>78</integer>
 				<key>line</key>
-				<integer>907</integer>
+				<integer>1066</integer>
 			</dict>
+			<key>columnSelection</key>
+			<false/>
 			<key>firstVisibleColumn</key>
 			<integer>0</integer>
 			<key>firstVisibleLine</key>
-			<integer>886</integer>
+			<integer>1045</integer>
+			<key>selectFrom</key>
+			<dict>
+				<key>column</key>
+				<integer>42</integer>
+				<key>line</key>
+				<integer>1066</integer>
+			</dict>
+			<key>selectTo</key>
+			<dict>
+				<key>column</key>
+				<integer>78</integer>
+				<key>line</key>
+				<integer>1066</integer>
+			</dict>
 		</dict>
 		<key>VYSOS_MakeWebPage.py</key>
 		<dict>
