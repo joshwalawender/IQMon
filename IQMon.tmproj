@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>currentDocument</key>
-	<string>VYSOS_MeasureNight.py</string>
+	<string>MeasureImage.py</string>
 	<key>documents</key>
 	<array>
 		<dict>
@@ -16,7 +16,7 @@
 			<key>filename</key>
 			<string>MeasureImage.py</string>
 			<key>lastUsed</key>
-			<date>2013-07-16T18:10:51Z</date>
+			<date>2013-07-17T04:04:38Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
@@ -34,9 +34,7 @@
 			<key>filename</key>
 			<string>VYSOS_MeasureNight.py</string>
 			<key>lastUsed</key>
-			<date>2013-07-16T18:11:05Z</date>
-			<key>selected</key>
-			<true/>
+			<date>2013-07-17T04:04:38Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
@@ -205,7 +203,7 @@
 			<key>firstVisibleColumn</key>
 			<integer>0</integer>
 			<key>firstVisibleLine</key>
-			<integer>0</integer>
+			<integer>939</integer>
 		</dict>
 		<key>SimulateFocus.py</key>
 		<dict>
@@ -307,7 +305,7 @@
 			<key>firstVisibleColumn</key>
 			<integer>0</integer>
 			<key>firstVisibleLine</key>
-			<integer>0</integer>
+			<integer>58</integer>
 		</dict>
 	</dict>
 	<key>openDocuments</key>
@@ -324,6 +322,6 @@
 	<key>showFileHierarchyDrawer</key>
 	<true/>
 	<key>windowFrame</key>
-	<string>{{433, 162}, {1366, 1150}}</string>
+	<string>{{14, 0}, {1050, 778}}</string>
 </dict>
 </plist>
