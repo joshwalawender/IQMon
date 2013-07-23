@@ -47,8 +47,12 @@ class Image(object):
 	- make jpeg (full frame or cropped)
 	- calculate focus move
 	'''
-	def __init__(self, filename, config):
-		pass
+	def __init__(self, filename, Config):
+		if os.path.exists(filename):
+			self.filename = filename
+		else:
+			self.filename = None
+			raise IOError("File {0} does not exist".format(filename))
 
 
 class untitledTests(unittest.TestCase):
