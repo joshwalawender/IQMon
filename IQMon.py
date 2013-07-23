@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # encoding: utf-8
 """
-untitled.py
+IQMon.py
 
 Created by Josh Walawender on 2013-07-22.
 Copyright (c) 2013 . All rights reserved.
