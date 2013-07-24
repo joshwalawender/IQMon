@@ -8,7 +8,7 @@ Originally written to analyze data from the VYSO telescopes, but written with th
 
 ## Version Map
 
-* __v1.0__ Initial version, works on VYSOS Data.
+* __v0.1__ Initial version, works on VYSOS Data.
 	* Implemented using functions instead of objects.
 	* Reports image pointing info (alt, az, moon angle)
 	* Analyzes image with SExtractor
@@ -17,8 +17,8 @@ Originally written to analyze data from the VYSO telescopes, but written with th
 	* Reports pointing error and position angle
 	* Makes jpegs of image and cropped version with circles overlayed on stars found by SExtractor
 	* Makes HTML and text file versions of results with one line per image, usually one night of images per file.
-* __v2.0__ Object oriented code.  Implements capabilities of v1.0.
-* __v2.1__ Robust error handling and timeout on astrometry.net call.
-* __v2.2__ Implements reading of raw DSLR images via dcraw.
-* __v2.3__ Refines WCS by adding distortion keywords.
-* __v2.4__ Determines zero point of image by comparing SExtractor photometry with catalog magnitudes (using UCAC4).
+* __v1.0__ Object oriented code.  Implements capabilities of v0.1.
+* __v1.1__ Robust error handling and timeout on astrometry.net call.
+* __v1.2__ Implements reading of raw DSLR images via dcraw.
+* __v1.3__ Refines WCS by adding distortion keywords.
+* __v1.4__ Determines zero point of image by comparing SExtractor photometry with catalog magnitudes (using UCAC4).
