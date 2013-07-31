@@ -12,307 +12,657 @@ import sys
 import os
 import re
 import unittest
+import shutil
+import time
+import subprocess32
 
 import astropy.units as u
+import astropy.io.fits as fits
+import astropy.coordinates as coords
+from astropy import wcs
 
-##--------------------------------------------------------------------------------------------------
+
+##-----------------------------------------------------------------------------
 ## Define Config object to hold IQMon configuration information
-##--------------------------------------------------------------------------------------------------
+##-----------------------------------------------------------------------------
 class Config(object):
-	'''
-	Contains configuration information for IQMon package that can be passed to methods and functions.
-	
-	Properties:
-	- location of configuration file for IQMon
-	'''
-	def __init__(self):
-		'''
-		Read and parse configuration file.
-		- Currently assumes that file is .IQMonConfig in the user's home directory.
-		- No defaults set, if config file not read, then values default to None.
-		'''
-		IQMonExecPath = None
-		LogPath = None
-		PlotsPath = None
-		tmpPath = None
-		PythonPath = None
-		DataPath = None
-		CatalogPath = None
-		
-		## Look for configuration file
-		HomePath = os.path.expandvars("$HOME")
-		ConfigFilePath = os.path.join(HomePath, ".IQMonConfig")
-		if os.path.exists(ConfigFilePath):
-			ConfigFile = open(ConfigFilePath, 'r')
-			ConfigFileLines = ConfigFile.readlines()
-			ConfigFile.close()
-		else:
-			ConfigFileLines = None
-		
-		## read configuration file
-		for line in ConfigFileLines:
-			IsIQMonExecPath = re.match("IQMONPATH\s=\s([a-zA-z0-9/\-_\.]+)", line)
-			if IsIQMonExecPath: IQMonExecPath = os.path.abspath(IsIQMonExecPath.group(1))
-			IsLogPath = re.match("IQMONLOGS\s=\s([a-zA-z0-9/\-_\.]+)", line)
-			if IsLogPath: LogPath = os.path.abspath(IsLogPath.group(1))
-			IsPlotsPath = re.match("IQMONPLOTS\s=\s([a-zA-z0-9/\-_\.]+)", line)
-			if IsPlotsPath: PlotsPath = os.path.abspath(IsPlotsPath.group(1))
-			IstmpPath = re.match("IQMONTMP\s=\s([a-zA-z0-9/\-_\.]+)", line)
-			if IstmpPath: tmpPath = os.path.abspath(IstmpPath.group(1))
-			IsPythonPath = re.match("IQMONPYTHON\s=\s([a-zA-z0-9/\-_\.]+)", line)
-			if IsPythonPath: PythonPath = os.path.abspath(IsPythonPath.group(1))
-			IsDataPath = re.match("VYSOS20DATAPATH\s=\s([a-zA-z0-9/\-_\.]+)", line)
-			if IsDataPath: DataPath = os.path.abspath(IsDataPath.group(1))
-			IsCatalogPath = re.match("CATALOGPATH\s=\s([a-zA-z0-9/\-_\.]+)", line)
-			if IsCatalogPath: CatalogPath = os.path.abspath(IsCatalogPath.group(1))
-		
-		self.IQMonExecPath = IQMonExecPath
-		self.LogPath       = LogPath
-		self.PlotsPath     = PlotsPath
-		self.tmpPath       = tmpPath
-		self.PythonPath    = PythonPath
-		self.DataPath      = DataPath
-		self.CatalogPath   = CatalogPath 
+    '''
+    Contains configuration information for IQMon package that can be passed to
+    methods and functions.
 
-##--------------------------------------------------------------------------------------------------
+    Properties:
+    - location of configuration file for IQMon
+    '''
+    def __init__(self):
+        '''
+        Read and parse configuration file.
+        - Currently assumes that file is .IQMonConfig in the user's home
+        directory.
+        - No defaults set, if config file not read, then values default to
+        None.
+        '''
+        IQMonExecPath = None
+        LogPath = None
+        PlotsPath = None
+        tmpPath = None
+        PythonPath = None
+        DataPath = None
+        CatalogPath = None
+
+        ## Look for configuration file
+        HomePath = os.path.expandvars("$HOME")
+        ConfigFilePath = os.path.join(HomePath, ".IQMonConfig")
+        if os.path.exists(ConfigFilePath):
+            ConfigFile = open(ConfigFilePath, 'r')
+            ConfigFileLines = ConfigFile.readlines()
+            ConfigFile.close()
+        else:
+            ConfigFileLines = None
+
+        ## read configuration file
+        for line in ConfigFileLines:
+            IsIQMonExecPath = re.match("IQMONPATH\s=\s([\w/\-\.]+)", line)
+            if IsIQMonExecPath:
+                IQMonExecPath = os.path.abspath(IsIQMonExecPath.group(1))
+            IsLogPath = re.match("IQMONLOGS\s=\s([\w/\-\.]+)", line)
+            if IsLogPath:
+                LogPath = os.path.abspath(IsLogPath.group(1))
+            IsPlotsPath = re.match("IQMONPLOTS\s=\s([\w/\-\.]+)", line)
+            if IsPlotsPath:
+                PlotsPath = os.path.abspath(IsPlotsPath.group(1))
+            IstmpPath = re.match("IQMONTMP\s=\s([\w/\-\.]+)", line)
+            if IstmpPath:
+                tmpPath = os.path.abspath(IstmpPath.group(1))
+            IsPythonPath = re.match("IQMONPYTHON\s=\s([\w/\-\.]+)", line)
+            if IsPythonPath:
+                PythonPath = os.path.abspath(IsPythonPath.group(1))
+            IsDataPath = re.match("VYSOS20DATAPATH\s=\s([\w/\-\.]+)", line)
+            if IsDataPath:
+                DataPath = os.path.abspath(IsDataPath.group(1))
+            IsCatalogPath = re.match("CATALOGPATH\s=\s([\w/\-\.]+)", line)
+            if IsCatalogPath:
+                CatalogPath = os.path.abspath(IsCatalogPath.group(1))
+
+        self.pathIQMonExec = IQMonExecPath
+        self.pathLog = LogPath
+        self.pathPlots = PlotsPath
+        self.pathTemp = tmpPath
+        self.pathData = DataPath
+        self.pathCatalog = CatalogPath
+        self.pythonPath = PythonPath
+
+
+##-----------------------------------------------------------------------------
 ## Define Telescope object to hold telescope information
-##--------------------------------------------------------------------------------------------------
+##-----------------------------------------------------------------------------
 class Telescope(object):
-	'''
-	Contains information about the telescope that can be passed to methods and functions.  The concept
-	for operation is that the user will write a simple script which creates a telescope object and
-	assigned values to all it's properties (or sets them to None).  The processing is then just a 
-	sequence of calls to the IQMon.Image object and it's methods.
+    '''
+    Contains information about the telescope that can be passed to methods and
+    functions.  The concept for operation is that the user will write a simple
+    script which creates a telescope object and assigned values to all it's
+    properties (or sets them to None).  The processing is then just a sequence
+    of calls to the IQMon.Image object and it's methods.
 
-	Properties:
-	- name
-	- longName
-	- focalLength
-	- pixelSize
-	- aperture
-	- gain
-	- nXPix
-	- nYPix
-	- unitsForFWHM
-	- ROI
-	- thresholdFWHM
-	- thresholdPointingErr
-	- thresholdEllipticity
-	- pixelScale
-	- fRatio
-	'''
-	_singletons = dict()
-	def __new__(cls):
-		if not cls._singletons.has_key(cls):
-			cls._singletons[cls] = object.__new__(cls)
-		return cls._singletons[cls]
-	
-	def __init__(self):
-		self.name = None
-		self.longName = None
-		self.focalLength = None
-		self.pixelSize = None
-		self.aperture = None
-		self.gain = None
-		self.nXPix = None
-		self.nYPix = None
-		self.unitsForFWHM = None
-		self.ROI = None
-		self.thresholdFWHM = None
-		self.thresholdPointingErr = None
-		self.thresholdEllipticity = None
-		self.pixelScale = None
-		self.fRatio = None
+    Properties:
+    - name
+    - longName
+    - focalLength
+    - pixelSize
+    - aperture
+    - gain
+    - nXPix
+    - nYPix
+    - unitsForFWHM
+    - ROI
+    - thresholdFWHM
+    - thresholdPointingErr
+    - thresholdEllipticity
+    - pixelScale
+    - fRatio
+    '''
+    _singletons = dict()
 
-	def CheckUnits(self):
-		'''
-		Method to check whether the properties of the object have units and to add units if the
-		value has no units.  Does not yet check whether the unit is reasonable (i.e. does
-		focalLength have length units).
-		'''
-		## name is a string
-		## longName is a string
-		## Default focalLength to units of mm
-		if self.focalLength and not hasattr(self.focalLength, 'unit'):
-			print("focalLength is unitless value.  Adding units of mm.")
-			self.focalLength = self.focalLength * u.mm
-		## Default pixelSize to units of microns
-		if self.pixelSize and not hasattr(self.pixelSize, 'unit'):
-			print("pixelSize is unitless value.  Adding units of microns")
-			self.pixelSize = self.pixelSize * u.micron
-		## Default aperture to units of mm
-		if self.aperture and not not hasattr(self.aperture, 'unit'):
-			print("aperture is unitless value.  Adding units of mm")
-			self.aperture = self.aperture * u.mm
-		## Default gain to units of 1/ADU
-		if self.gain and not not hasattr(self.gain, 'unit'):
-			print("gain is unitless value.  Adding units of 1/ADU")
-			self.gain = self.gain / u.adu
-		## Default nXPix to units of pixels
-		if self.nXPix and not not hasattr(self.nXPix, 'unit'):
-			print("nXPix is unitless value.  Adding units of pixels")
-			self.nXPix = self.nXPix * u.pix
-		## Default nYPix to units of pixels
-		if self.nYPix and not not hasattr(self.nYPix, 'unit'):
-			print("nYPix is unitless value.  Adding units of pixels")
-			self.nYPix = self.nYPix * u.pix
-		## Default unitsForFWHM to units of arcsec
-		if self.unitsForFWHM and not not hasattr(self.unitsForFWHM, 'unit'):
-			print("unitsForFWHM is unitless value.  Adding units of arcsec")
-			self.unitsForFWHM = self.unitsForFWHM * u.arcsec
-		## ROI is string
-		## Default thresholdFWHM to units of arcsec
-		if self.thresholdFWHM and not not hasattr(self.thresholdFWHM, 'unit'):
-			print("thresholdFWHM is unitless value.  Adding units of arcsec")
-			self.thresholdFWHM = self.thresholdFWHM * u.arcsec
-		## Default thresholdPointingErr to units of arcmin
-		if self.thresholdPointingErr and not not hasattr(self.thresholdPointingErr, 'unit'):
-			print("thresholdPointingErr is unitless value.  Adding units of arcmin")
-			self.thresholdPointingErr = self.thresholdPointingErr * u.arcmin
-		## Default thresholdEllipticity to dimensionless
-		if self.thresholdEllipticity and not not hasattr(self.thresholdEllipticity, 'unit'):
-			print("thresholdEllipticity is unitless value.  Adding units of dimensionless")
-			self.thresholdEllipticity = self.thresholdEllipticity * u.dimensionless_unscaled
-		## Default pixelScale to units of arcsec per pixel
-		if self.pixelScale and not not hasattr(self.pixelScale, 'unit'):
-			print("pixelScale is unitless value.  Adding units of arcsec / pixel")
-			self.pixelScale = self.pixelScale * u.arcsec / u.pix
-		## Default fRatio to dimensionless
-		if self.fRatio and not not hasattr(self.fRatio, 'unit'):
-			print("fRatio is unitless value.  Adding units of dimensionless")
-			self.fRatio = self.fRatio * u.dimensionless_unscaled
+    def __new__(cls):
+        if not cls in cls._singletons:
+            cls._singletons[cls] = object.__new__(cls)
+        return cls._singletons[cls]
 
-			
-		
+    def __init__(self):
+        self.name = None
+        self.longName = None
+        self.focalLength = None
+        self.pixelSize = None
+        self.aperture = None
+        self.gain = None
+        self.nXPix = None
+        self.nYPix = None
+        self.unitsForFWHM = None
+        self.ROI = None
+        self.thresholdFWHM = None
+        self.thresholdPointingErr = None
+        self.thresholdEllipticity = None
+        self.pixelScale = None
+        self.fRatio = None
+        self.SExtractorPhotAperture = None
+        self.SExtractorSeeing = None
 
-##--------------------------------------------------------------------------------------------------
-## Define Image object which holds information on the image and methods for analysis
-##--------------------------------------------------------------------------------------------------
+    def CheckUnits(self, logger):
+        '''
+        Method to check whether the properties of the object have units and to
+        add units if the value has no units.  Does not yet check whether the
+        unit is reasonable (i.e. does focalLength have length units).
+        '''
+        ## name is a string
+        ## longName is a string
+        ## Default focalLength to units of mm
+        if self.focalLength and not hasattr(self.focalLength, 'unit'):
+            if logger:
+                logger.debug(
+                    "focalLength is unitless value.  Adding mm.")
+            self.focalLength *= u.mm
+        ## Default pixelSize to units of microns
+        if self.pixelSize and not hasattr(self.pixelSize, 'unit'):
+            if logger:
+                logger.debug(
+                    "pixelSize is unitless value.  Adding microns")
+            self.pixelSize *= u.micron
+        ## Default aperture to units of mm
+        if self.aperture and not hasattr(self.aperture, 'unit'):
+            if logger:
+                logger.debug(
+                    "aperture is unitless value.  Adding mm")
+            self.aperture *= u.mm
+        ## Default gain to units of 1/ADU
+        if self.gain and not hasattr(self.gain, 'unit'):
+            if logger:
+                logger.debug(
+                    "gain is unitless value.  Adding 1/ADU")
+            self.gain /= u.adu
+        ## Default nXPix to units of pixels
+        if self.nXPix and not hasattr(self.nXPix, 'unit'):
+            if logger:
+                logger.debug(
+                    "nXPix is unitless value.  Adding pixels")
+            self.nXPix *= u.pix
+        ## Default nYPix to units of pixels
+        if self.nYPix and not hasattr(self.nYPix, 'unit'):
+            if logger:
+                logger.debug(
+                    "nYPix is unitless value.  Adding pixels")
+            self.nYPix *= u.pix
+        ## Default unitsForFWHM to units of arcsec
+        if self.unitsForFWHM and not hasattr(self.unitsForFWHM, 'unit'):
+            if logger:
+                logger.debug(
+                    "unitsForFWHM is unitless value.  Adding arcsec")
+            self.unitsForFWHM *= u.arcsec
+        ## ROI is string
+        ## Default thresholdFWHM to units of arcsec
+        if self.thresholdFWHM and not hasattr(self.thresholdFWHM, 'unit'):
+            if logger:
+                logger.debug(
+                    "thresholdFWHM is unitless value.  Adding arcsec")
+            self.thresholdFWHM *= u.arcsec
+        ## Default thresholdPointingErr to units of arcmin
+        if self.thresholdPointingErr and not hasattr(self.thresholdPointingErr, 'unit'):
+            if logger:
+                logger.debug(
+                    "thresholdPointingErr is unitless value.  Adding arcmin")
+            self.thresholdPointingErr *= u.arcmin
+        ## Default thresholdEllipticity to dimensionless
+        if self.thresholdEllipticity and not hasattr(self.thresholdEllipticity, 'unit'):
+            if logger:
+                logger.debug(
+                    "thresholdEllipticity is unitless value.  Adding dimensionless")
+            self.thresholdEllipticity *= u.dimensionless_unscaled
+        ## Default pixelScale to units of arcsec per pixel
+        if self.pixelScale and not hasattr(self.pixelScale, 'unit'):
+            if logger:
+                logger.debug(
+                    "pixelScale is unitless value.  Adding arcsec / pixel")
+            self.pixelScale *= u.arcsec / u.pix
+        ## Default fRatio to dimensionless
+        if self.fRatio and not hasattr(self.fRatio, 'unit'):
+            if logger:
+                logger.debug(
+                    "fRatio is unitless value.  Adding dimensionless")
+            self.fRatio *= u.dimensionless_unscaled
+
+
+##-----------------------------------------------------------------------------
+## Define Image object which holds information and methods for analysis
+##-----------------------------------------------------------------------------
 class Image(object):
-	'''
-	The IQMon.Image object represents a single input image to the IQMon process.
+    '''
+    The IQMon.Image object represents a single input image to the IQMon
+    process.
 
-	When defined, the image objects requires both a filename to a valid fits file and an IQMon.Config object.
+    When defined, the image objects requires both a filename to a valid fits
+    file and an IQMon.Config object.
 
-	Properties:
-	- original file name
-	- working file name
-	- target object name
-	- target RA
-	- target Dec
-	- target alt
-	- target az
-	- image WCS
-	- image exposure time
-	- moon alt
-	- moon separation from target
-	- moon illumination
+    Properties:
+    - original file name
+    - working file name
+    - target object name
+    - target RA
+    - target Dec
+    - target alt
+    - target az
+    - image WCS
+    - image exposure time
+    - moon alt
+    - moon separation from target
+    - moon illumination
 
-	Methods:
-	- extract header info
-	- read input file (rfits, dcraw, etc.)
-	- dark subtract image
-	- solve image using astrometry.net
-	- crop image
-	- filter cosmic rays
-	- refine WCS
-	- find stars (run sextractor) (detemine FWHM, ellipticity)
-	- determine pointing error
-	- determine zero point
-	- make image plots
-	- make jpeg (full frame or cropped)
-	'''
-	def __init__(self, filename):
-		if os.path.exists(filename):
-			self.filename = filename
-		else:
-			self.filename = None
-			raise IOError("File {0} does not exist".format(filename))
+    Methods:
+    - extract header info
+    - read input file (rfits, dcraw, etc.)
+    - dark subtract image
+    - solve image using astrometry.net
+    - crop image
+    - filter cosmic rays
+    - refine WCS
+    - find stars (run sextractor) (detemine FWHM, ellipticity)
+    - determine pointing error
+    - determine zero point
+    - make image plots
+    - make jpeg (full frame or cropped)
+    '''
+    def __init__(self, input):
+        if os.path.exists(input):
+            FitsFileDirectory, FitsFilename = os.path.split(input)
+            self.rawFile = input
+            self.rawFileName = FitsFilename
+            self.rawFileDirectory = FitsFileDirectory
+            self.rawFileBasename, self.fileExt = os.path.splitext(FitsFilename)
+        else:
+            self.rawFile = None
+            self.rawFileName = None
+            self.rawFileDirectory = None
+            raise IOError("File {0} does not exist".format(input))
+        self.workingFile = None
+        self.header = None
+        self.exptime = None
+        self.filter = None
+        self.focusPos = None
+        self.objectName = None
+        self.astrometrySolved = None
+        self.coordinate_WCS = None
+        self.coordinate_header = None
+        self.nSExtracted = None
+        self.SExBackground = None
+        self.SExBRMS = None
+        self.SExtractorSuccess = None
+        self.tempFiles = []
 
-	def GetHeader(self):
-		'''
-		Get information from the image fits header.
-		'''
-		pass
+    ##-------------------------------------------------------------------------
+    ## Get Header
+    ##-------------------------------------------------------------------------
+    def GetHeader(self, logger):
+        '''
+        Get information from the image fits header.
+        '''
+        hdulist = fits.open(self.workingFile)
+        self.header = hdulist[0].header
+        self.image = hdulist[0].data
+        hdulist.close()
+        logger.info("Reading image header.")
+        
+        ## Get exposure time from header
+        try:
+            self.exptime = self.header['EXPTIME']
+            logger.debug("Exposure Time = %.1f" % self.exptime)
+        except:
+            self.exptime = None
+            logger.debug("No Exposure Time Value Found in Header")
+        ## Get filter from header
+        try:
+            self.filter = self.header['FILTER']
+            logger.debug("Filter = %s" % self.filter)
+        except:
+            self.filter = None
+            logger.debug("No Filter Keyword Found in Header")
+        ## Get focus position from header
+        try:
+            self.focusPos = self.header['FOCUSPOS']
+            logger.debug("Focus Position = %d" % self.focusPos)
+        except:
+            self.focusPos = None
+            logger.debug("No Focus Position Value Found in Header")
+        ## Get object name from header
+        try:
+            self.objectName = self.header["OBJECT"]
+            logger.debug("Header Object Name = %s" % self.objectName)
+        except:
+            self.objectName = None
+            logger.debug("No Object Value Found in Header")
 
-	def ReadImage(self):
-		'''
-		Read the raw image and write out a working image in the IQMon temporary directory.
-		'''
-		pass
+        ## Determine Image Size in Pixels
+        self.nYPix, self.nXPix = self.image.shape
 
-	def DarkSubtract(self):
-		'''
-		Create master dark and subtract from image.
-		'''
-		pass
+        ## Read Header Coordinates in to astropy coordinates object
+        ImageRA  = self.header['RA']
+        if len(ImageRA.split(":")) != 3:
+            if len(ImageRA.split(" ")) == 3:
+                ImageRA = ":".join(ImageRA.split(" "))
+        ImageDEC = self.header['DEC']    
+        if len(ImageDEC.split(":")) != 3:
+            if len(ImageDEC.split(" ")) == 3:
+                ImageDEC = ":".join(ImageDEC.split(" "))
+        logger.debug("Read pointing info from header: "+ImageRA+" "+ImageDEC)
+        try:
+            self.coordinate_header = coords.ICRSCoordinates(
+                                                      ImageRA+" "+ImageDEC,
+                                                   unit=(u.hour, u.degree))
+        except:
+            logger.warning("Failed to read pointing info from header.")
+            self.coordinate_header = None
 
-	def FilterCosmicRays(self):
-		'''
-		Use IRAF to filter cosmic rays from image (not supported)
-		'''
-		pass
+        ## Read WCS
+        try:
+            self.imageWCS = wcs.WCS(self.header)
+            logger.debug("Found WCS in image header.")
+        except:
+            self.imageWCS = None
+            logger.info("No WCS found in image header")
 
-	def Crop(self):
-		'''
-		Crop working image to region of interest
-		'''
-		pass
 
-	def SolveAstrometry(self):
-		'''
-		Solve astrometry in the working image using the astrometry.net solver.
-		'''
-		pass
+    ##-------------------------------------------------------------------------
+    ## Read Image
+    ##-------------------------------------------------------------------------
+    def ReadImage(self, config):
+        '''
+        Read the raw image and write out a working image in the IQMon temporary
+        directory.
+        
+        - For the moment, this only copies a fits file from the original
+          location to the IQMon tmp directory.
+        - Later implement file format conversion from CRW, CR2, DNG, etc to
+          fits using dcraw.
+        '''
+        self.workingFile = os.path.join(config.pathTemp, self.rawFileName)
+        shutil.copy2(self.rawFile, self.workingFile)
+        self.tempFiles.append(self.workingFile)
 
-	def RefineWCS(self):
-		'''
-		Refine the WCS of the image to have accurate distortions.
-		'''
-		pass
+    ##-------------------------------------------------------------------------
+    ## Dark Subtract Image
+    ##-------------------------------------------------------------------------
+    def DarkSubtract(self, MasterDarkFile):
+        '''
+        Create master dark and subtract from image.
+        
+        Input the filename of the appropriate master dark.  May want to write
+        own function to make the master dark given input file data.
+        '''
+        pass
 
-	def DeterminePointingError(self):
-		'''
-		Determine pointing error (difference between objects coordinates and solved WCS).
-		'''
-		pass
+    ##-------------------------------------------------------------------------
+    ## Crop Image
+    ##-------------------------------------------------------------------------
+    def Crop(self, tel, logger):
+        '''
+        Crop working image to region of interest.
+        '''
+        if tel.ROI:
+            ## Parse ROI String
+            try:
+                MatchROI = re.match("\[?(\d{1,5}):(\d{1,5}),(\d{1,5}):(\d{1,5})\]?", tel.ROI)
+                x1 = int(MatchROI.group(1))
+                x2 = int(MatchROI.group(2))
+                y1 = int(MatchROI.group(3))
+                y2 = int(MatchROI.group(4))
+            except:
+                logger.warning("Could not parse ROI string in telescope object.")
+            else:
+                logger.info("Cropping Image To [{0}:{1},{2}:{3}]".format(x1, x2, y1, y2))
+                hdulist = fits.open(self.workingFile, mode="update")
+                hdulist[0].data = hdulist[0].data[x1:x2,y1:y2]
+                hdulist.flush()
+                hdulist.close()
 
-	def RunSExtractor(self):
-		'''
-		Run SExtractor on image.
-		'''
-		pass
 
-	def DetermineZeroPoint(self):
-		'''
-		Determine zero point by comparing measured magnitudes with catalog magnitudes.
-		'''
-		pass
+    ##-------------------------------------------------------------------------
+    ## Solve Astrometry Using astrometry.net
+    ##-------------------------------------------------------------------------
+    def SolveAstrometry(self, tel, config, logger):
+        '''
+        Solve astrometry in the working image using the astrometry.net solver.
+        '''
+        logger.info("Attempting to create WCS using Astrometry.net solver.")
+        AstrometryCommand = ["solve-field", "-l", "5", "-O", "-p", "-t", "3", 
+                             "-L", str(tel.pixelScale*0.90),
+                             "-H", str(tel.pixelScale*1.10),
+                             "-u", "arcsecperpix", "-z", "4", self.workingFile]
+        AstrometrySTDOUT = ""
 
-	def MakePlots(self):
-		'''
-		Make plots for image.
-		'''
-		pass
+        try:
+            StartTime = time.time()
+            AstrometrySTDOUT = subprocess32.check_output(AstrometryCommand, 
+                               stderr=subprocess32.STDOUT, timeout=30)
+            EndTime = time.time()
+            ProcessTime = EndTime - StartTime
+            logger.debug("Astrometry.net Processing Time: %.1f s", ProcessTime)
+        except TimeoutExpired:
+            logger.warning("Astrometry.net timed out")
+            self.astrometrySolved = False
+        except:
+            logger.warning("Astrometry.net failed.")
+            self.astrometrySolved = False
+        else:
+            pos = AstrometrySTDOUT.find("Field center: (RA H:M:S, Dec D:M:S) = ")
+            if pos != -1:
+                IsFieldCenter = re.match("\s*(\d{1,2}:\d{2}:\d{2}\.\d+,\s-?\d{1,2}:\d{2}:\d{2}\.\d+).*", 
+                                         AstrometrySTDOUT[pos+40:pos+75])
+                if IsFieldCenter:
+                    logger.info("Astrometry.net field center is: %s", IsFieldCenter.group(1))
+            else:
+                for line in AstrometrySTDOUT:
+                    logger.warning("  %s" % line)
+            NewFile = self.workingFile.replace(self.fileExt, ".new")
+            NewFitsFile = self.workingFile.replace(self.fileExt, ".new.fits")
+            if not os.path.exists(NewFile):
+                logger.warning("No new file created by astrometry.net")
+                self.astrometrySolved = False
+            else:
+                logger.debug("Astrometry.net succeeded")
+                if os.path.exists(NewFitsFile): os.remove(NewFitsFile)
+                os.rename(NewFile, NewFitsFile)
+                self.astrometrySolved = True
+                ## Update header history
+                hdulist = fits.open(self.workingFile, mode="update")
+                now = time.gmtime()
+                hdulist[0].header['history'] = "Solved by Astrometry.net at {0}".format(time.strftime("%Y-%m-%dT%H:%M:%S UTC"))
+                hdulist.close()
+            ## Add files created by astrometry.net to tempFiles list
+            self.tempFiles.append(os.path.join(config.pathTemp, self.rawFileBasename+".axy"))
+            self.tempFiles.append(os.path.join(config.pathTemp, self.rawFileBasename+".wcs"))
+            self.tempFiles.append(os.path.join(config.pathTemp, self.rawFileBasename+".solved"))
+            self.tempFiles.append(os.path.join(config.pathTemp, self.rawFileBasename+".rdls"))
+            self.tempFiles.append(os.path.join(config.pathTemp, self.rawFileBasename+".match"))
+            self.tempFiles.append(os.path.join(config.pathTemp, self.rawFileBasename+".corr"))
+            self.tempFiles.append(os.path.join(config.pathTemp, self.rawFileBasename+".new.fits"))
+            self.tempFiles.append(os.path.join(config.pathTemp, self.rawFileBasename+"-indx.xyls"))
 
-	def MakeJpegs(self):
-		'''
-		Make jpegs of cropped version and full frame of image.
-		'''
-		pass
-		
+    ##-------------------------------------------------------------------------
+    ## Refine WCS
+    ##-------------------------------------------------------------------------
+    def RefineWCS(self):
+        '''
+        Refine the WCS of the image to have accurate distortions.
+        '''
+        pass
 
+    ##-------------------------------------------------------------------------
+    ## Determine Pointing Error
+    ##-------------------------------------------------------------------------
+    def DeterminePointingError(self, logger):
+        '''
+        Determine pointing error (difference between objects coordinates and
+        solved WCS).
+        '''
+        logger.info("Detemining pointing error based on WCS solution")
+        if self.imageWCS and self.coordinate_header:
+            centerWCS = self.imageWCS.wcs_pix2world([[self.nXPix/2, self.nYPix/2]], 1)
+            self.coordinate_WCS = coords.ICRSCoordinates(ra=centerWCS[0][0],
+                                                   dec=centerWCS[0][1],
+                                                   unit=(u.degree, u.degree))
+            self.PointingError = self.coordinate_WCS.separation(self.coordinate_header)
+            logger.info("Target Coordinates are:  %s %s",
+                        self.coordinate_header.ra.format(u.hour, sep=":"),
+                        self.coordinate_header.dec.format(u.degree, sep=":", alwayssign=True))
+            logger.info("WCS of Central Pixel is: %s %s",
+                        self.coordinate_WCS.ra.format(u.hour, sep=":"),
+                        self.coordinate_WCS.dec.format(u.degree, sep=":", alwayssign=True))
+            logger.info("Pointing Error is %.2f arcmin", self.PointingError.arcmins)
+        else:
+            self.PointingError = None
+            logger.warning("Pointing error not calculated.")
+
+    ##-------------------------------------------------------------------------
+    ## Run SExtractor
+    ##-------------------------------------------------------------------------
+    def RunSExtractor(self, tel, config, logger):
+        '''
+        Run SExtractor on image.
+        
+        - need to check that tel.SExtractorPhotAperture is set
+        - need to check that tel.gain is set
+        - need to check that tel.pixelScale is set
+        - need to check that tel.SExtractorSeeing is set
+        '''
+        SExtractorDefaultFile = os.path.join(config.pathIQMonExec, "default.sex")
+        SExtractorConfigFile = os.path.join(config.pathTemp, self.rawFileBasename+".sex")
+        self.tempFiles.append(SExtractorConfigFile)
+        SExtractorCatalog = os.path.join(config.pathTemp, self.rawFileBasename+".cat")
+        self.tempFiles.append(SExtractorCatalog)
+        PhotometryCatalogFile_xy = os.path.join(config.pathTemp, self.rawFileBasename+"PhotCat_xy.txt")
+        self.tempFiles.append(PhotometryCatalogFile_xy)
+
+        ## Create PhotometryCatalogFile_xy file for SExtractor Association
+        if os.path.exists(PhotometryCatalogFile_xy): os.remove(PhotometryCatalogFile_xy)
+        PhotCatFileObject = open(PhotometryCatalogFile_xy, 'w')
+        PhotCatFileObject.write("# No Existing WCS Found for this image\n")
+        PhotCatFileObject.write("# This is a dummy file to keep SExtractor happy\n")
+        PhotCatFileObject.write("0.0  0.0  0.0  0.0\n")
+        PhotCatFileObject.close()
+
+        ## Make edits To default.sex based on telescope:
+        ## Read in default config file        
+        DefaultConfig = open(SExtractorDefaultFile, 'r')
+        NewConfig     = open(SExtractorConfigFile, 'w')
+        for line in DefaultConfig:
+            newline = line
+            if re.match("CATALOG_NAME\s+", line):
+                newline = "CATALOG_NAME     "+SExtractorCatalog+"\n"
+            if re.match("PARAMETERS_NAME\s+", line):
+                newline = "PARAMETERS_NAME  "+os.path.join(config.pathIQMonExec, "default.param")+"\n"
+            if re.match("PHOT_APERTURES\s+", line):
+                newline = "PHOT_APERTURES   "+str(tel.SExtractorPhotAperture.to(u.pix).value)+"\n"
+            if re.match("GAIN\s+", line):
+                newline = "GAIN             "+str(tel.gain.value)+"\n"
+            if re.match("PIXEL_SCALE\s+", line):
+                newline = "PIXEL_SCALE      "+str(tel.pixelScale.value)+"\n"
+            if re.match("SEEING_FWHM\s+", line):
+                newline = "SEEING_FWHM      "+str(tel.SExtractorSeeing.to(u.arcsec).value)+"\n"
+            if re.match("ASSOC_NAME\s+", line):
+                newline = "ASSOC_NAME       "+PhotometryCatalogFile_xy+"\n"
+            NewConfig.write(newline)
+        DefaultConfig.close()
+        NewConfig.close()
+
+        ## Run SExtractor
+        logger.info("Invoking SExtractor.")
+        SExtractorCommand = ["sex", self.workingFile, "-c", SExtractorConfigFile]
+        try:
+            SExSTDOUT = subprocess32.check_output(SExtractorCommand, stderr=subprocess32.STDOUT, timeout=30)
+            for line in SExSTDOUT.split("\n"):
+                line.replace("[1A", "")
+                line.replace("[1M>", "")
+                if not re.match(".*Setting up background map.*", line) and not re.match(".*Line:\s[0-9]*.*", line):
+                    logger.debug("  "+line)
+        except:
+            logger.warning("SExtractor error.")
+        else:
+            ## Extract Number of Stars from SExtractor Output
+            pos = SExSTDOUT.find("sextracted ")
+            IsSExCount = re.match("\s*([0-9]+)\s+", SExSTDOUT[pos+11:pos+21])
+            if IsSExCount:
+                self.nSExtracted = int(IsSExCount.group(1))
+                logger.info("SExtractor found %d sources.", self.nSExtracted)
+            else:
+                self.nSExtracted = None
+            ## Extract Background Level from SExtractor Output
+            pos = SExSTDOUT.find("Background: ")
+            IsSExBkgnd = re.match("\s*([0-9\.]+)\s*", SExSTDOUT[pos+11:pos+21])
+            if IsSExBkgnd:
+                self.SExBackground = float(IsSExBkgnd.group(1))
+                logger.info("SExtractor background is %f", self.SExBackground)
+            else:
+                self.SExBackground = None
+            ## Extract Background RMS from SExtractor Output
+            IsSExBRMS = re.match("\s*RMS:\s([0-9\.]+)\s*", SExSTDOUT[pos+21:pos+37])
+            if IsSExBRMS:
+                self.SExBRMS = float(IsSExBRMS.group(1))
+                logger.info("SExtractor background RMS is %f", self.SExBRMS)
+            else:
+                self.SExBRMS = None
+
+            ## If No Output Catalog Created ...
+            if not os.path.exists(SExtractorCatalog):
+                logger.warning("SExtractor failed to create catalog.")
+                self.SExtractorSuccess = False
+            else:
+                self.SExtractorSuccess = True
+
+
+    ##-------------------------------------------------------------------------
+    ## Determine Zero Point from SExtractor Catalog
+    ##-------------------------------------------------------------------------
+    def DetermineZeroPoint(self):
+        '''
+        Determine zero point by comparing measured magnitudes with catalog
+        magnitudes.
+        '''
+        pass
+
+    ##-------------------------------------------------------------------------
+    ## Make Plost of Image Properties
+    ##-------------------------------------------------------------------------
+    def MakePlots(self):
+        '''
+        Make plots for image.
+        '''
+        pass
+
+    ##-------------------------------------------------------------------------
+    ## Make JPEGs of Image
+    ##-------------------------------------------------------------------------
+    def MakeJpegs(self):
+        '''
+        Make jpegs of cropped version and full frame of image.
+        '''
+        pass
+
+    ##-------------------------------------------------------------------------
+    ## Clean Up by Deleting Temporary Files
+    ##-------------------------------------------------------------------------
+    def CleanUp(self, logger):
+        logger.info("Cleaning Up Temporary Files.")
+        for item in self.tempFiles:
+            if os.path.exists(item):
+                logger.debug("Deleting {0}".format(item))
+                os.remove(item)
+        
+        
 class ConfigTests(unittest.TestCase):
-	def setUp(self):
-		pass
-
+    def setUp(self):
+        pass
 
 
 class ImageTests(unittest.TestCase):
-	def setUp(self):
-		pass
-
+    def setUp(self):
+        pass
 
 
 if __name__ == '__main__':
-	unittest.main()
+    unittest.main()
