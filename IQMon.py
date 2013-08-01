@@ -394,7 +394,9 @@ class Image(object):
         Input the filename of the appropriate master dark.  May want to write
         own function to make the master dark given input file data.
         '''
-        pass
+        hdulist_image = fits.open(self.workingFile)
+        hdulist_dark = fits.open(MasterDarkFile)
+        
 
     ##-------------------------------------------------------------------------
     ## Crop Image
@@ -626,7 +628,7 @@ class Image(object):
         pass
 
     ##-------------------------------------------------------------------------
-    ## Make Plost of Image Properties
+    ## Make Plots of Image Properties
     ##-------------------------------------------------------------------------
     def MakePlots(self):
         '''
