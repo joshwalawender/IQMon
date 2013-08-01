@@ -8,6 +8,7 @@ Copyright (c) 2013 . All rights reserved.
 """
 from __future__ import division, print_function
 
+## Import General Tools
 import sys
 import os
 import re
@@ -16,6 +17,8 @@ import shutil
 import time
 import subprocess32
 
+## Import Astronomy Specific Tools
+import ephem
 import astropy.units as u
 import astropy.io.fits as fits
 import astropy.coordinates as coords
@@ -145,6 +148,7 @@ class Telescope(object):
         self.fRatio = None
         self.SExtractorPhotAperture = None
         self.SExtractorSeeing = None
+        self.site = None
 
     def CheckUnits(self, logger):
         '''
@@ -298,7 +302,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Get Header
     ##-------------------------------------------------------------------------
-    def GetHeader(self, logger):
+    def GetHeader(self, tel, logger):
         '''
         Get information from the image fits header.
         '''
@@ -308,10 +312,10 @@ class Image(object):
         hdulist.close()
         logger.info("Reading image header.")
         
-        ## Get exposure time from header
+        ## Get exposure time from header (assumes seconds)
         try:
-            self.exptime = self.header['EXPTIME']
-            logger.debug("Exposure Time = %.1f" % self.exptime)
+            self.exptime = float(self.header['EXPTIME']) * u.s
+            logger.debug("Exposure Time = %s" % self.exptime)
         except:
             self.exptime = None
             logger.debug("No Exposure Time Value Found in Header")
@@ -336,6 +340,36 @@ class Image(object):
         except:
             self.objectName = None
             logger.debug("No Object Value Found in Header")
+        ## Get Observation Date and Time from header
+        ## (assumes YYYY-MM-DDTHH:MM:SS format)
+        try:
+            self.dateObs = self.header["DATE-OBS"]
+            logger.debug("Header Date = %s" % self.dateObs)
+        except:
+            self.dateObs = None
+            logger.debug("No Date Value Found in Header")
+        ## Get Latitude from header (assumes decimal degrees)
+        try:
+            self.latitude = self.header["LAT-OBS"] * u.deg
+            logger.debug("Header Latitude = %s" % self.latitude)
+        except:
+            self.latitude = None
+            logger.debug("No Latitude Value Found in Header")
+        ## Get Longitude from header (assumes decimal degrees)
+        try:
+            self.longitude = self.header["LONG-OBS"] * u.deg
+            logger.debug("Header Date = %s" % self.longitude)
+        except:
+            self.longitude = None
+            logger.debug("No Longitiude Value Found in Header")
+        ## Get Site Altitude from header (assumes meters)
+        try:
+            self.altitude = self.header["ALT-OBS"] * u.meter
+            logger.debug("Header Altitude = %s" % self.altitude)
+        except:
+            self.altitude = None
+            logger.debug("No Altitude Value Found in Header")
+
 
         ## Determine Image Size in Pixels
         self.nYPix, self.nXPix = self.image.shape
@@ -365,6 +399,35 @@ class Image(object):
         except:
             self.imageWCS = None
             logger.info("No WCS found in image header")
+            
+        ## Determine Alt, Az, Moon Sep, Moon Illum using ephem module
+        if self.dateObs and self.latitude and self.longitude:
+            ## Populate site object properties
+            SiteDate = "/".join(self.dateObs[0:10].split("-"))
+            SiteTime = self.dateObs[11:]        
+            tel.site.date = ephem.Date(SiteDate+" "+SiteTime)
+            tel.site.lat = self.latitude.to(u.deg).value
+            tel.site.lon = self.longitude.to(u.deg).value
+            if self.altitude: tel.site.elevation = self.altitude.to(u.meter).value
+            ## Do calculations using ephem
+            TargetObject = ephem.readdb("Target,f|M|F7,"+ImageRA+","+ImageDEC+",2.02,2000")
+            TargetObject.compute(tel.site)
+            self.targetAlt = TargetObject.alt * 180./ephem.pi * u.deg
+            self.targetAz = TargetObject.az * 180./ephem.pi * u.deg
+            logger.info("Target Alt, Az = {0}, {1}".format(self.targetAlt, self.targetAz))
+            TheMoon = ephem.Moon()
+            TheMoon.compute(tel.site)
+            self.moonPhase = TheMoon.phase
+            self.moonSep = ephem.separation(TargetObject, TheMoon) * 180./ephem.pi * u.deg
+            self.moonAlt = TheMoon.alt * 180./ephem.pi * u.deg
+            logger.info("A %0.f percent illuminated Moon is %s from the target." % (self.moonPhase, self.moonSep))
+        else:
+            self.targetAlt = None
+            self.targetAz = None
+            self.moonPhase = None
+            self.moonSep = None
+            self.moonAlt = None
+            logger.warning("Object position and Moon position not calculated.")
 
 
     ##-------------------------------------------------------------------------
@@ -617,6 +680,16 @@ class Image(object):
                 self.SExtractorSuccess = True
 
 
+    ##-------------------------------------------------------------------------
+    ## Read SExtractor Catalog
+    ##-------------------------------------------------------------------------
+    def ReadSExtractorCat(self):
+        '''
+        Read SExtractor Catalog.
+        '''
+        pass
+    
+    
     ##-------------------------------------------------------------------------
     ## Determine Zero Point from SExtractor Catalog
     ##-------------------------------------------------------------------------
