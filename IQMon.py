@@ -16,6 +16,8 @@ import unittest
 import shutil
 import time
 import subprocess32
+import math
+import numpy as np
 
 ## Import Astronomy Specific Tools
 import ephem
@@ -315,60 +317,67 @@ class Image(object):
         ## Get exposure time from header (assumes seconds)
         try:
             self.exptime = float(self.header['EXPTIME']) * u.s
-            logger.debug("Exposure Time = %s" % self.exptime)
+            logger.debug("Exposure time = {0:.1f} s".format(self.exptime.to(u.s).value))
         except:
             self.exptime = None
-            logger.debug("No Exposure Time Value Found in Header")
+            logger.debug("No exposure time value found in header")
         ## Get filter from header
         try:
             self.filter = self.header['FILTER']
-            logger.debug("Filter = %s" % self.filter)
+            logger.debug("Filter = {0}".format(self.filter))
         except:
             self.filter = None
-            logger.debug("No Filter Keyword Found in Header")
+            logger.debug("No filter keyword found in header")
         ## Get focus position from header
         try:
             self.focusPos = self.header['FOCUSPOS']
-            logger.debug("Focus Position = %d" % self.focusPos)
+            logger.debug("Focus position = {0}".format(self.focusPos))
         except:
             self.focusPos = None
-            logger.debug("No Focus Position Value Found in Header")
+            logger.debug("No focus position value found in header")
         ## Get object name from header
         try:
             self.objectName = self.header["OBJECT"]
-            logger.debug("Header Object Name = %s" % self.objectName)
+            logger.debug("Header object name = {0}".format(self.objectName))
         except:
             self.objectName = None
-            logger.debug("No Object Value Found in Header")
+            logger.debug("No object value found in header")
+        ## Get airmass from header
+        try:
+            self.headerAirmass = self.header["AIRMASS"]
+            logger.debug("Header airmass = {0:.2f}".format(self.headerAirmass))
+        except:
+            self.headerAirmass = None
+            logger.debug("No airmass value found in header")
         ## Get Observation Date and Time from header
         ## (assumes YYYY-MM-DDTHH:MM:SS format)
         try:
             self.dateObs = self.header["DATE-OBS"]
-            logger.debug("Header Date = %s" % self.dateObs)
+            logger.debug("Header date = {0}".format(self.dateObs))
         except:
             self.dateObs = None
-            logger.debug("No Date Value Found in Header")
-        ## Get Latitude from header (assumes decimal degrees)
+            logger.debug("No date value found in header")
+        ## Get Site Latitude from header (assumes decimal degrees)
         try:
             self.latitude = self.header["LAT-OBS"] * u.deg
-            logger.debug("Header Latitude = %s" % self.latitude)
+            logger.debug("Header latitude = {0:.4f} deg".format(self.latitude.to(u.deg).value))
         except:
             self.latitude = None
-            logger.debug("No Latitude Value Found in Header")
-        ## Get Longitude from header (assumes decimal degrees)
+            logger.debug("No latitude value found in header")
+        ## Get Site Longitude from header (assumes decimal degrees)
         try:
             self.longitude = self.header["LONG-OBS"] * u.deg
-            logger.debug("Header Date = %s" % self.longitude)
+            logger.debug("Header longitiude = {0:.4f} deg".format(self.longitude.to(u.deg).value))
         except:
             self.longitude = None
-            logger.debug("No Longitiude Value Found in Header")
+            logger.debug("No longitiude value found in header")
         ## Get Site Altitude from header (assumes meters)
         try:
             self.altitude = self.header["ALT-OBS"] * u.meter
-            logger.debug("Header Altitude = %s" % self.altitude)
+            logger.debug("Header altitude = {0:.0f} meters".format(self.altitude.to(u.meter).value))
         except:
             self.altitude = None
-            logger.debug("No Altitude Value Found in Header")
+            logger.debug("No altitude value found in header")
 
 
         ## Determine Image Size in Pixels
@@ -406,27 +415,33 @@ class Image(object):
             SiteDate = "/".join(self.dateObs[0:10].split("-"))
             SiteTime = self.dateObs[11:]        
             tel.site.date = ephem.Date(SiteDate+" "+SiteTime)
-            tel.site.lat = self.latitude.to(u.deg).value
-            tel.site.lon = self.longitude.to(u.deg).value
+            tel.site.lat = str(self.latitude.to(u.deg).value)
+            tel.site.lon = str(self.longitude.to(u.deg).value)
             if self.altitude: tel.site.elevation = self.altitude.to(u.meter).value
             ## Do calculations using ephem
             TargetObject = ephem.readdb("Target,f|M|F7,"+ImageRA+","+ImageDEC+",2.02,2000")
             TargetObject.compute(tel.site)
             self.targetAlt = TargetObject.alt * 180./ephem.pi * u.deg
             self.targetAz = TargetObject.az * 180./ephem.pi * u.deg
-            logger.info("Target Alt, Az = {0}, {1}".format(self.targetAlt, self.targetAz))
+            logger.info("Target Alt, Az = {0:.1f}, {1:.1f}".format(self.targetAlt.to(u.deg).value, self.targetAz.to(u.deg).value))
+            self.zenithAngle = 90.*u.deg - self.targetAlt
+            self.airmass = 1.0/math.cos(self.zenithAngle.to(u.radian).value)*(1.0 - 0.0012*(1.0/(math.cos(self.zenithAngle.to(u.radian).value)**2 - 1.0)))
+            logger.info("Target airmass (calculated) = {0:.2f}".format(self.airmass))
+            ## Calculate Moon Position and Illumination
             TheMoon = ephem.Moon()
             TheMoon.compute(tel.site)
             self.moonPhase = TheMoon.phase
             self.moonSep = ephem.separation(TargetObject, TheMoon) * 180./ephem.pi * u.deg
             self.moonAlt = TheMoon.alt * 180./ephem.pi * u.deg
-            logger.info("A %0.f percent illuminated Moon is %s from the target." % (self.moonPhase, self.moonSep))
+            logger.info("A {0:.0f} percent illuminated Moon is {1:.0f} from the target.".format(self.moonPhase, self.moonSep.to(u.deg).value))
         else:
             self.targetAlt = None
             self.targetAz = None
             self.moonPhase = None
             self.moonSep = None
             self.moonAlt = None
+            self.zenithAngle = None
+            self.airmass = None
             logger.warning("Object position and Moon position not calculated.")
 
 
@@ -450,16 +465,53 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Dark Subtract Image
     ##-------------------------------------------------------------------------
-    def DarkSubtract(self, MasterDarkFile):
+    def DarkSubtract(self, Darks, tel, config, logger):
         '''
         Create master dark and subtract from image.
         
         Input the filename of the appropriate master dark.  May want to write
         own function to make the master dark given input file data.
         '''
-        hdulist_image = fits.open(self.workingFile)
-        hdulist_dark = fits.open(MasterDarkFile)
-        
+        logger.debug("Dark subtracting image.  Opening image data.")
+        hdulist_image = fits.open(self.workingFile, mode='update')
+        ## Load master dark if provided, but if multiple files input, combine
+        ## them in to master dark, then load combined master dark.
+        if len(Darks) == 1:
+            logger.debug("Found master dark.  Opening master dark data.")
+            hdulist_dark = fits.open(Darks[0])
+            MasterDarkData = hdulist_dark[0].data
+        elif len(Darks) > 1:
+            logger.info("Multiple input darks detected.  Median combining {0} darks.".format(len(Darks)))
+            ## Combine multiple darks frames
+            DarkData = []
+            for Dark in Darks:
+                hdulist = fits.open(Dark)
+                DarkData.append(hdulist[0].data)
+            DarkData = np.array(DarkData)
+            MasterDarkData = np.median(DarkData, axis=0)
+            ## Save Master Dark to Fits File
+            DataPath = os.path.split(self.rawFile)[0]
+            DataNightString = os.path.split(DataPath)[1]
+            MasterDarkFilename = "MasterDark_"+tel.name+"_"+DataNightString+"_"+str(int(math.floor(self.exptime.to(u.s).value)))+".fits"
+            MasterDarkFile  = os.path.join(config.pathTemp, MasterDarkFilename)	
+            hdu_MasterDark = fits.PrimaryHDU(MasterDarkData)
+            hdulist_MasterDark = fits.HDUList([hdu_MasterDark])
+            hdulist_MasterDark.header = hdulist[0].header
+            hdulist_MasterDark.header['history'] = "Combined {0} images to make this master dark.".format(len(Darks))
+            logger.info("Writing master dark file: {0}".format(MasterDarkFile))
+            hdulist_MasterDark.writeto(MasterDarkFile)
+        else:
+            logger.error("No input dark files detected.")
+        ## Now Subtract MasterDark from Image
+        logger.info("Subtracting dark from image.")
+        ImageData = hdulist_image[0].data
+        DifferenceImage = ImageData - MasterDarkData
+        hdulist_image[0].data = DifferenceImage
+        hdulist_image.flush()
+#         logger.debug("Median level of image = {0}".format(np.median(ImageData)))
+#         logger.debug("Median level of dark = {0}".format(np.median(MasterDarkData)))
+#         logger.debug("Median level of dark subtracted = {0}".format(np.median(DifferenceImage)))
+
 
     ##-------------------------------------------------------------------------
     ## Crop Image
@@ -573,11 +625,11 @@ class Image(object):
                                                    unit=(u.degree, u.degree))
             self.PointingError = self.coordinate_WCS.separation(self.coordinate_header)
             logger.info("Target Coordinates are:  %s %s",
-                        self.coordinate_header.ra.format(u.hour, sep=":"),
-                        self.coordinate_header.dec.format(u.degree, sep=":", alwayssign=True))
+                        self.coordinate_header.ra.format(u.hour, sep=":", precision=1),
+                        self.coordinate_header.dec.format(u.degree, sep=":", precision=1, alwayssign=True))
             logger.info("WCS of Central Pixel is: %s %s",
-                        self.coordinate_WCS.ra.format(u.hour, sep=":"),
-                        self.coordinate_WCS.dec.format(u.degree, sep=":", alwayssign=True))
+                        self.coordinate_WCS.ra.format(u.hour, sep=":", precision=1),
+                        self.coordinate_WCS.dec.format(u.degree, sep=":", precision=1, alwayssign=True))
             logger.info("Pointing Error is %.2f arcmin", self.PointingError.arcmins)
         else:
             self.PointingError = None
@@ -595,6 +647,7 @@ class Image(object):
         - need to check that tel.pixelScale is set
         - need to check that tel.SExtractorSeeing is set
         '''
+        ## Set up file names
         SExtractorDefaultFile = os.path.join(config.pathIQMonExec, "default.sex")
         SExtractorConfigFile = os.path.join(config.pathTemp, self.rawFileBasename+".sex")
         self.tempFiles.append(SExtractorConfigFile)
@@ -653,7 +706,7 @@ class Image(object):
             IsSExCount = re.match("\s*([0-9]+)\s+", SExSTDOUT[pos+11:pos+21])
             if IsSExCount:
                 self.nSExtracted = int(IsSExCount.group(1))
-                logger.info("SExtractor found %d sources.", self.nSExtracted)
+                logger.info("SExtractor found {0} sources.".format(self.nSExtracted))
             else:
                 self.nSExtracted = None
             ## Extract Background Level from SExtractor Output
@@ -661,14 +714,14 @@ class Image(object):
             IsSExBkgnd = re.match("\s*([0-9\.]+)\s*", SExSTDOUT[pos+11:pos+21])
             if IsSExBkgnd:
                 self.SExBackground = float(IsSExBkgnd.group(1))
-                logger.info("SExtractor background is %f", self.SExBackground)
+                logger.info("SExtractor background is {0:.1f}".format(self.SExBackground))
             else:
                 self.SExBackground = None
             ## Extract Background RMS from SExtractor Output
             IsSExBRMS = re.match("\s*RMS:\s([0-9\.]+)\s*", SExSTDOUT[pos+21:pos+37])
             if IsSExBRMS:
                 self.SExBRMS = float(IsSExBRMS.group(1))
-                logger.info("SExtractor background RMS is %f", self.SExBRMS)
+                logger.info("SExtractor background RMS is {0:.1f}".format(self.SExBRMS))
             else:
                 self.SExBRMS = None
 
