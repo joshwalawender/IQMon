@@ -25,6 +25,7 @@ import astropy.units as u
 import astropy.io.fits as fits
 import astropy.coordinates as coords
 from astropy import wcs
+from astropy.io import ascii
 
 
 ##-----------------------------------------------------------------------------
@@ -300,6 +301,8 @@ class Image(object):
         self.SExBRMS = None
         self.SExtractorSuccess = None
         self.tempFiles = []
+        self.SExtractorResults = None
+        self.nStarsSEx = None
 
     ##-------------------------------------------------------------------------
     ## Get Header
@@ -317,67 +320,76 @@ class Image(object):
         ## Get exposure time from header (assumes seconds)
         try:
             self.exptime = float(self.header['EXPTIME']) * u.s
-            logger.debug("Exposure time = {0:.1f} s".format(self.exptime.to(u.s).value))
         except:
             self.exptime = None
             logger.debug("No exposure time value found in header")
+        else:
+            logger.debug("Exposure time = {0:.1f} s".format(self.exptime.to(u.s).value))
         ## Get filter from header
         try:
             self.filter = self.header['FILTER']
-            logger.debug("Filter = {0}".format(self.filter))
         except:
             self.filter = None
             logger.debug("No filter keyword found in header")
+        else:
+            logger.debug("Filter = {0}".format(self.filter))
         ## Get focus position from header
         try:
             self.focusPos = self.header['FOCUSPOS']
-            logger.debug("Focus position = {0}".format(self.focusPos))
         except:
             self.focusPos = None
             logger.debug("No focus position value found in header")
+        else:
+            logger.debug("Focus position = {0}".format(self.focusPos))
         ## Get object name from header
         try:
             self.objectName = self.header["OBJECT"]
-            logger.debug("Header object name = {0}".format(self.objectName))
         except:
             self.objectName = None
             logger.debug("No object value found in header")
+        else:
+            logger.debug("Header object name = {0}".format(self.objectName))
         ## Get airmass from header
         try:
             self.headerAirmass = self.header["AIRMASS"]
-            logger.debug("Header airmass = {0:.2f}".format(self.headerAirmass))
         except:
             self.headerAirmass = None
             logger.debug("No airmass value found in header")
+        else:
+            logger.debug("Header airmass = {0:.2f}".format(self.headerAirmass))
         ## Get Observation Date and Time from header
         ## (assumes YYYY-MM-DDTHH:MM:SS format)
         try:
             self.dateObs = self.header["DATE-OBS"]
-            logger.debug("Header date = {0}".format(self.dateObs))
         except:
             self.dateObs = None
             logger.debug("No date value found in header")
+        else:
+            logger.debug("Header date = {0}".format(self.dateObs))
         ## Get Site Latitude from header (assumes decimal degrees)
         try:
             self.latitude = self.header["LAT-OBS"] * u.deg
-            logger.debug("Header latitude = {0:.4f} deg".format(self.latitude.to(u.deg).value))
         except:
             self.latitude = None
             logger.debug("No latitude value found in header")
+        else:
+            logger.debug("Header latitude = {0:.4f} deg".format(self.latitude.to(u.deg).value))
         ## Get Site Longitude from header (assumes decimal degrees)
         try:
             self.longitude = self.header["LONG-OBS"] * u.deg
-            logger.debug("Header longitiude = {0:.4f} deg".format(self.longitude.to(u.deg).value))
         except:
             self.longitude = None
             logger.debug("No longitiude value found in header")
+        else:
+            logger.debug("Header longitiude = {0:.4f} deg".format(self.longitude.to(u.deg).value))
         ## Get Site Altitude from header (assumes meters)
         try:
             self.altitude = self.header["ALT-OBS"] * u.meter
-            logger.debug("Header altitude = {0:.0f} meters".format(self.altitude.to(u.meter).value))
         except:
             self.altitude = None
             logger.debug("No altitude value found in header")
+        else:
+            logger.debug("Header altitude = {0:.0f} meters".format(self.altitude.to(u.meter).value))
 
 
         ## Determine Image Size in Pixels
@@ -404,10 +416,11 @@ class Image(object):
         ## Read WCS
         try:
             self.imageWCS = wcs.WCS(self.header)
-            logger.debug("Found WCS in image header.")
         except:
             self.imageWCS = None
             logger.info("No WCS found in image header")
+        else:
+            logger.debug("Found WCS in image header.")
             
         ## Determine Alt, Az, Moon Sep, Moon Illum using ephem module
         if self.dateObs and self.latitude and self.longitude:
@@ -493,7 +506,7 @@ class Image(object):
             DataPath = os.path.split(self.rawFile)[0]
             DataNightString = os.path.split(DataPath)[1]
             MasterDarkFilename = "MasterDark_"+tel.name+"_"+DataNightString+"_"+str(int(math.floor(self.exptime.to(u.s).value)))+".fits"
-            MasterDarkFile  = os.path.join(config.pathTemp, MasterDarkFilename)	
+            MasterDarkFile  = os.path.join(config.pathTemp, MasterDarkFilename)    
             hdu_MasterDark = fits.PrimaryHDU(MasterDarkData)
             hdulist_MasterDark = fits.HDUList([hdu_MasterDark])
             hdulist_MasterDark.header = hdulist[0].header
@@ -524,13 +537,13 @@ class Image(object):
             ## Parse ROI String
             try:
                 MatchROI = re.match("\[?(\d{1,5}):(\d{1,5}),(\d{1,5}):(\d{1,5})\]?", tel.ROI)
+            except:
+                logger.warning("Could not parse ROI string in telescope object.")
+            else:
                 x1 = int(MatchROI.group(1))
                 x2 = int(MatchROI.group(2))
                 y1 = int(MatchROI.group(3))
                 y2 = int(MatchROI.group(4))
-            except:
-                logger.warning("Could not parse ROI string in telescope object.")
-            else:
                 logger.info("Cropping Image To [{0}:{1},{2}:{3}]".format(x1, x2, y1, y2))
                 hdulist = fits.open(self.workingFile, mode="update")
                 hdulist[0].data = hdulist[0].data[x1:x2,y1:y2]
@@ -557,8 +570,6 @@ class Image(object):
             AstrometrySTDOUT = subprocess32.check_output(AstrometryCommand, 
                                stderr=subprocess32.STDOUT, timeout=30)
             EndTime = time.time()
-            ProcessTime = EndTime - StartTime
-            logger.debug("Astrometry.net Processing Time: %.1f s", ProcessTime)
         except TimeoutExpired:
             logger.warning("Astrometry.net timed out")
             self.astrometrySolved = False
@@ -566,6 +577,8 @@ class Image(object):
             logger.warning("Astrometry.net failed.")
             self.astrometrySolved = False
         else:
+            ProcessTime = EndTime - StartTime
+            logger.debug("Astrometry.net Processing Time: %.1f s", ProcessTime)
             pos = AstrometrySTDOUT.find("Field center: (RA H:M:S, Dec D:M:S) = ")
             if pos != -1:
                 IsFieldCenter = re.match("\s*(\d{1,2}:\d{2}:\d{2}\.\d+,\s-?\d{1,2}:\d{2}:\d{2}\.\d+).*", 
@@ -693,14 +706,14 @@ class Image(object):
         SExtractorCommand = ["sex", self.workingFile, "-c", SExtractorConfigFile]
         try:
             SExSTDOUT = subprocess32.check_output(SExtractorCommand, stderr=subprocess32.STDOUT, timeout=30)
+        except:
+            logger.warning("SExtractor error.")
+        else:
             for line in SExSTDOUT.split("\n"):
                 line.replace("[1A", "")
                 line.replace("[1M>", "")
                 if not re.match(".*Setting up background map.*", line) and not re.match(".*Line:\s[0-9]*.*", line):
                     logger.debug("  "+line)
-        except:
-            logger.warning("SExtractor error.")
-        else:
             ## Extract Number of Stars from SExtractor Output
             pos = SExSTDOUT.find("sextracted ")
             IsSExCount = re.match("\s*([0-9]+)\s+", SExSTDOUT[pos+11:pos+21])
@@ -728,21 +741,51 @@ class Image(object):
             ## If No Output Catalog Created ...
             if not os.path.exists(SExtractorCatalog):
                 logger.warning("SExtractor failed to create catalog.")
-                self.SExtractorSuccess = False
+                self.SExtractorCatalog = None
             else:
-                self.SExtractorSuccess = True
+                self.SExtractorCatalog = SExtractorCatalog
+
+            ## Read Catalog
+            logger.info("Reading SExtractor output catalog.")
+            self.SExtractorResults = ascii.read(self.SExtractorCatalog, reader=ascii.sextractor.SExtractor)
+            SExImageRadius = []
+            SExAngleInImage = []
+            for star in self.SExtractorResults:
+                SExImageRadius.append(math.sqrt((self.nXPix/2-star['X_IMAGE'])**2 + (self.nYPix/2-star['Y_IMAGE'])**2))
+                SExAngleInImage.append(math.atan((star['X_IMAGE']-self.nXPix/2)/(self.nYPix/2-star['Y_IMAGE']))*180.0/math.pi)
+            self.SExtractorResults.add_column(astropy.table.Column(data=SExImageRadius, name='ImageRadius'))
+            self.SExtractorResults.add_column(astropy.table.Column(data=SExAngleInImage, name='AngleInImage'))
+            self.nStarsSEx = len(SExtractorResults)
+            logger.info("Read in {0} stars from SExtractor.".format(self.nStarsSEx))
 
 
     ##-------------------------------------------------------------------------
-    ## Read SExtractor Catalog
+    ## Determine Image FWHM from SExtractor Catalog
     ##-------------------------------------------------------------------------
-    def ReadSExtractorCat(self):
+    def DetermineFWHM(self):
         '''
-        Read SExtractor Catalog.
+        Determine typical FWHM of image from SExtractor results.
         '''
-        pass
-    
-    
+        if self.nStarsSEx > 1:
+        	IQRadiusFactor = 1.0
+			DiagonalRadius = math.sqrt(self.nXPix/2**2+self.nYPix/2**2)
+			IQRadius = DiagonalRadius*IQRadiusFactor
+			CentralFWHMs = []
+			CentralEllipticities = []
+			for star in SExtractorResults:
+				if star['ImageRadius'] <= IQRadius:
+					CentralFWHMs.append(star['FWHM_IMAGE'])
+					CentralEllipticities.append(star['ELLIPTICITY'])		
+			self.FWHM = np.median(CentralFWHMs)
+			self.ellipticity = np.median(CentralEllipticities)
+			logger.info("Median FWHM in inner region is %-4.2f pixels", self.FWHM)
+			logger.info("Median Ellipticity in inner region is %-.2f", self.ellipticity)
+		else:
+			self.FWHM = None
+			self.ellipticity = None
+
+
+
     ##-------------------------------------------------------------------------
     ## Determine Zero Point from SExtractor Catalog
     ##-------------------------------------------------------------------------
@@ -752,6 +795,7 @@ class Image(object):
         magnitudes.
         '''
         pass
+
 
     ##-------------------------------------------------------------------------
     ## Make Plots of Image Properties
@@ -790,6 +834,22 @@ class ConfigTests(unittest.TestCase):
 class ImageTests(unittest.TestCase):
     def setUp(self):
         pass
+
+
+##############################################################
+## Determines mode(s) of an array
+## - returns mode(s) given a binsize
+##############################################################
+def modes(array, binsize):
+	values = []
+	for element in array:
+		#print element, element/binsize, round(element/binsize,0), round(element/binsize,0)*binsize
+		values.append(round(element/binsize,0))
+	count = defaultdict(int)
+	for v in values:
+		count[v] +=1
+	best = max(count.values())
+	return [k*binsize for k,v in count.items() if v == best]
 
 
 if __name__ == '__main__':
