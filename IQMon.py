@@ -24,6 +24,7 @@ import ephem
 import astropy.units as u
 import astropy.io.fits as fits
 import astropy.coordinates as coords
+import astropy.table as table
 from astropy import wcs
 from astropy.io import ascii
 
@@ -747,42 +748,42 @@ class Image(object):
 
             ## Read Catalog
             logger.info("Reading SExtractor output catalog.")
-            self.SExtractorResults = ascii.read(self.SExtractorCatalog, reader=ascii.sextractor.SExtractor)
+            self.SExtractorResults = ascii.read(self.SExtractorCatalog, Reader=ascii.sextractor.SExtractor)
             SExImageRadius = []
             SExAngleInImage = []
             for star in self.SExtractorResults:
                 SExImageRadius.append(math.sqrt((self.nXPix/2-star['X_IMAGE'])**2 + (self.nYPix/2-star['Y_IMAGE'])**2))
                 SExAngleInImage.append(math.atan((star['X_IMAGE']-self.nXPix/2)/(self.nYPix/2-star['Y_IMAGE']))*180.0/math.pi)
-            self.SExtractorResults.add_column(astropy.table.Column(data=SExImageRadius, name='ImageRadius'))
-            self.SExtractorResults.add_column(astropy.table.Column(data=SExAngleInImage, name='AngleInImage'))
-            self.nStarsSEx = len(SExtractorResults)
+            self.SExtractorResults.add_column(table.Column(data=SExImageRadius, name='ImageRadius'))
+            self.SExtractorResults.add_column(table.Column(data=SExAngleInImage, name='AngleInImage'))
+            self.nStarsSEx = len(self.SExtractorResults)
             logger.info("Read in {0} stars from SExtractor.".format(self.nStarsSEx))
 
 
     ##-------------------------------------------------------------------------
     ## Determine Image FWHM from SExtractor Catalog
     ##-------------------------------------------------------------------------
-    def DetermineFWHM(self):
+    def DetermineFWHM(self, logger):
         '''
         Determine typical FWHM of image from SExtractor results.
         '''
         if self.nStarsSEx > 1:
-        	IQRadiusFactor = 1.0
-			DiagonalRadius = math.sqrt(self.nXPix/2**2+self.nYPix/2**2)
-			IQRadius = DiagonalRadius*IQRadiusFactor
-			CentralFWHMs = []
-			CentralEllipticities = []
-			for star in SExtractorResults:
-				if star['ImageRadius'] <= IQRadius:
-					CentralFWHMs.append(star['FWHM_IMAGE'])
-					CentralEllipticities.append(star['ELLIPTICITY'])		
-			self.FWHM = np.median(CentralFWHMs)
-			self.ellipticity = np.median(CentralEllipticities)
-			logger.info("Median FWHM in inner region is %-4.2f pixels", self.FWHM)
-			logger.info("Median Ellipticity in inner region is %-.2f", self.ellipticity)
-		else:
-			self.FWHM = None
-			self.ellipticity = None
+            IQRadiusFactor = 1.0
+            DiagonalRadius = math.sqrt(self.nXPix/2**2+self.nYPix/2**2)
+            IQRadius = DiagonalRadius*IQRadiusFactor
+            CentralFWHMs = []
+            CentralEllipticities = []
+            for star in self.SExtractorResults:
+                if star['ImageRadius'] <= IQRadius:
+                    CentralFWHMs.append(star['FWHM_IMAGE'])
+                    CentralEllipticities.append(star['ELLIPTICITY'])        
+            self.FWHM = np.median(CentralFWHMs) * u.pix
+            self.ellipticity = np.median(CentralEllipticities)
+            logger.info("Median FWHM in inner region is {0:.2f} pixels".format(self.FWHM.to(u.pix).value))
+            logger.info("Median Ellipticity in inner region is {0:.2f}".format(self.ellipticity))
+        else:
+            self.FWHM = None
+            self.ellipticity = None
 
 
 
@@ -841,15 +842,15 @@ class ImageTests(unittest.TestCase):
 ## - returns mode(s) given a binsize
 ##############################################################
 def modes(array, binsize):
-	values = []
-	for element in array:
-		#print element, element/binsize, round(element/binsize,0), round(element/binsize,0)*binsize
-		values.append(round(element/binsize,0))
-	count = defaultdict(int)
-	for v in values:
-		count[v] +=1
-	best = max(count.values())
-	return [k*binsize for k,v in count.items() if v == best]
+    values = []
+    for element in array:
+        #print element, element/binsize, round(element/binsize,0), round(element/binsize,0)*binsize
+        values.append(round(element/binsize,0))
+    count = defaultdict(int)
+    for v in values:
+        count[v] +=1
+    best = max(count.values())
+    return [k*binsize for k,v in count.items() if v == best]
 
 
 if __name__ == '__main__':
