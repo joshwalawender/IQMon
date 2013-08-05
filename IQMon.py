@@ -238,34 +238,11 @@ class Image(object):
     file and an IQMon.Config object.
 
     Properties:
-    - original file name
-    - working file name
-    - target object name
-    - target RA
-    - target Dec
-    - target alt
-    - target az
-    - image WCS
-    - image exposure time
-    - moon alt
-    - moon separation from target
-    - moon illumination
 
     Methods:
-    - extract header info
-    - read input file (rfits, dcraw, etc.)
-    - dark subtract image
-    - solve image using astrometry.net
-    - crop image
-    - filter cosmic rays
-    - refine WCS
-    - find stars (run sextractor) (detemine FWHM, ellipticity)
-    - determine pointing error
-    - determine zero point
-    - make image plots
-    - make jpeg (full frame or cropped)
     '''
     def __init__(self, input):
+        self.startProcessTime = time.time()
         if os.path.exists(input):
             FitsFileDirectory, FitsFilename = os.path.split(input)
             self.rawFile = input
@@ -289,19 +266,18 @@ class Image(object):
         self.nSExtracted = None
         self.SExBackground = None
         self.SExBRMS = None
-        self.SExtractorSuccess = None
         self.tempFiles = []
         self.SExtractorResults = None
         self.nStarsSEx = None
         self.htmlImageList = None
-        self.linkFullFrameJPEG = None
-        self.linkCropJPEG = None
         self.positionAngle = None
         self.zeroPoint = None
         self.processTime = None
         self.FWHM = None
         self.ellipticity = None
         self.pointingError = None
+        self.imageFlipped = None
+        self.jpegFileNames = []
 
 
     ##-------------------------------------------------------------------------
@@ -421,7 +397,41 @@ class Image(object):
             logger.info("No WCS found in image header")
         else:
             logger.debug("Found WCS in image header.")
-            
+        ## Determine PA of Image
+        PC11 = float(self.imageWCS.to_header()['PC1_1'])
+        PC12 = float(self.imageWCS.to_header()['PC1_2'])
+        PC21 = float(self.imageWCS.to_header()['PC2_1'])
+        PC22 = float(self.imageWCS.to_header()['PC2_2'])
+        if (abs(PC21) > abs(PC22)) and (PC21 >= 0): 
+            North = "Right"
+            self.positionAngle = 270.*u.deg + math.degrees(math.atan(PC22/PC21))*u.deg
+        elif (abs(PC21) > abs(PC22)) and (PC21 < 0):
+            North = "Left"
+            self.positionAngle = 90.*u.deg + math.degrees(math.atan(PC22/PC21))*u.deg
+        elif (abs(PC21) < abs(PC22)) and (PC22 >= 0):
+            North = "Up"
+            self.positionAngle = 0.*u.deg + math.degrees(math.atan(PC21/PC22))*u.deg
+        elif (abs(PC21) < abs(PC22)) and (PC22 < 0):
+            North = "Down"
+            self.positionAngle = 180.*u.deg + math.degrees(math.atan(PC21/PC22))*u.deg
+        if (abs(PC11) > abs(PC12)) and (PC11 > 0): East = "Right"
+        if (abs(PC11) > abs(PC12)) and (PC11 < 0): East = "Left"
+        if (abs(PC11) < abs(PC12)) and (PC12 > 0): East = "Up"
+        if (abs(PC11) < abs(PC12)) and (PC12 < 0): East = "Down"
+        if North == "Up" and East == "Left": self.imageFlipped = False
+        if North == "Up" and East == "Right": self.imageFlipped = True
+        if North == "Down" and East == "Left": self.imageFlipped = True
+        if North == "Down" and East == "Right": self.imageFlipped = False
+        if North == "Right" and East == "Up": self.imageFlipped = False
+        if North == "Right" and East == "Down": self.imageFlipped = True
+        if North == "Left" and East == "Up": self.imageFlipped = True
+        if North == "Left" and East == "Down": self.imageFlipped = False
+        logger.debug("Position angle of WCS is {0:.1f} degrees.".format(self.positionAngle.to(u.deg).value))
+        logger.debug("Image orientation is North {0}, East {1}.".format(North, East))
+        if self.imageFlipped:
+            logger.debug("Image is mirrored.")
+
+
         ## Determine Alt, Az, Moon Sep, Moon Illum using ephem module
         if self.dateObs and self.latitude and self.longitude:
             ## Populate site object properties
@@ -436,17 +446,17 @@ class Image(object):
             TargetObject.compute(tel.site)
             self.targetAlt = TargetObject.alt * 180./ephem.pi * u.deg
             self.targetAz = TargetObject.az * 180./ephem.pi * u.deg
-            logger.info("Target Alt, Az = {0:.1f}, {1:.1f}".format(self.targetAlt.to(u.deg).value, self.targetAz.to(u.deg).value))
+            logger.debug("Target Alt, Az = {0:.1f}, {1:.1f}".format(self.targetAlt.to(u.deg).value, self.targetAz.to(u.deg).value))
             self.zenithAngle = 90.*u.deg - self.targetAlt
             self.airmass = 1.0/math.cos(self.zenithAngle.to(u.radian).value)*(1.0 - 0.0012*(1.0/(math.cos(self.zenithAngle.to(u.radian).value)**2 - 1.0)))
-            logger.info("Target airmass (calculated) = {0:.2f}".format(self.airmass))
+            logger.debug("Target airmass (calculated) = {0:.2f}".format(self.airmass))
             ## Calculate Moon Position and Illumination
             TheMoon = ephem.Moon()
             TheMoon.compute(tel.site)
             self.moonPhase = TheMoon.phase
             self.moonSep = ephem.separation(TargetObject, TheMoon) * 180./ephem.pi * u.deg
             self.moonAlt = TheMoon.alt * 180./ephem.pi * u.deg
-            logger.info("A {0:.0f} percent illuminated Moon is {1:.0f} from the target.".format(self.moonPhase, self.moonSep.to(u.deg).value))
+            logger.debug("A {0:.0f} percent illuminated Moon is {1:.0f} deg from target.".format(self.moonPhase, self.moonSep.to(u.deg).value))
         else:
             self.targetAlt = None
             self.targetAz = None
@@ -637,12 +647,12 @@ class Image(object):
                                                    dec=centerWCS[0][1],
                                                    unit=(u.degree, u.degree))
             self.pointingError = self.coordinate_WCS.separation(self.coordinate_header)
-            logger.info("Target Coordinates are:  %s %s",
-                        self.coordinate_header.ra.format(u.hour, sep=":", precision=1),
-                        self.coordinate_header.dec.format(u.degree, sep=":", precision=1, alwayssign=True))
-            logger.info("WCS of Central Pixel is: %s %s",
-                        self.coordinate_WCS.ra.format(u.hour, sep=":", precision=1),
-                        self.coordinate_WCS.dec.format(u.degree, sep=":", precision=1, alwayssign=True))
+            logger.debug("Target Coordinates are:  %s %s",
+                         self.coordinate_header.ra.format(u.hour, sep=":", precision=1),
+                         self.coordinate_header.dec.format(u.degree, sep=":", precision=1, alwayssign=True))
+            logger.debug("WCS of Central Pixel is: %s %s",
+                         self.coordinate_WCS.ra.format(u.hour, sep=":", precision=1),
+                         self.coordinate_WCS.dec.format(u.degree, sep=":", precision=1, alwayssign=True))
             logger.info("Pointing Error is %.2f arcmin", self.pointingError.arcmins)
         else:
             logger.warning("Pointing error not calculated.")
@@ -745,7 +755,7 @@ class Image(object):
                 self.SExtractorCatalog = SExtractorCatalog
 
             ## Read Catalog
-            logger.info("Reading SExtractor output catalog.")
+            logger.debug("Reading SExtractor output catalog.")
             self.SExtractorResults = ascii.read(self.SExtractorCatalog, Reader=ascii.sextractor.SExtractor)
             SExImageRadius = []
             SExAngleInImage = []
@@ -755,7 +765,7 @@ class Image(object):
             self.SExtractorResults.add_column(table.Column(data=SExImageRadius, name='ImageRadius'))
             self.SExtractorResults.add_column(table.Column(data=SExAngleInImage, name='AngleInImage'))
             self.nStarsSEx = len(self.SExtractorResults)
-            logger.info("Read in {0} stars from SExtractor.".format(self.nStarsSEx))
+            logger.info("Read in {0} stars from SExtractor catalog.".format(self.nStarsSEx))
 
 
     ##-------------------------------------------------------------------------
@@ -806,13 +816,47 @@ class Image(object):
         pass
 
     ##-------------------------------------------------------------------------
-    ## Make JPEGs of Image
+    ## Make JPEG of Image
     ##-------------------------------------------------------------------------
-    def MakeJpegs(self):
+    def MakeJPEG(self, jpegFileName, tel, config, logger, marked=False, rotate=False, binning=1):
         '''
-        Make jpegs of cropped version and full frame of image.
+        Make jpegs of image.
         '''
-        pass
+        jpegFile = os.path.join(config.pathPlots, jpegFileName)
+        if marked:
+            logger.info("Making marked jpeg with binning factor of {0}.".format(binning))
+        else:
+            logger.info("Making jpeg with binning factor of {0}.".format(binning))
+        if os.path.exists(jpegFile): os.remove(jpegFile)
+        binningString = str(1./binning*100)+"%"
+        JPEGcommand = ["convert", "-contrast-stretch", "0.9%,1%", "-compress", "JPEG", "-quality", "70", "-stroke", "red", "-fill", "none", "-resize", binningString]
+        if marked:
+            if self.FWHM:
+                MarkRadius=max([4, 2*math.ceil(self.FWHM.value)])
+            else:
+                MarkRadius = 4
+            for star in self.SExtractorResults:
+                MarkXPos = star['X_IMAGE']
+                MarkYPos = self.nXPix - star['Y_IMAGE']
+                JPEGcommand.append('-draw')
+                JPEGcommand.append("circle %d,%d %d,%d" % (MarkXPos, MarkYPos, MarkXPos+MarkRadius, MarkYPos))
+        if rotate:
+            if self.positionAngle:
+                JPEGcommand.append("-rotate")
+                JPEGcommand.append(str(self.positionAngle.to(u.deg).value))
+                if self.imageFlipped:
+                    JPEGcommand.append("-flop")
+            else:
+                logger.warning("No position angle value found.  Not rotating JPEG.")
+        JPEGcommand.append(self.workingFile)
+        JPEGcommand.append(jpegFile)
+        try:        
+            ConvertSTDOUT = subprocess32.check_output(JPEGcommand, stderr=subprocess32.STDOUT, timeout=30)
+        except:
+            logger.warning("Failed to create jpeg.")
+        else:
+            self.jpegFileNames.append(jpegFileName)
+
 
     ##-------------------------------------------------------------------------
     ## Clean Up by Deleting Temporary Files
@@ -867,14 +911,12 @@ class Image(object):
             HTML = open(self.htmlImageList, 'a')
             HTML.write("    <tr>\n")
             HTML.write("      <td style='color:black;text-align:left'>{0}</td>\n".format(self.dateObs))
-            if self.linkFullFrameJPEG and self.linkCropJPEG:
-                HTML.write("      <td style='color:black;text-align:left'><a href='{0}'>{1}</a> (<a href='{2}'>C</a>)</td>\n".format(self.linkFullFrameJPEG, self.rawFileName, self.linkCropJPEG))
-            elif self.linkFullFrameJPEG and not self.linkCropJPEG:
-                HTML.write("      <td style='color:black;text-align:left'><a href='{0}'>{1}</a></td>\n".format(self.linkFullFrameJPEG, self.rawFileName))
-            elif not self.linkFullFrameJPEG and self.linkCropJPEG:
-                HTML.write("      <td style='color:black;text-align:left'>{0} (<a href='{1}'>C</a>)</td>\n".format(self.rawFileName, self.linkCropJPEG))
-            else:
-                HTML.write("      <td style='color:black;text-align:left'>{0}</td>\n".format(self.rawFileName))
+            if len(self.jpegFileNames) == 0:
+                HTML.write("      <td style='color:black;text-align:left'>{0}</td>\n".format(self.rawFileBasename))
+            elif len(self.jpegFileNames) == 1:
+                HTML.write("      <td style='color:black;text-align:left'><a href='{0}'>{1}</a></td>\n".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]), self.rawFileBasename))
+            elif len(self.jpegFileNames) >= 2:
+                HTML.write("      <td style='color:black;text-align:left'><a href='{0}'>{1}</a> (<a href='{2}'>JPEG2</a>)</td>\n".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]), self.rawFileBasename, os.path.join("..", "..", "Plots", self.jpegFileNames[1])))                
             if self.targetAlt and self.targetAz and self.airmass and self.moonSep and self.moonPhase:
                 HTML.write("      <td style='color:black'>{0:.1f}</td>\n".format(self.targetAlt.to(u.deg).value))
                 HTML.write("      <td style='color:black'>{0:.1f}</td>\n".format(self.targetAz.to(u.deg).value))
@@ -926,6 +968,17 @@ class Image(object):
             HTML.write("</body>\n")
             HTML.write("</html>\n")
             HTML.close()
+
+
+    ##-------------------------------------------------------------------------
+    ## Calcualte Process Time
+    ##-------------------------------------------------------------------------
+    def CalculateProcessTime(self, logger):
+        self.endProcessTime = time.time()
+        self.processTime = self.endProcessTime - self.startProcessTime
+        logger.info("IQMon processing time = {0:.1f} seconds".format(self.processTime))
+
+
 
 
 class ConfigTests(unittest.TestCase):
