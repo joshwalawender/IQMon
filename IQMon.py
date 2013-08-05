@@ -70,33 +70,22 @@ class Config(object):
         for line in ConfigFileLines:
             IsIQMonExecPath = re.match("IQMONPATH\s=\s([\w/\-\.]+)", line)
             if IsIQMonExecPath:
-                IQMonExecPath = os.path.abspath(IsIQMonExecPath.group(1))
+                self.pathIQMonExec = os.path.abspath(IsIQMonExecPath.group(1))
             IsLogPath = re.match("IQMONLOGS\s=\s([\w/\-\.]+)", line)
             if IsLogPath:
-                LogPath = os.path.abspath(IsLogPath.group(1))
+                self.pathLog = os.path.abspath(IsLogPath.group(1))
             IsPlotsPath = re.match("IQMONPLOTS\s=\s([\w/\-\.]+)", line)
             if IsPlotsPath:
-                PlotsPath = os.path.abspath(IsPlotsPath.group(1))
+                self.pathPlots = os.path.abspath(IsPlotsPath.group(1))
             IstmpPath = re.match("IQMONTMP\s=\s([\w/\-\.]+)", line)
             if IstmpPath:
-                tmpPath = os.path.abspath(IstmpPath.group(1))
+                self.pathTemp = os.path.abspath(IstmpPath.group(1))
             IsPythonPath = re.match("IQMONPYTHON\s=\s([\w/\-\.]+)", line)
             if IsPythonPath:
                 PythonPath = os.path.abspath(IsPythonPath.group(1))
-            IsDataPath = re.match("VYSOS20DATAPATH\s=\s([\w/\-\.]+)", line)
-            if IsDataPath:
-                DataPath = os.path.abspath(IsDataPath.group(1))
             IsCatalogPath = re.match("CATALOGPATH\s=\s([\w/\-\.]+)", line)
             if IsCatalogPath:
-                CatalogPath = os.path.abspath(IsCatalogPath.group(1))
-
-        self.pathIQMonExec = IQMonExecPath
-        self.pathLog = LogPath
-        self.pathPlots = PlotsPath
-        self.pathTemp = tmpPath
-        self.pathData = DataPath
-        self.pathCatalog = CatalogPath
-        self.pythonPath = PythonPath
+                self.pathCatalog = os.path.abspath(IsCatalogPath.group(1))
 
 
 ##-----------------------------------------------------------------------------
@@ -153,7 +142,7 @@ class Telescope(object):
         self.SExtractorPhotAperture = None
         self.SExtractorSeeing = None
         self.site = None
-
+        
     def CheckUnits(self, logger):
         '''
         Method to check whether the properties of the object have units and to
@@ -304,6 +293,16 @@ class Image(object):
         self.tempFiles = []
         self.SExtractorResults = None
         self.nStarsSEx = None
+        self.htmlImageList = None
+        self.linkFullFrameJPEG = None
+        self.linkCropJPEG = None
+        self.positionAngle = None
+        self.zeroPoint = None
+        self.processTime = None
+        self.FWHM = None
+        self.ellipticity = None
+        self.pointingError = None
+
 
     ##-------------------------------------------------------------------------
     ## Get Header
@@ -637,16 +636,15 @@ class Image(object):
             self.coordinate_WCS = coords.ICRSCoordinates(ra=centerWCS[0][0],
                                                    dec=centerWCS[0][1],
                                                    unit=(u.degree, u.degree))
-            self.PointingError = self.coordinate_WCS.separation(self.coordinate_header)
+            self.pointingError = self.coordinate_WCS.separation(self.coordinate_header)
             logger.info("Target Coordinates are:  %s %s",
                         self.coordinate_header.ra.format(u.hour, sep=":", precision=1),
                         self.coordinate_header.dec.format(u.degree, sep=":", precision=1, alwayssign=True))
             logger.info("WCS of Central Pixel is: %s %s",
                         self.coordinate_WCS.ra.format(u.hour, sep=":", precision=1),
                         self.coordinate_WCS.dec.format(u.degree, sep=":", precision=1, alwayssign=True))
-            logger.info("Pointing Error is %.2f arcmin", self.PointingError.arcmins)
+            logger.info("Pointing Error is %.2f arcmin", self.pointingError.arcmins)
         else:
-            self.PointingError = None
             logger.warning("Pointing error not calculated.")
 
     ##-------------------------------------------------------------------------
@@ -820,13 +818,116 @@ class Image(object):
     ## Clean Up by Deleting Temporary Files
     ##-------------------------------------------------------------------------
     def CleanUp(self, logger):
+        '''
+        Clean up by deleting temporary files.
+        '''
         logger.info("Cleaning Up Temporary Files.")
         for item in self.tempFiles:
             if os.path.exists(item):
                 logger.debug("Deleting {0}".format(item))
                 os.remove(item)
-        
-        
+
+    ##-------------------------------------------------------------------------
+    ## Append Line With Image Info to HTML File List
+    ##-------------------------------------------------------------------------
+    def AddWebLogEntry(self, tel, config, logger):
+        '''
+        This function adds one line to the HTML table of images.  The line
+        contains the image info extracted by IQMon.
+        '''
+        if self.htmlImageList:
+            ## If HTML file does not yet exist, create it and insert header
+            ## from template file.
+            if not os.path.exists(self.htmlImageList):
+                logger.debug("HTML files does not exist.  Creating it.")
+                HTML = open(self.htmlImageList, 'w')
+                HTMLheader = open(os.path.join(config.pathIQMonExec, "ImageListHeader.html"), 'r')
+                header = HTMLheader.read()
+                header = header.replace("telescopename", tel.longName)
+                header = header.replace("FWHMunits", str(tel.unitsForFWHM.unit))
+                HTMLheader.close()
+                HTML.write(header)
+                HTML.close()
+            ## If HTML file does exist, we need to strip off the lines which
+            ## end the file, so we can append more data to the table.
+            else:
+                logger.debug("HTML file exists.  Copying contents.")
+                HTML = open(self.htmlImageList, 'r')
+                existingContent = HTML.read().split("\n")
+                HTML.close()
+                HTML = open(self.htmlImageList, 'w')
+                for line in existingContent:
+                    IsEndTable = re.match("\s*</table>\s*", line)
+                    IsEndBody = re.match("\s*</body>\s*", line)
+                    IsEndHTML = re.match("\s*</html>\s*", line)
+                    if not IsEndTable and not IsEndBody and not IsEndHTML:
+                        HTML.write(line)
+            ## Write Lines for this Image to HTML File
+            logger.info("Adding image data to HTML log file.")
+            HTML = open(self.htmlImageList, 'a')
+            HTML.write("    <tr>\n")
+            HTML.write("      <td style='color:black;text-align:left'>{0}</td>\n".format(self.dateObs))
+            if self.linkFullFrameJPEG and self.linkCropJPEG:
+                HTML.write("      <td style='color:black;text-align:left'><a href='{0}'>{1}</a> (<a href='{2}'>C</a>)</td>\n".format(self.linkFullFrameJPEG, self.rawFileName, self.linkCropJPEG))
+            elif self.linkFullFrameJPEG and not self.linkCropJPEG:
+                HTML.write("      <td style='color:black;text-align:left'><a href='{0}'>{1}</a></td>\n".format(self.linkFullFrameJPEG, self.rawFileName))
+            elif not self.linkFullFrameJPEG and self.linkCropJPEG:
+                HTML.write("      <td style='color:black;text-align:left'>{0} (<a href='{1}'>C</a>)</td>\n".format(self.rawFileName, self.linkCropJPEG))
+            else:
+                HTML.write("      <td style='color:black;text-align:left'>{0}</td>\n".format(self.rawFileName))
+            if self.targetAlt and self.targetAz and self.airmass and self.moonSep and self.moonPhase:
+                HTML.write("      <td style='color:black'>{0:.1f}</td>\n".format(self.targetAlt.to(u.deg).value))
+                HTML.write("      <td style='color:black'>{0:.1f}</td>\n".format(self.targetAz.to(u.deg).value))
+                HTML.write("      <td style='color:{0}'>{1:.2f}</td>\n".format("black", self.airmass))
+                HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format("black", self.moonSep.to(u.deg).value))
+                HTML.write("      <td style='color:black'>{0:.1f}</td>\n".format(self.moonPhase))
+            else:
+                HTML.write("      <td style='color:black'>{0}</td>\n".format(""))
+                HTML.write("      <td style='color:black'>{0}</td>\n".format(""))
+                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+                HTML.write("      <td style='color:black'>{0}</td>\n".format(""))
+            if self.FWHM and self.ellipticity:
+                if tel.unitsForFWHM.unit == u.arcsec:
+                    FWHM_for_HTML = (self.FWHM * u.radian.to(u.arcsec)*tel.pixelSize.to(u.mm)/tel.focalLength.to(u.mm)).value
+                else:
+                    FWHM_for_HTML = self.FWHM.value
+                HTML.write("      <td style='color:{0}'>{1:.2f}</td>\n".format("black", FWHM_for_HTML))
+                HTML.write("      <td style='color:{0}'>{1:.2f}</td>\n".format("black", self.ellipticity))
+            else:
+                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+            if self.SExBackground and self.SExBRMS:
+                HTML.write("      <td style='color:{0}'>{1:.1f} [{2:.1f}]</td>\n".format("black", self.SExBackground, self.SExBRMS))
+            else:
+                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+            if self.pointingError:
+                HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format("black", self.pointingError.arcmins))
+            else:
+                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+            if self.positionAngle:
+                HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format("black", self.positionAngle.to(u.deg).value))
+            else:
+                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+            if self.zeroPoint:
+                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", self.zeroPoint))
+            else:
+                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+            if self.nStarsSEx:
+                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", self.nStarsSEx))
+            else:
+                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+            if self.processTime:
+                HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format("black", self.processTime))
+            else:
+                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+            HTML.write("    </tr>\n")
+            HTML.write("  </table>\n")
+            HTML.write("</body>\n")
+            HTML.write("</html>\n")
+            HTML.close()
+
+
 class ConfigTests(unittest.TestCase):
     def setUp(self):
         pass
