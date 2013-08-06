@@ -278,6 +278,8 @@ class Image(object):
         self.pointingError = None
         self.imageFlipped = None
         self.jpegFileNames = []
+        self.summaryFile = None
+        self.htmlImageList = None
 
 
     ##-------------------------------------------------------------------------
@@ -971,6 +973,102 @@ class Image(object):
             HTML.write("</body>\n")
             HTML.write("</html>\n")
             HTML.close()
+
+
+    ##-------------------------------------------------------------------------
+    ## Append Line With Image Info to Summary Text File
+    ##-------------------------------------------------------------------------
+    def AddSummaryEntry(self, logger):
+        if self.summaryFile:
+            logger.info("Writing Summary File Entry.")
+            logger.debug("Summary File: {0}".format(self.summaryFile))
+            ## Read in previous data
+            if not os.path.exists(self.summaryFile):
+                logger.info("Making new astropy table object")
+                SummaryTable = table.Table(names=("ExpStart", "File", "FWHM (pix)", "Ellipticity", 
+                                           "Alt (deg)", "Az (deg)", "Airmass", "PointingError (arcmin)", 
+                                           "ZeroPoint", "nStars", "Background", "Background RMS"),
+                                     dtypes=('a22', 'a120', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'i4', 'f4', 'f4'),
+                                     masked=True)
+            else:
+                logger.info("Reading astropy table object from file: {0}".format(self.summaryFile))
+                SummaryTable = ascii.read(self.summaryFile)
+            ## Astropy table writer can not write None to table initialized
+            ## with type.  If any outputs are None, change to some value.
+            tableMask = np.zeros(12)
+            ## dateObs
+            if self.dateObs: dateObs = self.dateObs
+            else: 
+                dateObs = ""
+                tableMask[0] = True
+            ## FileName
+            if self.rawFileName: rawFileName = self.rawFileName
+            else: 
+                rawFileName = ""
+                tableMask[1] = True
+            ## FWHM
+            if self.FWHM: FWHM = self.FWHM.to(u.pix).value
+            else:
+                FWHM = 0.
+                tableMask[2] = True
+            ## Ellipticity
+            if self.ellipticity: ellipticity = self.ellipticity
+            else:
+                ellipticity = 0.
+                tableMask[3] = True
+            ## Target Alt
+            if self.targetAlt: targetAlt = self.targetAlt.to(u.deg).value
+            else:
+                targetAlt = 0.
+                tableMask[4] = True
+            ## Target Az
+            if self.targetAz: targetAz = self.targetAz.to(u.deg).value
+            else:
+                targetAz = 0.
+                tableMask[5] = True
+            ## Airmass
+            if self.airmass: airmass = self.airmass
+            else:
+                airmass = 0.
+                tableMask[6] = True
+            ## Pointing Error
+            if self.pointingError: pointingError = self.pointingError.arcmins
+            else:
+                pointingError = 0.
+                tableMask[7] = True
+            ## Zero Point
+            if self.zeroPoint: zeroPoint = self.zeroPoint
+            else:
+                zeroPoint = 0.
+                tableMask[8] = True
+            ## nStarsSEx
+            if self.nStarsSEx: nStarsSEx = self.nStarsSEx
+            else: 
+                nStarsSEx = 0.
+                tableMask[9] = True
+            ## SExtractor Background
+            if self.SExBackground: SExBackground = self.SExBackground
+            else:
+                SExBackground = 0.
+                tableMask[10] = True
+            ## SExtractor Background RMS
+            if self.SExBRMS: SExBRMS = self.SExBRMS
+            else:
+                SExBRMS = 0.
+                tableMask[11] = True
+            ## Add row to table
+            logger.debug("Writing new row to log table.")
+            SummaryTable.add_row((dateObs, rawFileName,
+                                  FWHM, ellipticity,
+                                  targetAlt, targetAz,
+                                  airmass, pointingError,
+                                  zeroPoint, nStarsSEx,
+                                  SExBackground, SExBRMS),
+                                  mask=tableMask)
+            ## Write Table to File
+            logger.info("Writing new summary file.")
+            ascii.write(SummaryTable, self.summaryFile,
+                        Writer=ascii.basic.Basic)
 
 
     ##-------------------------------------------------------------------------
