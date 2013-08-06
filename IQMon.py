@@ -399,6 +399,7 @@ class Image(object):
             logger.info("No WCS found in image header")
         else:
             logger.debug("Found WCS in image header.")
+
         ## Determine PA of Image
         try:
             PC11 = float(self.imageWCS.to_header()['PC1_1'])
@@ -406,19 +407,16 @@ class Image(object):
             PC21 = float(self.imageWCS.to_header()['PC2_1'])
             PC22 = float(self.imageWCS.to_header()['PC2_2'])
         except:
-            logger.debug("Could not find WCS PCn_m values in header.")
+            logger.debug("Could not find PCn_m values in WCS.")
             try:
                 PC11 = float(self.imageWCS.to_header()['CD1_1'])
                 PC12 = float(self.imageWCS.to_header()['CD1_2'])
                 PC21 = float(self.imageWCS.to_header()['CD2_1'])
                 PC22 = float(self.imageWCS.to_header()['CD2_2'])
             except:
-                logger.debug("Could not find WCS CDn_m values in header.")
-                PC11 = None
-                PC12 = None
-                PC21 = None
-                PC22 = None
-        if PC11:
+                logger.debug("Could not find CDn_m values in WCS.")
+                self.imageWCS = None
+        if self.imageWCS:
             if (abs(PC21) > abs(PC22)) and (PC21 >= 0): 
                 North = "Right"
                 self.positionAngle = 270.*u.deg + math.degrees(math.atan(PC22/PC21))*u.deg
@@ -589,7 +587,7 @@ class Image(object):
         Solve astrometry in the working image using the astrometry.net solver.
         '''
         logger.info("Attempting to create WCS using Astrometry.net solver.")
-        AstrometryCommand = ["solve-field", "-l", "5", "-O", "-p", "-t", "3", 
+        AstrometryCommand = ["solve-field", "-l", "5", "-O", "-p",
                              "-L", str(tel.pixelScale*0.90),
                              "-H", str(tel.pixelScale*1.10),
                              "-u", "arcsecperpix", "-z", "4", self.workingFile]
@@ -598,11 +596,11 @@ class Image(object):
         try:
             StartTime = time.time()
             AstrometrySTDOUT = subprocess32.check_output(AstrometryCommand, 
-                               stderr=subprocess32.STDOUT, timeout=30)
+                               stderr=subprocess32.STDOUT, timeout=20)
             EndTime = time.time()
-        except TimeoutExpired:
-            logger.warning("Astrometry.net timed out")
-            self.astrometrySolved = False
+#         except TimeoutExpired:
+#             logger.warning("Astrometry.net timed out")
+#             self.astrometrySolved = False
         except:
             logger.warning("Astrometry.net failed.")
             self.astrometrySolved = False
@@ -663,6 +661,7 @@ class Image(object):
         logger.info("Detemining pointing error based on WCS solution")
         if self.imageWCS and self.coordinate_header:
             centerWCS = self.imageWCS.wcs_pix2world([[self.nXPix/2, self.nYPix/2]], 1)
+            logger.debug("Using coordinates of center point: {0} {1}".format(centerWCS[0][0], centerWCS[0][1]))
             self.coordinate_WCS = coords.ICRSCoordinates(ra=centerWCS[0][0],
                                                    dec=centerWCS[0][1],
                                                    unit=(u.degree, u.degree))
