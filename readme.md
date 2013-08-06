@@ -13,10 +13,14 @@ If the image contains a WCS, the module can also compare the WCS coordinates of 
 
 ## Requirements
 
+* python2.7.X
 * astropy (http://www.astropy.org)
 * pyephem (http://rhodesmill.org/pyephem/)
 * SExtractor (http://www.astromatic.net/software/sextractor)
 * astrometry.net solver (http://astrometry.net)
+
+* matplotlib (Should be bundled with most python installations)
+* subprocess32
 
 ## Version History
 

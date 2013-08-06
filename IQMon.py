@@ -828,15 +828,6 @@ class Image(object):
 
 
     ##-------------------------------------------------------------------------
-    ## Make Plots of Image Properties
-    ##-------------------------------------------------------------------------
-    def MakePlots(self):
-        '''
-        Make plots for image.
-        '''
-        pass
-
-    ##-------------------------------------------------------------------------
     ## Make JPEG of Image
     ##-------------------------------------------------------------------------
     def MakeJPEG(self, jpegFileName, tel, config, logger, marked=False, rotate=False, binning=1):
@@ -1094,21 +1085,6 @@ class Image(object):
         self.endProcessTime = time.time()
         self.processTime = self.endProcessTime - self.startProcessTime
         logger.info("IQMon processing time = {0:.1f} seconds".format(self.processTime))
-
-
-##############################################################
-## Determines mode(s) of an array
-## - returns mode(s) given a binsize
-##############################################################
-def modes(array, binsize):
-    values = []
-    for element in array:
-        values.append(round(element/binsize,0))
-    count = defaultdict(int)
-    for v in values:
-        count[v] +=1
-    best = max(count.values())
-    return [k*binsize for k,v in count.items() if v == best]
 
 
 if __name__ == '__main__':
