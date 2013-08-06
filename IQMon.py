@@ -777,16 +777,19 @@ class Image(object):
         '''
         if self.nStarsSEx > 1:
             IQRadiusFactor = 1.0
-            DiagonalRadius = math.sqrt(self.nXPix/2**2+self.nYPix/2**2)
+            DiagonalRadius = math.sqrt((self.nXPix/2)**2+(self.nYPix/2)**2)
             IQRadius = DiagonalRadius*IQRadiusFactor
             CentralFWHMs = []
             CentralEllipticities = []
             for star in self.SExtractorResults:
                 if star['ImageRadius'] <= IQRadius:
                     CentralFWHMs.append(star['FWHM_IMAGE'])
-                    CentralEllipticities.append(star['ELLIPTICITY'])        
-            self.FWHM = np.median(CentralFWHMs) * u.pix
-            self.ellipticity = np.median(CentralEllipticities)
+                    CentralEllipticities.append(star['ELLIPTICITY'])   
+            if len(CentralFWHMs) > 3:
+                self.FWHM = np.median(CentralFWHMs) * u.pix
+                self.ellipticity = np.median(CentralEllipticities)
+            else:
+                logger.warning("Not enough stars detected in central region of image to form median FWHM.")
             logger.info("Median FWHM in inner region is {0:.2f} pixels".format(self.FWHM.to(u.pix).value))
             logger.info("Median Ellipticity in inner region is {0:.2f}".format(self.ellipticity))
         else:
