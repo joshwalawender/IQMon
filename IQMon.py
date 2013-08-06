@@ -400,38 +400,56 @@ class Image(object):
         else:
             logger.debug("Found WCS in image header.")
         ## Determine PA of Image
-        PC11 = float(self.imageWCS.to_header()['PC1_1'])
-        PC12 = float(self.imageWCS.to_header()['PC1_2'])
-        PC21 = float(self.imageWCS.to_header()['PC2_1'])
-        PC22 = float(self.imageWCS.to_header()['PC2_2'])
-        if (abs(PC21) > abs(PC22)) and (PC21 >= 0): 
-            North = "Right"
-            self.positionAngle = 270.*u.deg + math.degrees(math.atan(PC22/PC21))*u.deg
-        elif (abs(PC21) > abs(PC22)) and (PC21 < 0):
-            North = "Left"
-            self.positionAngle = 90.*u.deg + math.degrees(math.atan(PC22/PC21))*u.deg
-        elif (abs(PC21) < abs(PC22)) and (PC22 >= 0):
-            North = "Up"
-            self.positionAngle = 0.*u.deg + math.degrees(math.atan(PC21/PC22))*u.deg
-        elif (abs(PC21) < abs(PC22)) and (PC22 < 0):
-            North = "Down"
-            self.positionAngle = 180.*u.deg + math.degrees(math.atan(PC21/PC22))*u.deg
-        if (abs(PC11) > abs(PC12)) and (PC11 > 0): East = "Right"
-        if (abs(PC11) > abs(PC12)) and (PC11 < 0): East = "Left"
-        if (abs(PC11) < abs(PC12)) and (PC12 > 0): East = "Up"
-        if (abs(PC11) < abs(PC12)) and (PC12 < 0): East = "Down"
-        if North == "Up" and East == "Left": self.imageFlipped = False
-        if North == "Up" and East == "Right": self.imageFlipped = True
-        if North == "Down" and East == "Left": self.imageFlipped = True
-        if North == "Down" and East == "Right": self.imageFlipped = False
-        if North == "Right" and East == "Up": self.imageFlipped = False
-        if North == "Right" and East == "Down": self.imageFlipped = True
-        if North == "Left" and East == "Up": self.imageFlipped = True
-        if North == "Left" and East == "Down": self.imageFlipped = False
-        logger.debug("Position angle of WCS is {0:.1f} degrees.".format(self.positionAngle.to(u.deg).value))
-        logger.debug("Image orientation is North {0}, East {1}.".format(North, East))
-        if self.imageFlipped:
-            logger.debug("Image is mirrored.")
+        try:
+            PC11 = float(self.imageWCS.to_header()['PC1_1'])
+            PC12 = float(self.imageWCS.to_header()['PC1_2'])
+            PC21 = float(self.imageWCS.to_header()['PC2_1'])
+            PC22 = float(self.imageWCS.to_header()['PC2_2'])
+        except:
+            logger.debug("Could not find WCS PCn_m values in header.")
+            try:
+                PC11 = float(self.imageWCS.to_header()['CD1_1'])
+                PC12 = float(self.imageWCS.to_header()['CD1_2'])
+                PC21 = float(self.imageWCS.to_header()['CD2_1'])
+                PC22 = float(self.imageWCS.to_header()['CD2_2'])
+            except:
+                logger.debug("Could not find WCS CDn_m values in header.")
+                PC11 = None
+                PC12 = None
+                PC21 = None
+                PC22 = None
+        if PC11:
+            if (abs(PC21) > abs(PC22)) and (PC21 >= 0): 
+                North = "Right"
+                self.positionAngle = 270.*u.deg + math.degrees(math.atan(PC22/PC21))*u.deg
+            elif (abs(PC21) > abs(PC22)) and (PC21 < 0):
+                North = "Left"
+                self.positionAngle = 90.*u.deg + math.degrees(math.atan(PC22/PC21))*u.deg
+            elif (abs(PC21) < abs(PC22)) and (PC22 >= 0):
+                North = "Up"
+                self.positionAngle = 0.*u.deg + math.degrees(math.atan(PC21/PC22))*u.deg
+            elif (abs(PC21) < abs(PC22)) and (PC22 < 0):
+                North = "Down"
+                self.positionAngle = 180.*u.deg + math.degrees(math.atan(PC21/PC22))*u.deg
+            if (abs(PC11) > abs(PC12)) and (PC11 > 0): East = "Right"
+            if (abs(PC11) > abs(PC12)) and (PC11 < 0): East = "Left"
+            if (abs(PC11) < abs(PC12)) and (PC12 > 0): East = "Up"
+            if (abs(PC11) < abs(PC12)) and (PC12 < 0): East = "Down"
+            if North == "Up" and East == "Left": self.imageFlipped = False
+            if North == "Up" and East == "Right": self.imageFlipped = True
+            if North == "Down" and East == "Left": self.imageFlipped = True
+            if North == "Down" and East == "Right": self.imageFlipped = False
+            if North == "Right" and East == "Up": self.imageFlipped = False
+            if North == "Right" and East == "Down": self.imageFlipped = True
+            if North == "Left" and East == "Up": self.imageFlipped = True
+            if North == "Left" and East == "Down": self.imageFlipped = False
+            logger.debug("Position angle of WCS is {0:.1f} degrees.".format(self.positionAngle.to(u.deg).value))
+            logger.debug("Image orientation is North {0}, East {1}.".format(North, East))
+            if self.imageFlipped:
+                logger.debug("Image is mirrored.")
+        else:
+            self.positionAngle = None
+            self.imageFlipped = None
 
 
         ## Determine Alt, Az, Moon Sep, Moon Illum using ephem module
