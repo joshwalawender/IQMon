@@ -12,7 +12,6 @@ from __future__ import division, print_function
 import sys
 import os
 import re
-import unittest
 import shutil
 import time
 import subprocess32
@@ -40,6 +39,13 @@ class Config(object):
     Properties:
     - location of configuration file for IQMon
     '''
+    _singletons = dict()
+
+    def __new__(cls):
+        if not cls in cls._singletons:
+            cls._singletons[cls] = object.__new__(cls)
+        return cls._singletons[cls]
+
     def __init__(self):
         '''
         Read and parse configuration file.
@@ -48,13 +54,6 @@ class Config(object):
         - No defaults set, if config file not read, then values default to
         None.
         '''
-        IQMonExecPath = None
-        LogPath = None
-        PlotsPath = None
-        tmpPath = None
-        PythonPath = None
-        DataPath = None
-        CatalogPath = None
 
         ## Look for configuration file
         HomePath = os.path.expandvars("$HOME")
@@ -1097,18 +1096,6 @@ class Image(object):
         logger.info("IQMon processing time = {0:.1f} seconds".format(self.processTime))
 
 
-
-
-class ConfigTests(unittest.TestCase):
-    def setUp(self):
-        pass
-
-
-class ImageTests(unittest.TestCase):
-    def setUp(self):
-        pass
-
-
 ##############################################################
 ## Determines mode(s) of an array
 ## - returns mode(s) given a binsize
@@ -1116,7 +1103,6 @@ class ImageTests(unittest.TestCase):
 def modes(array, binsize):
     values = []
     for element in array:
-        #print element, element/binsize, round(element/binsize,0), round(element/binsize,0)*binsize
         values.append(round(element/binsize,0))
     count = defaultdict(int)
     for v in values:
