@@ -88,34 +88,39 @@ A typical code to use IQMon on a single image might be structured something like
         tel.site = ephem.Observer()
         
         ## Create IQMon.Image Object
-        image = IQMon.Image(FitsFile)
-        
-        ## Create Logger Object
+        image = IQMon.Image(FitsFile, tel, config)  ## Create image object
+                
+        ## Create Filenames and set verbosity
         IQMonLogFileName = "/path/to/my/log"
-        image.htmlImageList = "/path/to/my/HTML/output"
-        image.summaryFile = "/path/to/my/text/output"
+        htmlImageList = "/path/to/my/HTML/output"
+        summaryFile = "/path/to/my/text/output"
+        FullFrameJPEG = "/path/to/full/frame/jpeg"
+        CropFrameJPEG = "/path/to/crop/frame/jpeg"
         verbose = True
-        logger = config.MakeLogger(IQMonLogFileName, verbose)
         
         ## Perform Actual Image Analysis
-        tel.CheckUnits(logger)
-        image.ReadImage(config)        ## Create working copy of image (don't edit raw file!)
-        image.GetHeader(tel, logger)   ## Extract values from header
-        image.MakeJPEG(image.rawFileBasename+"_full.jpg", tel, config, logger, rotate=True, binning=2)
-        if not image.imageWCS:                          ## if no WCS found in header ...
-            image.SolveAstrometry(tel, config, logger)  ## Solve Astrometry
-            image.GetHeader(tel, logger)                ## Refresh Header
-        image.DeterminePointingError(logger)            ## Calculate Pointing Error
-        darks = ListDarks(image, tel, config, logger)   ## List dark files
-        image.DarkSubtract(darks, tel, config, logger)  ## Dark Subtract Image
-        image.Crop(tel, logger)                         ## Crop Image
-        image.GetHeader(tel, logger)                    ## Refresh Header
-        image.RunSExtractor(tel, config, logger)        ## Run SExtractor
-        image.DetermineFWHM(logger)                     ## Determine FWHM from SExtractor Results
-        image.CleanUp(logger)                           ## Delete temporary files
-        image.CalculateProcessTime(logger)              ## Calculate how long it took to process this image
-        image.AddWebLogEntry(tel, config, logger)       ## Add line for this image to your HTML table
-        image.AddSummaryEntry(logger)                   ## Add line for this image to your text table
+        image.MakeLogger(IQMonLogFileName, args.verbose)
+        image.logger.info("###### Processing Image:  %s ######", FitsFilename)
+        image.logger.info("Setting telescope variable to %s", telescope)
+        image.tel.CheckUnits()
+        image.ReadImage()           ## Create working copy of image (don't edit raw file!)
+        image.GetHeader()           ## Extract values from header
+        image.MakeJPEG(FullFrameJPEG, rotate=True, binning=2)
+        if not image.imageWCS:      ## If no WCS found in header ...
+            image.SolveAstrometry() ## Solve Astrometry
+            image.GetHeader()       ## Refresh Header
+        image.DeterminePointingError() ## Calculate Pointing Error
+        darks = ListDarks(image)    ## List dark files
+        image.DarkSubtract(darks)   ## Dark Subtract Image
+        image.Crop()                ## Crop Image
+        image.GetHeader()           ## Refresh Header
+        image.RunSExtractor()       ## Run SExtractor
+        image.DetermineFWHM()       ## Determine FWHM from SExtractor results
+        image.MakeJPEG(CropFrameJPEG, marked=True, binning=1)
+        image.CleanUp()             ## Cleanup (delete) temporary files.
+        image.CalculateProcessTime()## Calculate how long it took to process this image
+        image.AddWebLogEntry(htmlImageList) ## Add line for this image to HTML table
+        image.AddSummaryEntry(summaryFile)  ## Add line for this image to text table
 
 
 

@@ -92,30 +92,6 @@ class Config(object):
 #                 self.pathCatalog = os.path.abspath(IsCatalogPath.group(1))
 
 
-    def MakeLogger(self, IQMonLogFileName, verbose):
-        '''
-        Create the logger object to pass to IQMon methods.  Takes as input the
-        full path to the file to write the log to and verboase, a boolean value
-        which will increase the verbosity of the concole log (the file log will
-        always be at debug level).
-        '''
-        logger = logging.getLogger('IQMonLogger')
-        logger.setLevel(logging.DEBUG)
-        LogFileHandler = logging.FileHandler(IQMonLogFileName)
-        LogFileHandler.setLevel(logging.DEBUG)
-        LogConsoleHandler = logging.StreamHandler()
-        if verbose:
-            LogConsoleHandler.setLevel(logging.DEBUG)
-        else:
-            LogConsoleHandler.setLevel(logging.INFO)
-        LogFormat = logging.Formatter('%(asctime)23s %(levelname)8s: %(message)s')
-        LogFileHandler.setFormatter(LogFormat)
-        LogConsoleHandler.setFormatter(LogFormat)
-        logger.addHandler(LogConsoleHandler)
-        logger.addHandler(LogFileHandler)
-        return logger
-
-
 ##-----------------------------------------------------------------------------
 ## Define Telescope object to hold telescope information
 ##-----------------------------------------------------------------------------
@@ -177,7 +153,7 @@ class Telescope(object):
         self.SExtractorSeeing = None
         self.site = None
         
-    def CheckUnits(self, logger):
+    def CheckUnits(self):
         '''
         Checks whether the telescope properties have the right type.  If a unit
         is expected, checks whether the input has units and whether it is
@@ -300,6 +276,32 @@ class Image(object):
         self.pointingError = None
         self.imageFlipped = None
         self.jpegFileNames = []
+
+
+    ##-------------------------------------------------------------------------
+    ## Make Logger Object
+    ##-------------------------------------------------------------------------
+    def MakeLogger(self, IQMonLogFileName, verbose):
+        '''
+        Create the logger object to use when processing.  Takes as input the
+        full path to the file to write the log to and verboase, a boolean value
+        which will increase the verbosity of the concole log (the file log will
+        always be at debug level).
+        '''
+        self.logger = logging.getLogger('IQMonLogger')
+        self.logger.setLevel(logging.DEBUG)
+        LogFileHandler = logging.FileHandler(IQMonLogFileName)
+        LogFileHandler.setLevel(logging.DEBUG)
+        LogConsoleHandler = logging.StreamHandler()
+        if verbose:
+            LogConsoleHandler.setLevel(logging.DEBUG)
+        else:
+            LogConsoleHandler.setLevel(logging.INFO)
+        LogFormat = logging.Formatter('%(asctime)23s %(levelname)8s: %(message)s')
+        LogFileHandler.setFormatter(LogFormat)
+        LogConsoleHandler.setFormatter(LogFormat)
+        self.logger.addHandler(LogConsoleHandler)
+        self.logger.addHandler(LogFileHandler)
 
 
     ##-------------------------------------------------------------------------
