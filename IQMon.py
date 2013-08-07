@@ -1107,6 +1107,3 @@ class Image(object):
         self.processTime = self.endProcessTime - self.startProcessTime
         logger.info("IQMon processing time = {0:.1f} seconds".format(self.processTime))
 
-
-if __name__ == '__main__':
-    main()
