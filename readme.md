@@ -5,7 +5,7 @@ Copyright © 2012-2013, Dr. Josh Walawender (email: jmwalawender@gmail.com). All
 
 ## Overview
 
-IQMon is a python module which can be used to quickly analyze an image for on the fly reports of image quality (__I__mage __Q__uality __Mon__itor = __IQMon__).  Originally written to analyze data from the VYSOS telescopes, but also written with the intent of building a set of general tools to analyze any fits image.
+IQMon is a python module which can be used to quickly analyze an image for on the fly reports of image quality (**I**mage **Q**uality **Mon**itor = **IQMon**).  Originally written to analyze data from the VYSOS telescopes, but also written with the intent of building a set of general tools to analyze any fits image.
 
 The base finctionality is that it uses SExtractor to find stars in the image and report the typical Full Width at Half Max (FWHM) and ellipticity.  This allows quick and dirty evaluation of the image quality in near real time (a few to tens of seconds on modest hardware circa 2010).
 
@@ -24,11 +24,11 @@ If the image contains a WCS, the module can also compare the WCS coordinates of 
 
 ## Version History
 
-* __v1.0__ (released on github.com 2013/08/??)
+* **v1.0** (released on github.com 2013/08/??)
     * Rewritten as object oriented code.  Implements most capabilities of v0.1.
     * Does not color code HTML table with alerts to poor values of FWHM, pointing error, etc.
     * Runs roughly 2x faster than v0.X.
-* __v0.X__ (frozen 2013/07/15)
+* **v0.X** (frozen 2013/07/15)
     * Initial version, not under version control.
     * Works on VYSOS Data.
     * Implemented using functions instead of objects.
@@ -130,7 +130,7 @@ A typical code to use IQMon on a single image might be structured something like
 
 … in no particular order:
 
-* Add color coding of HTML output table to allow marking of poor FWHM, ellipticity, pointing error, moon separation, and airmass values.
+* Add color coding of HTML output table to allow marking of poor FWHM, ellipticity, and pointing error
 * Robust error handling and timeout on astrometry.net call.
 * Add method to write image analysis results to MySQL database
     * Add method to make HTML table from database of images rather than image by image.  This would not be a method of image, but either of telescope or config or perhaps a new object.
