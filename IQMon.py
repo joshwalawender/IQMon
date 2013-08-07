@@ -22,9 +22,9 @@ import numpy as np
 ## Import Astronomy Specific Tools
 import ephem
 import astropy.units as u
-import astropy.io.fits as fits
+from astropy.io import fits
 import astropy.coordinates as coords
-import astropy.table as table
+from astropy import table
 from astropy import wcs
 from astropy.io import ascii
 
@@ -38,7 +38,15 @@ class Config(object):
     methods and functions.
 
     Properties:
-    - location of configuration file for IQMon
+    - pathIQMonExec: path to the IQMon folder where sextractor default files
+                     are stored.  Typically this is the directory where IQMon
+                     is installed.
+    - pathLog:       path where IQMon's log files should be written
+                     (i.e. ~/IQMon/Logs/)
+    - pathPlots:     path where plots and jpegs should be written
+                     (i.e. ~/IQMon/Plots/)
+    - pathTemp:      path where temporary files should be written
+                     (i.e. ~/IQMon/tmp/)
     '''
     _singletons = dict()
 
@@ -50,10 +58,9 @@ class Config(object):
     def __init__(self):
         '''
         Read and parse configuration file.
-        - Currently assumes that file is .IQMonConfig in the user's home
-        directory.
+        - Assumes that file is .IQMonConfig in the user's home directory.
         - No defaults set, if config file not read, then values default to
-        None.
+          None.
         '''
 
         ## Look for configuration file
@@ -80,16 +87,17 @@ class Config(object):
             IstmpPath = re.match("IQMONTMP\s=\s([\w/\-\.]+)", line)
             if IstmpPath:
                 self.pathTemp = os.path.abspath(IstmpPath.group(1))
-            IsPythonPath = re.match("IQMONPYTHON\s=\s([\w/\-\.]+)", line)
-            if IsPythonPath:
-                PythonPath = os.path.abspath(IsPythonPath.group(1))
-            IsCatalogPath = re.match("CATALOGPATH\s=\s([\w/\-\.]+)", line)
-            if IsCatalogPath:
-                self.pathCatalog = os.path.abspath(IsCatalogPath.group(1))
+#             IsCatalogPath = re.match("CATALOGPATH\s=\s([\w/\-\.]+)", line)
+#             if IsCatalogPath:
+#                 self.pathCatalog = os.path.abspath(IsCatalogPath.group(1))
 
 
     def MakeLogger(self, IQMonLogFileName, verbose):
         '''
+        Create the logger object to pass to IQMon methods.  Takes as input the
+        full path to the file to write the log to and verboase, a boolean value
+        which will increase the verbosity of the concole log (the file log will
+        always be at debug level).
         '''
         logger = logging.getLogger('IQMonLogger')
         logger.setLevel(logging.DEBUG)
@@ -120,21 +128,27 @@ class Telescope(object):
     of calls to the IQMon.Image object and it's methods.
 
     Properties:
-    - name
-    - longName
-    - focalLength
-    - pixelSize
-    - aperture
-    - gain
-    - nXPix
-    - nYPix
-    - unitsForFWHM
-    - ROI
-    - thresholdFWHM
-    - thresholdPointingErr
-    - thresholdEllipticity
-    - pixelScale
-    - fRatio
+      name:          a short name for the telescope
+      longName:      a long name for the telescope
+      focalLength:   
+      pixelSize:     
+      pixelScale:    The estimated pixel scale of the telescope in arcsec per
+                     pixel.  This should be an astropy Unit object with a value
+                     and units.
+      fRatio:        
+      aperture:      
+      gain:          The gain (in electrons per ADU) of the CCD.
+      nXPix:         
+      nYPix:         
+      site:          a pyephem site object defining the site of the telescope
+      unitsForFWHM:  
+      ROI:           the "region of interest" to crop the image to.  Format
+                     should be '[x1:x2,y1:y2]' or 'x1:x2,y1:y2'.
+      thresholdFWHM: 
+      thresholdPointingErr:   
+      thresholdEllipticity:   
+      SExtractorPhotAperture: 
+      SExtractorSeeing:       The initial seeing estimate for SExtractor.
     '''
     _singletons = dict()
 
@@ -165,86 +179,67 @@ class Telescope(object):
         
     def CheckUnits(self, logger):
         '''
-        Method to check whether the properties of the object have units and to
-        add units if the value has no units.  Does not yet check whether the
-        unit is reasonable (i.e. does focalLength have length units).
+        Checks whether the telescope properties have the right type.  If a unit
+        is expected, checks whether the input has units and whether it is
+        reducible to the expected unit.  If input has no units and they are
+        expected, then adds the default unit.
         '''
         ## name is a string
+        assert type(self.name) == str
         ## longName is a string
-        ## Default focalLength to units of mm
-        if self.focalLength and not hasattr(self.focalLength, 'unit'):
-            if logger:
-                logger.debug(
-                    "focalLength is unitless value.  Adding mm.")
+        assert type(self.longName) == str
+        ## Default focalLength units to mm
+        if type(self.focalLength) == u.quantity.Quantity:
+            assert self.focalLength.to(u.mm)
+        else:
             self.focalLength *= u.mm
-        ## Default pixelSize to units of microns
-        if self.pixelSize and not hasattr(self.pixelSize, 'unit'):
-            if logger:
-                logger.debug(
-                    "pixelSize is unitless value.  Adding microns")
+        ## Default pixelSize units to microns
+        if type(self.pixelSize) == u.quantity.Quantity:
+            assert self.pixelSize.to(u.micron)
+        else:
             self.pixelSize *= u.micron
         ## Default aperture to units of mm
-        if self.aperture and not hasattr(self.aperture, 'unit'):
-            if logger:
-                logger.debug(
-                    "aperture is unitless value.  Adding mm")
+        if type(self.aperture) == u.quantity.Quantity:
+            assert self.aperture.to(u.mm)
+        else:
             self.aperture *= u.mm
         ## Default gain to units of 1/ADU
-        if self.gain and not hasattr(self.gain, 'unit'):
-            if logger:
-                logger.debug(
-                    "gain is unitless value.  Adding 1/ADU")
-            self.gain /= u.adu
-        ## Default nXPix to units of pixels
-        if self.nXPix and not hasattr(self.nXPix, 'unit'):
-            if logger:
-                logger.debug(
-                    "nXPix is unitless value.  Adding pixels")
-            self.nXPix *= u.pix
-        ## Default nYPix to units of pixels
-        if self.nYPix and not hasattr(self.nYPix, 'unit'):
-            if logger:
-                logger.debug(
-                    "nYPix is unitless value.  Adding pixels")
-            self.nYPix *= u.pix
+        if type(self.gain) == u.quantity.Quantity:
+            assert self.gain.to(1/u.adu)
+        else:
+            self.gain *= 1./u.adu
         ## Default unitsForFWHM to units of arcsec
-        if self.unitsForFWHM and not hasattr(self.unitsForFWHM, 'unit'):
-            if logger:
-                logger.debug(
-                    "unitsForFWHM is unitless value.  Adding arcsec")
-            self.unitsForFWHM *= u.arcsec
+        if type(self.unitsForFWHM) == u.quantity.Quantity:
+            assert self.unitsForFWHM.to(u.pix) or self.unitsForFWHM.to(u.arcsec)
+        else:
+            self.unitsForFWHM *= u.pix
         ## ROI is string
-        ## Default thresholdFWHM to units of arcsec
-        if self.thresholdFWHM and not hasattr(self.thresholdFWHM, 'unit'):
-            if logger:
-                logger.debug(
-                    "thresholdFWHM is unitless value.  Adding arcsec")
-            self.thresholdFWHM *= u.arcsec
+        assert type(self.ROI) == str
+        ## Default thresholdFWHM to same units as unitsForFWHM
+        if type(self.thresholdFWHM) == u.quantity.Quantity:
+                assert self.thresholdFWHM.to(u.pix) or self.thresholdFWHM.to(u.arcsec)
+        else:
+            self.thresholdFWHM *= u.pix
         ## Default thresholdPointingErr to units of arcmin
-        if self.thresholdPointingErr and not hasattr(self.thresholdPointingErr, 'unit'):
-            if logger:
-                logger.debug(
-                    "thresholdPointingErr is unitless value.  Adding arcmin")
+        if type(self.thresholdPointingErr) == u.quantity.Quantity:
+            assert self.thresholdPointingErr.to(u.arcmin)
+        else:
             self.thresholdPointingErr *= u.arcmin
         ## Default thresholdEllipticity to dimensionless
-        if self.thresholdEllipticity and not hasattr(self.thresholdEllipticity, 'unit'):
-            if logger:
-                logger.debug(
-                    "thresholdEllipticity is unitless value.  Adding dimensionless")
-            self.thresholdEllipticity *= u.dimensionless_unscaled
+        if type(self.thresholdEllipticity) == u.quantity.Quantity:
+            assert self.thresholdEllipticity.to(u.dimensionless_unscaled)
+        else:
+            assert float(self.thresholdEllipticity) >=0 and float(self.thresholdEllipticity) <= 1.
         ## Default pixelScale to units of arcsec per pixel
-        if self.pixelScale and not hasattr(self.pixelScale, 'unit'):
-            if logger:
-                logger.debug(
-                    "pixelScale is unitless value.  Adding arcsec / pixel")
+        if type(self.pixelScale) == u.quantity.Quantity:
+            assert self.pixelScale.to(u.arcsec / u.pix)
+        else:
             self.pixelScale *= u.arcsec / u.pix
         ## Default fRatio to dimensionless
-        if self.fRatio and not hasattr(self.fRatio, 'unit'):
-            if logger:
-                logger.debug(
-                    "fRatio is unitless value.  Adding dimensionless")
-            self.fRatio *= u.dimensionless_unscaled
-
+        if type(self.fRatio) == u.quantity.Quantity:
+            assert self.fRatio.to(u.dimensionless_unscaled)
+        else:
+            assert float(self.fRatio)
 
 ##-----------------------------------------------------------------------------
 ## Define Image object which holds information and methods for analysis
@@ -274,6 +269,7 @@ class Image(object):
             self.rawFileName = None
             self.rawFileDirectory = None
             raise IOError("File {0} does not exist".format(input))
+        ## Initialize values to None
         self.workingFile = None
         self.header = None
         self.exptime = None
@@ -608,8 +604,8 @@ class Image(object):
         '''
         logger.info("Attempting to create WCS using Astrometry.net solver.")
         AstrometryCommand = ["solve-field", "-l", "5", "-O", "-p",
-                             "-L", str(tel.pixelScale*0.90),
-                             "-H", str(tel.pixelScale*1.10),
+                             "-L", str(tel.pixelScale.value*0.90),
+                             "-H", str(tel.pixelScale.value*1.10),
                              "-u", "arcsecperpix", "-z", "4", self.workingFile]
         AstrometrySTDOUT = ""
 
@@ -702,109 +698,111 @@ class Image(object):
     def RunSExtractor(self, tel, config, logger):
         '''
         Run SExtractor on image.
-        
-        - need to check that tel.SExtractorPhotAperture is set
-        - need to check that tel.gain is set
-        - need to check that tel.pixelScale is set
-        - need to check that tel.SExtractorSeeing is set
         '''
-        ## Set up file names
-        SExtractorDefaultFile = os.path.join(config.pathIQMonExec, "default.sex")
-        SExtractorConfigFile = os.path.join(config.pathTemp, self.rawFileBasename+".sex")
-        self.tempFiles.append(SExtractorConfigFile)
-        SExtractorCatalog = os.path.join(config.pathTemp, self.rawFileBasename+".cat")
-        self.tempFiles.append(SExtractorCatalog)
-        PhotometryCatalogFile_xy = os.path.join(config.pathTemp, self.rawFileBasename+"PhotCat_xy.txt")
-        self.tempFiles.append(PhotometryCatalogFile_xy)
+        assert type(tel.gain) == u.quantity.Quantity
+        assert type(tel.pixelScale) == u.quantity.Quantity
+        assert type(tel.SExtractorSeeing) == u.quantity.Quantity
+        assert type(tel.SExtractorPhotAperture) == u.quantity.Quantity
+        if tel.gain and tel.pixelScale and tel.SExtractorSeeing and tel.SExtractorPhotAperture:
+            ## Set up file names
+            SExtractorDefaultFile = os.path.join(config.pathIQMonExec, "default.sex")
+            SExtractorConfigFile = os.path.join(config.pathTemp, self.rawFileBasename+".sex")
+            self.tempFiles.append(SExtractorConfigFile)
+            SExtractorCatalog = os.path.join(config.pathTemp, self.rawFileBasename+".cat")
+            self.tempFiles.append(SExtractorCatalog)
+            PhotometryCatalogFile_xy = os.path.join(config.pathTemp, self.rawFileBasename+"PhotCat_xy.txt")
+            self.tempFiles.append(PhotometryCatalogFile_xy)
 
-        ## Create PhotometryCatalogFile_xy file for SExtractor Association
-        if os.path.exists(PhotometryCatalogFile_xy): os.remove(PhotometryCatalogFile_xy)
-        PhotCatFileObject = open(PhotometryCatalogFile_xy, 'w')
-        PhotCatFileObject.write("# No Existing WCS Found for this image\n")
-        PhotCatFileObject.write("# This is a dummy file to keep SExtractor happy\n")
-        PhotCatFileObject.write("0.0  0.0  0.0  0.0\n")
-        PhotCatFileObject.close()
+            ## Create PhotometryCatalogFile_xy file for SExtractor Association
+            if os.path.exists(PhotometryCatalogFile_xy): os.remove(PhotometryCatalogFile_xy)
+            PhotCatFileObject = open(PhotometryCatalogFile_xy, 'w')
+            PhotCatFileObject.write("# No Existing WCS Found for this image\n")
+            PhotCatFileObject.write("# This is a dummy file to keep SExtractor happy\n")
+            PhotCatFileObject.write("0.0  0.0  0.0  0.0\n")
+            PhotCatFileObject.close()
 
-        ## Make edits To default.sex based on telescope:
-        ## Read in default config file        
-        DefaultConfig = open(SExtractorDefaultFile, 'r')
-        NewConfig     = open(SExtractorConfigFile, 'w')
-        for line in DefaultConfig:
-            newline = line
-            if re.match("CATALOG_NAME\s+", line):
-                newline = "CATALOG_NAME     "+SExtractorCatalog+"\n"
-            if re.match("PARAMETERS_NAME\s+", line):
-                newline = "PARAMETERS_NAME  "+os.path.join(config.pathIQMonExec, "default.param")+"\n"
-            if re.match("PHOT_APERTURES\s+", line):
-                newline = "PHOT_APERTURES   "+str(tel.SExtractorPhotAperture.to(u.pix).value)+"\n"
-            if re.match("GAIN\s+", line):
-                newline = "GAIN             "+str(tel.gain.value)+"\n"
-            if re.match("PIXEL_SCALE\s+", line):
-                newline = "PIXEL_SCALE      "+str(tel.pixelScale.value)+"\n"
-            if re.match("SEEING_FWHM\s+", line):
-                newline = "SEEING_FWHM      "+str(tel.SExtractorSeeing.to(u.arcsec).value)+"\n"
-            if re.match("ASSOC_NAME\s+", line):
-                newline = "ASSOC_NAME       "+PhotometryCatalogFile_xy+"\n"
-            NewConfig.write(newline)
-        DefaultConfig.close()
-        NewConfig.close()
+            ## Make edits To default.sex based on telescope:
+            ## Read in default config file        
+            DefaultConfig = open(SExtractorDefaultFile, 'r')
+            NewConfig     = open(SExtractorConfigFile, 'w')
+            for line in DefaultConfig:
+                newline = line
+                if re.match("CATALOG_NAME\s+", line):
+                    newline = "CATALOG_NAME     "+SExtractorCatalog+"\n"
+                if re.match("PARAMETERS_NAME\s+", line):
+                    newline = "PARAMETERS_NAME  "+os.path.join(config.pathIQMonExec, "default.param")+"\n"
+                if re.match("PHOT_APERTURES\s+", line):
+                    newline = "PHOT_APERTURES   "+str(tel.SExtractorPhotAperture.to(u.pix).value)+"\n"
+                if re.match("GAIN\s+", line):
+                    newline = "GAIN             "+str(tel.gain.value)+"\n"
+                if re.match("PIXEL_SCALE\s+", line):
+                    newline = "PIXEL_SCALE      "+str(tel.pixelScale.value)+"\n"
+                if re.match("SEEING_FWHM\s+", line):
+                    newline = "SEEING_FWHM      "+str(tel.SExtractorSeeing.to(u.arcsec).value)+"\n"
+                if re.match("ASSOC_NAME\s+", line):
+                    newline = "ASSOC_NAME       "+PhotometryCatalogFile_xy+"\n"
+                NewConfig.write(newline)
+            DefaultConfig.close()
+            NewConfig.close()
 
-        ## Run SExtractor
-        logger.info("Invoking SExtractor.")
-        SExtractorCommand = ["sex", self.workingFile, "-c", SExtractorConfigFile]
-        try:
-            SExSTDOUT = subprocess32.check_output(SExtractorCommand, stderr=subprocess32.STDOUT, timeout=30)
-        except:
-            logger.warning("SExtractor error.")
+            ## Run SExtractor
+            logger.info("Invoking SExtractor.")
+            SExtractorCommand = ["sex", self.workingFile, "-c", SExtractorConfigFile]
+            try:
+                SExSTDOUT = subprocess32.check_output(SExtractorCommand, stderr=subprocess32.STDOUT, timeout=30)
+            except:
+                logger.warning("SExtractor error.")
+            else:
+                for line in SExSTDOUT.split("\n"):
+                    line.replace("[1A", "")
+                    line.replace("[1M>", "")
+                    if not re.match(".*Setting up background map.*", line) and not re.match(".*Line:\s[0-9]*.*", line):
+                        logger.debug("  "+line)
+                ## Extract Number of Stars from SExtractor Output
+                pos = SExSTDOUT.find("sextracted ")
+                IsSExCount = re.match("\s*([0-9]+)\s+", SExSTDOUT[pos+11:pos+21])
+                if IsSExCount:
+                    self.nSExtracted = int(IsSExCount.group(1))
+                    logger.info("SExtractor found {0} sources.".format(self.nSExtracted))
+                else:
+                    self.nSExtracted = None
+                ## Extract Background Level from SExtractor Output
+                pos = SExSTDOUT.find("Background: ")
+                IsSExBkgnd = re.match("\s*([0-9\.]+)\s*", SExSTDOUT[pos+11:pos+21])
+                if IsSExBkgnd:
+                    self.SExBackground = float(IsSExBkgnd.group(1))
+                    logger.info("SExtractor background is {0:.1f}".format(self.SExBackground))
+                else:
+                    self.SExBackground = None
+                ## Extract Background RMS from SExtractor Output
+                IsSExBRMS = re.match("\s*RMS:\s([0-9\.]+)\s*", SExSTDOUT[pos+21:pos+37])
+                if IsSExBRMS:
+                    self.SExBRMS = float(IsSExBRMS.group(1))
+                    logger.info("SExtractor background RMS is {0:.1f}".format(self.SExBRMS))
+                else:
+                    self.SExBRMS = None
+
+                ## If No Output Catalog Created ...
+                if not os.path.exists(SExtractorCatalog):
+                    logger.warning("SExtractor failed to create catalog.")
+                    self.SExtractorCatalog = None
+                else:
+                    self.SExtractorCatalog = SExtractorCatalog
+
+                ## Read Catalog
+                logger.debug("Reading SExtractor output catalog.")
+                self.SExtractorResults = ascii.read(self.SExtractorCatalog, Reader=ascii.sextractor.SExtractor)
+                SExImageRadius = []
+                SExAngleInImage = []
+                for star in self.SExtractorResults:
+                    SExImageRadius.append(math.sqrt((self.nXPix/2-star['X_IMAGE'])**2 + (self.nYPix/2-star['Y_IMAGE'])**2))
+                    SExAngleInImage.append(math.atan((star['X_IMAGE']-self.nXPix/2)/(self.nYPix/2-star['Y_IMAGE']))*180.0/math.pi)
+                self.SExtractorResults.add_column(table.Column(data=SExImageRadius, name='ImageRadius'))
+                self.SExtractorResults.add_column(table.Column(data=SExAngleInImage, name='AngleInImage'))
+                self.nStarsSEx = len(self.SExtractorResults)
+                logger.info("Read in {0} stars from SExtractor catalog.".format(self.nStarsSEx))
         else:
-            for line in SExSTDOUT.split("\n"):
-                line.replace("[1A", "")
-                line.replace("[1M>", "")
-                if not re.match(".*Setting up background map.*", line) and not re.match(".*Line:\s[0-9]*.*", line):
-                    logger.debug("  "+line)
-            ## Extract Number of Stars from SExtractor Output
-            pos = SExSTDOUT.find("sextracted ")
-            IsSExCount = re.match("\s*([0-9]+)\s+", SExSTDOUT[pos+11:pos+21])
-            if IsSExCount:
-                self.nSExtracted = int(IsSExCount.group(1))
-                logger.info("SExtractor found {0} sources.".format(self.nSExtracted))
-            else:
-                self.nSExtracted = None
-            ## Extract Background Level from SExtractor Output
-            pos = SExSTDOUT.find("Background: ")
-            IsSExBkgnd = re.match("\s*([0-9\.]+)\s*", SExSTDOUT[pos+11:pos+21])
-            if IsSExBkgnd:
-                self.SExBackground = float(IsSExBkgnd.group(1))
-                logger.info("SExtractor background is {0:.1f}".format(self.SExBackground))
-            else:
-                self.SExBackground = None
-            ## Extract Background RMS from SExtractor Output
-            IsSExBRMS = re.match("\s*RMS:\s([0-9\.]+)\s*", SExSTDOUT[pos+21:pos+37])
-            if IsSExBRMS:
-                self.SExBRMS = float(IsSExBRMS.group(1))
-                logger.info("SExtractor background RMS is {0:.1f}".format(self.SExBRMS))
-            else:
-                self.SExBRMS = None
-
-            ## If No Output Catalog Created ...
-            if not os.path.exists(SExtractorCatalog):
-                logger.warning("SExtractor failed to create catalog.")
-                self.SExtractorCatalog = None
-            else:
-                self.SExtractorCatalog = SExtractorCatalog
-
-            ## Read Catalog
-            logger.debug("Reading SExtractor output catalog.")
-            self.SExtractorResults = ascii.read(self.SExtractorCatalog, Reader=ascii.sextractor.SExtractor)
-            SExImageRadius = []
-            SExAngleInImage = []
-            for star in self.SExtractorResults:
-                SExImageRadius.append(math.sqrt((self.nXPix/2-star['X_IMAGE'])**2 + (self.nYPix/2-star['Y_IMAGE'])**2))
-                SExAngleInImage.append(math.atan((star['X_IMAGE']-self.nXPix/2)/(self.nYPix/2-star['Y_IMAGE']))*180.0/math.pi)
-            self.SExtractorResults.add_column(table.Column(data=SExImageRadius, name='ImageRadius'))
-            self.SExtractorResults.add_column(table.Column(data=SExAngleInImage, name='AngleInImage'))
-            self.nStarsSEx = len(self.SExtractorResults)
-            logger.info("Read in {0} stars from SExtractor catalog.".format(self.nStarsSEx))
+            logger.warning("Telescope proerties not set.")
 
 
     ##-------------------------------------------------------------------------
@@ -888,6 +886,9 @@ class Image(object):
         except:
             logger.warning("Failed to create jpeg.")
         else:
+            for line in ConvertSTDOUT.split("\n"):
+                if len(line) > 0:
+                    logger.debug(line)
             self.jpegFileNames.append(jpegFileName)
 
 
