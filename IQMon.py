@@ -15,6 +15,7 @@ import re
 import shutil
 import time
 import subprocess32
+import logging
 import math
 import numpy as np
 
@@ -85,6 +86,26 @@ class Config(object):
             IsCatalogPath = re.match("CATALOGPATH\s=\s([\w/\-\.]+)", line)
             if IsCatalogPath:
                 self.pathCatalog = os.path.abspath(IsCatalogPath.group(1))
+
+
+    def MakeLogger(self, IQMonLogFileName, verbose):
+        '''
+        '''
+        logger = logging.getLogger('IQMonLogger')
+        logger.setLevel(logging.DEBUG)
+        LogFileHandler = logging.FileHandler(IQMonLogFileName)
+        LogFileHandler.setLevel(logging.DEBUG)
+        LogConsoleHandler = logging.StreamHandler()
+        if verbose:
+            LogConsoleHandler.setLevel(logging.DEBUG)
+        else:
+            LogConsoleHandler.setLevel(logging.INFO)
+        LogFormat = logging.Formatter('%(asctime)23s %(levelname)8s: %(message)s')
+        LogFileHandler.setFormatter(LogFormat)
+        LogConsoleHandler.setFormatter(LogFormat)
+        logger.addHandler(LogConsoleHandler)
+        logger.addHandler(LogFileHandler)
+        return logger
 
 
 ##-----------------------------------------------------------------------------
