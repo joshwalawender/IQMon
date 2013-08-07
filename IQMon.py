@@ -210,14 +210,14 @@ class Telescope(object):
             self.gain *= 1./u.adu
         ## Default unitsForFWHM to units of arcsec
         if type(self.unitsForFWHM) == u.quantity.Quantity:
-            assert self.unitsForFWHM.to(u.pix) or self.unitsForFWHM.to(u.arcsec)
+            assert self.unitsForFWHM.unit in [u.arcsec, u.pix]
         else:
             self.unitsForFWHM *= u.pix
         ## ROI is string
         assert type(self.ROI) == str
         ## Default thresholdFWHM to same units as unitsForFWHM
         if type(self.thresholdFWHM) == u.quantity.Quantity:
-                assert self.thresholdFWHM.to(u.pix) or self.thresholdFWHM.to(u.arcsec)
+            assert self.thresholdFWHM.unit in [u.arcsec, u.pix]
         else:
             self.thresholdFWHM *= u.pix
         ## Default thresholdPointingErr to units of arcmin
@@ -256,7 +256,7 @@ class Image(object):
 
     Methods:
     '''
-    def __init__(self, input):
+    def __init__(self, input, tel, config):
         self.startProcessTime = time.time()
         if os.path.exists(input):
             FitsFileDirectory, FitsFilename = os.path.split(input)
@@ -269,7 +269,14 @@ class Image(object):
             self.rawFileName = None
             self.rawFileDirectory = None
             raise IOError("File {0} does not exist".format(input))
+        ## Confirm that input tel is an IQMon.Telescope object
+        assert type(tel) == Telescope
+        self.tel = tel
+        ## Confirm that input config is an IQMon.Config object
+        assert type(config) == Config
+        self.config = config
         ## Initialize values to None
+        self.logger = None
         self.workingFile = None
         self.header = None
         self.exptime = None
@@ -285,7 +292,6 @@ class Image(object):
         self.tempFiles = []
         self.SExtractorResults = None
         self.nStarsSEx = None
-        self.htmlImageList = None
         self.positionAngle = None
         self.zeroPoint = None
         self.processTime = None
@@ -294,14 +300,12 @@ class Image(object):
         self.pointingError = None
         self.imageFlipped = None
         self.jpegFileNames = []
-        self.summaryFile = None
-        self.htmlImageList = None
 
 
     ##-------------------------------------------------------------------------
     ## Get Header
     ##-------------------------------------------------------------------------
-    def GetHeader(self, tel, logger):
+    def GetHeader(self):
         '''
         Get information from the image fits header.
         '''
@@ -309,81 +313,81 @@ class Image(object):
         self.header = hdulist[0].header
         self.image = hdulist[0].data
         hdulist.close()
-        logger.info("Reading image header.")
+        self.logger.info("Reading image header.")
         
         ## Get exposure time from header (assumes seconds)
         try:
             self.exptime = float(self.header['EXPTIME']) * u.s
         except:
             self.exptime = None
-            logger.debug("No exposure time value found in header")
+            self.logger.debug("No exposure time value found in header")
         else:
-            logger.debug("Exposure time = {0:.1f} s".format(self.exptime.to(u.s).value))
+            self.logger.debug("Exposure time = {0:.1f} s".format(self.exptime.to(u.s).value))
         ## Get filter from header
         try:
             self.filter = self.header['FILTER']
         except:
             self.filter = None
-            logger.debug("No filter keyword found in header")
+            self.logger.debug("No filter keyword found in header")
         else:
-            logger.debug("Filter = {0}".format(self.filter))
+            self.logger.debug("Filter = {0}".format(self.filter))
         ## Get focus position from header
         try:
             self.focusPos = self.header['FOCUSPOS']
         except:
             self.focusPos = None
-            logger.debug("No focus position value found in header")
+            self.logger.debug("No focus position value found in header")
         else:
-            logger.debug("Focus position = {0}".format(self.focusPos))
+            self.logger.debug("Focus position = {0}".format(self.focusPos))
         ## Get object name from header
         try:
             self.objectName = self.header["OBJECT"]
         except:
             self.objectName = None
-            logger.debug("No object value found in header")
+            self.logger.debug("No object value found in header")
         else:
-            logger.debug("Header object name = {0}".format(self.objectName))
+            self.logger.debug("Header object name = {0}".format(self.objectName))
         ## Get airmass from header
         try:
             self.headerAirmass = self.header["AIRMASS"]
         except:
             self.headerAirmass = None
-            logger.debug("No airmass value found in header")
+            self.logger.debug("No airmass value found in header")
         else:
-            logger.debug("Header airmass = {0:.2f}".format(self.headerAirmass))
+            self.logger.debug("Header airmass = {0:.2f}".format(self.headerAirmass))
         ## Get Observation Date and Time from header
         ## (assumes YYYY-MM-DDTHH:MM:SS format)
         try:
             self.dateObs = self.header["DATE-OBS"]
         except:
             self.dateObs = None
-            logger.debug("No date value found in header")
+            self.logger.debug("No date value found in header")
         else:
-            logger.debug("Header date = {0}".format(self.dateObs))
+            self.logger.debug("Header date = {0}".format(self.dateObs))
         ## Get Site Latitude from header (assumes decimal degrees)
         try:
             self.latitude = self.header["LAT-OBS"] * u.deg
         except:
             self.latitude = None
-            logger.debug("No latitude value found in header")
+            self.logger.debug("No latitude value found in header")
         else:
-            logger.debug("Header latitude = {0:.4f} deg".format(self.latitude.to(u.deg).value))
+            self.logger.debug("Header latitude = {0:.4f} deg".format(self.latitude.to(u.deg).value))
         ## Get Site Longitude from header (assumes decimal degrees)
         try:
             self.longitude = self.header["LONG-OBS"] * u.deg
         except:
             self.longitude = None
-            logger.debug("No longitiude value found in header")
+            self.logger.debug("No longitiude value found in header")
         else:
-            logger.debug("Header longitiude = {0:.4f} deg".format(self.longitude.to(u.deg).value))
+            self.logger.debug("Header longitiude = {0:.4f} deg".format(self.longitude.to(u.deg).value))
         ## Get Site Altitude from header (assumes meters)
         try:
             self.altitude = self.header["ALT-OBS"] * u.meter
         except:
             self.altitude = None
-            logger.debug("No altitude value found in header")
+            self.logger.debug("No altitude value found in header")
         else:
-            logger.debug("Header altitude = {0:.0f} meters".format(self.altitude.to(u.meter).value))
+            self.logger.debug("Header altitude = {0:.0f} meters".format(self.altitude.to(u.meter).value))
 
 
         ## Determine Image Size in Pixels
@@ -398,13 +402,13 @@ class Image(object):
         if len(ImageDEC.split(":")) != 3:
             if len(ImageDEC.split(" ")) == 3:
                 ImageDEC = ":".join(ImageDEC.split(" "))
-        logger.debug("Read pointing info from header: "+ImageRA+" "+ImageDEC)
+        self.logger.debug("Read pointing info from header: "+ImageRA+" "+ImageDEC)
         try:
             self.coordinate_header = coords.ICRSCoordinates(
                                                       ImageRA+" "+ImageDEC,
                                                    unit=(u.hour, u.degree))
         except:
-            logger.warning("Failed to read pointing info from header.")
+            self.logger.warning("Failed to read pointing info from header.")
             self.coordinate_header = None
 
         ## Read WCS
@@ -412,9 +416,9 @@ class Image(object):
             self.imageWCS = wcs.WCS(self.header)
         except:
             self.imageWCS = None
-            logger.info("No WCS found in image header")
+            self.logger.info("No WCS found in image header")
         else:
-            logger.debug("Found WCS in image header.")
+            self.logger.debug("Found WCS in image header.")
 
         ## Determine PA of Image
         try:
@@ -423,14 +427,14 @@ class Image(object):
             PC21 = float(self.imageWCS.to_header()['PC2_1'])
             PC22 = float(self.imageWCS.to_header()['PC2_2'])
         except:
-            logger.debug("Could not find PCn_m values in WCS.")
+            self.logger.debug("Could not find PCn_m values in WCS.")
             try:
                 PC11 = float(self.imageWCS.to_header()['CD1_1'])
                 PC12 = float(self.imageWCS.to_header()['CD1_2'])
                 PC21 = float(self.imageWCS.to_header()['CD2_1'])
                 PC22 = float(self.imageWCS.to_header()['CD2_2'])
             except:
-                logger.debug("Could not find CDn_m values in WCS.")
+                self.logger.debug("Could not find CDn_m values in WCS.")
                 self.imageWCS = None
         if self.imageWCS:
             if (abs(PC21) > abs(PC22)) and (PC21 >= 0): 
@@ -457,10 +461,10 @@ class Image(object):
             if North == "Right" and East == "Down": self.imageFlipped = True
             if North == "Left" and East == "Up": self.imageFlipped = True
             if North == "Left" and East == "Down": self.imageFlipped = False
-            logger.debug("Position angle of WCS is {0:.1f} degrees.".format(self.positionAngle.to(u.deg).value))
-            logger.debug("Image orientation is North {0}, East {1}.".format(North, East))
+            self.logger.debug("Position angle of WCS is {0:.1f} degrees.".format(self.positionAngle.to(u.deg).value))
+            self.logger.debug("Image orientation is North {0}, East {1}.".format(North, East))
             if self.imageFlipped:
-                logger.debug("Image is mirrored.")
+                self.logger.debug("Image is mirrored.")
         else:
             self.positionAngle = None
             self.imageFlipped = None
@@ -471,26 +475,26 @@ class Image(object):
             ## Populate site object properties
             SiteDate = "/".join(self.dateObs[0:10].split("-"))
             SiteTime = self.dateObs[11:]        
-            tel.site.date = ephem.Date(SiteDate+" "+SiteTime)
-            tel.site.lat = str(self.latitude.to(u.deg).value)
-            tel.site.lon = str(self.longitude.to(u.deg).value)
-            if self.altitude: tel.site.elevation = self.altitude.to(u.meter).value
+            self.tel.site.date = ephem.Date(SiteDate+" "+SiteTime)
+            self.tel.site.lat = str(self.latitude.to(u.deg).value)
+            self.tel.site.lon = str(self.longitude.to(u.deg).value)
+            if self.altitude: self.tel.site.elevation = self.altitude.to(u.meter).value
             ## Do calculations using ephem
             TargetObject = ephem.readdb("Target,f|M|F7,"+ImageRA+","+ImageDEC+",2.02,2000")
-            TargetObject.compute(tel.site)
+            TargetObject.compute(self.tel.site)
             self.targetAlt = TargetObject.alt * 180./ephem.pi * u.deg
             self.targetAz = TargetObject.az * 180./ephem.pi * u.deg
-            logger.debug("Target Alt, Az = {0:.1f}, {1:.1f}".format(self.targetAlt.to(u.deg).value, self.targetAz.to(u.deg).value))
+            self.logger.debug("Target Alt, Az = {0:.1f}, {1:.1f}".format(self.targetAlt.to(u.deg).value, self.targetAz.to(u.deg).value))
             self.zenithAngle = 90.*u.deg - self.targetAlt
             self.airmass = 1.0/math.cos(self.zenithAngle.to(u.radian).value)*(1.0 - 0.0012*(1.0/(math.cos(self.zenithAngle.to(u.radian).value)**2 - 1.0)))
-            logger.debug("Target airmass (calculated) = {0:.2f}".format(self.airmass))
+            self.logger.debug("Target airmass (calculated) = {0:.2f}".format(self.airmass))
             ## Calculate Moon Position and Illumination
             TheMoon = ephem.Moon()
-            TheMoon.compute(tel.site)
+            TheMoon.compute(self.tel.site)
             self.moonPhase = TheMoon.phase
             self.moonSep = ephem.separation(TargetObject, TheMoon) * 180./ephem.pi * u.deg
             self.moonAlt = TheMoon.alt * 180./ephem.pi * u.deg
-            logger.debug("A {0:.0f} percent illuminated Moon is {1:.0f} deg from target.".format(self.moonPhase, self.moonSep.to(u.deg).value))
+            self.logger.debug("A {0:.0f} percent illuminated Moon is {1:.0f} deg from target.".format(self.moonPhase, self.moonSep.to(u.deg).value))
         else:
             self.targetAlt = None
             self.targetAz = None
@@ -499,13 +503,13 @@ class Image(object):
             self.moonAlt = None
             self.zenithAngle = None
             self.airmass = None
-            logger.warning("Object position and Moon position not calculated.")
+            self.logger.warning("Object position and Moon position not calculated.")
 
 
     ##-------------------------------------------------------------------------
     ## Read Image
     ##-------------------------------------------------------------------------
-    def ReadImage(self, config):
+    def ReadImage(self):
         '''
         Read the raw image and write out a working image in the IQMon temporary
         directory.
@@ -515,30 +519,30 @@ class Image(object):
         - Later implement file format conversion from CRW, CR2, DNG, etc to
           fits using dcraw.
         '''
-        self.workingFile = os.path.join(config.pathTemp, self.rawFileName)
+        self.workingFile = os.path.join(self.config.pathTemp, self.rawFileName)
         shutil.copy2(self.rawFile, self.workingFile)
         self.tempFiles.append(self.workingFile)
 
     ##-------------------------------------------------------------------------
     ## Dark Subtract Image
     ##-------------------------------------------------------------------------
-    def DarkSubtract(self, Darks, tel, config, logger):
+    def DarkSubtract(self, Darks):
         '''
         Create master dark and subtract from image.
         
         Input the filename of the appropriate master dark.  May want to write
         own function to make the master dark given input file data.
         '''
-        logger.debug("Dark subtracting image.  Opening image data.")
+        self.logger.debug("Dark subtracting image.  Opening image data.")
         hdulist_image = fits.open(self.workingFile, mode='update')
         ## Load master dark if provided, but if multiple files input, combine
         ## them in to master dark, then load combined master dark.
         if len(Darks) == 1:
-            logger.debug("Found master dark.  Opening master dark data.")
+            self.logger.debug("Found master dark.  Opening master dark data.")
             hdulist_dark = fits.open(Darks[0])
             MasterDarkData = hdulist_dark[0].data
         elif len(Darks) > 1:
-            logger.info("Multiple input darks detected.  Median combining {0} darks.".format(len(Darks)))
+            self.logger.info("Multiple input darks detected.  Median combining {0} darks.".format(len(Darks)))
             ## Combine multiple darks frames
             DarkData = []
             for Dark in Darks:
@@ -549,46 +553,46 @@ class Image(object):
             ## Save Master Dark to Fits File
             DataPath = os.path.split(self.rawFile)[0]
             DataNightString = os.path.split(DataPath)[1]
-            MasterDarkFilename = "MasterDark_"+tel.name+"_"+DataNightString+"_"+str(int(math.floor(self.exptime.to(u.s).value)))+".fits"
-            MasterDarkFile  = os.path.join(config.pathTemp, MasterDarkFilename)    
+            MasterDarkFilename = "MasterDark_"+self.tel.name+"_"+DataNightString+"_"+str(int(math.floor(self.exptime.to(u.s).value)))+".fits"
+            MasterDarkFile  = os.path.join(self.config.pathTemp, MasterDarkFilename)    
             hdu_MasterDark = fits.PrimaryHDU(MasterDarkData)
             hdulist_MasterDark = fits.HDUList([hdu_MasterDark])
             hdulist_MasterDark.header = hdulist[0].header
             hdulist_MasterDark.header['history'] = "Combined {0} images to make this master dark.".format(len(Darks))
-            logger.info("Writing master dark file: {0}".format(MasterDarkFile))
+            self.logger.info("Writing master dark file: {0}".format(MasterDarkFile))
             hdulist_MasterDark.writeto(MasterDarkFile)
         else:
-            logger.error("No input dark files detected.")
+            self.logger.error("No input dark files detected.")
         ## Now Subtract MasterDark from Image
-        logger.info("Subtracting dark from image.")
+        self.logger.info("Subtracting dark from image.")
         ImageData = hdulist_image[0].data
         DifferenceImage = ImageData - MasterDarkData
         hdulist_image[0].data = DifferenceImage
         hdulist_image.flush()
-#         logger.debug("Median level of image = {0}".format(np.median(ImageData)))
-#         logger.debug("Median level of dark = {0}".format(np.median(MasterDarkData)))
-#         logger.debug("Median level of dark subtracted = {0}".format(np.median(DifferenceImage)))
+#         self.logger.debug("Median level of image = {0}".format(np.median(ImageData)))
+#         self.logger.debug("Median level of dark = {0}".format(np.median(MasterDarkData)))
+#         self.logger.debug("Median level of dark subtracted = {0}".format(np.median(DifferenceImage)))
 
 
     ##-------------------------------------------------------------------------
     ## Crop Image
     ##-------------------------------------------------------------------------
-    def Crop(self, tel, logger):
+    def Crop(self):
         '''
         Crop working image to region of interest.
         '''
-        if tel.ROI:
+        if self.tel.ROI:
             ## Parse ROI String
             try:
-                MatchROI = re.match("\[?(\d{1,5}):(\d{1,5}),(\d{1,5}):(\d{1,5})\]?", tel.ROI)
+                MatchROI = re.match("\[?(\d{1,5}):(\d{1,5}),(\d{1,5}):(\d{1,5})\]?", self.tel.ROI)
             except:
-                logger.warning("Could not parse ROI string in telescope object.")
+                self.logger.warning("Could not parse ROI string in telescope object.")
             else:
                 x1 = int(MatchROI.group(1))
                 x2 = int(MatchROI.group(2))
                 y1 = int(MatchROI.group(3))
                 y2 = int(MatchROI.group(4))
-                logger.info("Cropping Image To [{0}:{1},{2}:{3}]".format(x1, x2, y1, y2))
+                self.logger.info("Cropping Image To [{0}:{1},{2}:{3}]".format(x1, x2, y1, y2))
                 hdulist = fits.open(self.workingFile, mode="update")
                 hdulist[0].data = hdulist[0].data[x1:x2,y1:y2]
                 hdulist.flush()
@@ -598,14 +602,14 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Solve Astrometry Using astrometry.net
     ##-------------------------------------------------------------------------
-    def SolveAstrometry(self, tel, config, logger):
+    def SolveAstrometry(self):
         '''
         Solve astrometry in the working image using the astrometry.net solver.
         '''
-        logger.info("Attempting to create WCS using Astrometry.net solver.")
+        self.logger.info("Attempting to create WCS using Astrometry.net solver.")
         AstrometryCommand = ["solve-field", "-l", "5", "-O", "-p",
-                             "-L", str(tel.pixelScale.value*0.90),
-                             "-H", str(tel.pixelScale.value*1.10),
+                             "-L", str(self.tel.pixelScale.value*0.90),
+                             "-H", str(self.tel.pixelScale.value*1.10),
                              "-u", "arcsecperpix", "-z", "4", self.workingFile]
         AstrometrySTDOUT = ""
 
@@ -615,30 +619,30 @@ class Image(object):
                                stderr=subprocess32.STDOUT, timeout=20)
             EndTime = time.time()
 #         except TimeoutExpired:
-#             logger.warning("Astrometry.net timed out")
+#             self.logger.warning("Astrometry.net timed out")
 #             self.astrometrySolved = False
         except:
-            logger.warning("Astrometry.net failed.")
+            self.logger.warning("Astrometry.net failed.")
             self.astrometrySolved = False
         else:
             ProcessTime = EndTime - StartTime
-            logger.debug("Astrometry.net Processing Time: %.1f s", ProcessTime)
+            self.logger.debug("Astrometry.net Processing Time: %.1f s", ProcessTime)
             pos = AstrometrySTDOUT.find("Field center: (RA H:M:S, Dec D:M:S) = ")
             if pos != -1:
                 IsFieldCenter = re.match("\s*(\d{1,2}:\d{2}:\d{2}\.\d+,\s-?\d{1,2}:\d{2}:\d{2}\.\d+).*", 
                                          AstrometrySTDOUT[pos+40:pos+75])
                 if IsFieldCenter:
-                    logger.info("Astrometry.net field center is: %s", IsFieldCenter.group(1))
+                    self.logger.info("Astrometry.net field center is: %s", IsFieldCenter.group(1))
             else:
                 for line in AstrometrySTDOUT:
-                    logger.warning("  %s" % line)
+                    self.logger.warning("  %s" % line)
             NewFile = self.workingFile.replace(self.fileExt, ".new")
             NewFitsFile = self.workingFile.replace(self.fileExt, ".new.fits")
             if not os.path.exists(NewFile):
-                logger.warning("No new file created by astrometry.net")
+                self.logger.warning("No new file created by astrometry.net")
                 self.astrometrySolved = False
             else:
-                logger.debug("Astrometry.net succeeded")
+                self.logger.debug("Astrometry.net succeeded")
                 if os.path.exists(NewFitsFile): os.remove(NewFitsFile)
                 os.rename(NewFile, NewFitsFile)
                 self.astrometrySolved = True
@@ -648,14 +652,14 @@ class Image(object):
                 hdulist[0].header['history'] = "Solved by Astrometry.net at {0}".format(time.strftime("%Y-%m-%dT%H:%M:%S UTC"))
                 hdulist.close()
             ## Add files created by astrometry.net to tempFiles list
-            self.tempFiles.append(os.path.join(config.pathTemp, self.rawFileBasename+".axy"))
-            self.tempFiles.append(os.path.join(config.pathTemp, self.rawFileBasename+".wcs"))
-            self.tempFiles.append(os.path.join(config.pathTemp, self.rawFileBasename+".solved"))
-            self.tempFiles.append(os.path.join(config.pathTemp, self.rawFileBasename+".rdls"))
-            self.tempFiles.append(os.path.join(config.pathTemp, self.rawFileBasename+".match"))
-            self.tempFiles.append(os.path.join(config.pathTemp, self.rawFileBasename+".corr"))
-            self.tempFiles.append(os.path.join(config.pathTemp, self.rawFileBasename+".new.fits"))
-            self.tempFiles.append(os.path.join(config.pathTemp, self.rawFileBasename+"-indx.xyls"))
+            self.tempFiles.append(os.path.join(self.config.pathTemp, self.rawFileBasename+".axy"))
+            self.tempFiles.append(os.path.join(self.config.pathTemp, self.rawFileBasename+".wcs"))
+            self.tempFiles.append(os.path.join(self.config.pathTemp, self.rawFileBasename+".solved"))
+            self.tempFiles.append(os.path.join(self.config.pathTemp, self.rawFileBasename+".rdls"))
+            self.tempFiles.append(os.path.join(self.config.pathTemp, self.rawFileBasename+".match"))
+            self.tempFiles.append(os.path.join(self.config.pathTemp, self.rawFileBasename+".corr"))
+            self.tempFiles.append(os.path.join(self.config.pathTemp, self.rawFileBasename+".new.fits"))
+            self.tempFiles.append(os.path.join(self.config.pathTemp, self.rawFileBasename+"-indx.xyls"))
 
     ##-------------------------------------------------------------------------
     ## Refine WCS
@@ -669,48 +673,48 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Determine Pointing Error
     ##-------------------------------------------------------------------------
-    def DeterminePointingError(self, logger):
+    def DeterminePointingError(self):
         '''
         Determine pointing error (difference between objects coordinates and
         solved WCS).
         '''
-        logger.info("Detemining pointing error based on WCS solution")
+        self.logger.info("Detemining pointing error based on WCS solution")
         if self.imageWCS and self.coordinate_header:
             centerWCS = self.imageWCS.wcs_pix2world([[self.nXPix/2, self.nYPix/2]], 1)
-            logger.debug("Using coordinates of center point: {0} {1}".format(centerWCS[0][0], centerWCS[0][1]))
+            self.logger.debug("Using coordinates of center point: {0} {1}".format(centerWCS[0][0], centerWCS[0][1]))
             self.coordinate_WCS = coords.ICRSCoordinates(ra=centerWCS[0][0],
                                                    dec=centerWCS[0][1],
                                                    unit=(u.degree, u.degree))
             self.pointingError = self.coordinate_WCS.separation(self.coordinate_header)
-            logger.debug("Target Coordinates are:  %s %s",
+            self.logger.debug("Target Coordinates are:  %s %s",
                          self.coordinate_header.ra.format(u.hour, sep=":", precision=1),
                          self.coordinate_header.dec.format(u.degree, sep=":", precision=1, alwayssign=True))
-            logger.debug("WCS of Central Pixel is: %s %s",
+            self.logger.debug("WCS of Central Pixel is: %s %s",
                          self.coordinate_WCS.ra.format(u.hour, sep=":", precision=1),
                          self.coordinate_WCS.dec.format(u.degree, sep=":", precision=1, alwayssign=True))
-            logger.info("Pointing Error is %.2f arcmin", self.pointingError.arcmins)
+            self.logger.info("Pointing Error is %.2f arcmin", self.pointingError.arcmins)
         else:
-            logger.warning("Pointing error not calculated.")
+            self.logger.warning("Pointing error not calculated.")
 
     ##-------------------------------------------------------------------------
     ## Run SExtractor
     ##-------------------------------------------------------------------------
-    def RunSExtractor(self, tel, config, logger):
+    def RunSExtractor(self):
         '''
         Run SExtractor on image.
         '''
-        assert type(tel.gain) == u.quantity.Quantity
-        assert type(tel.pixelScale) == u.quantity.Quantity
-        assert type(tel.SExtractorSeeing) == u.quantity.Quantity
-        assert type(tel.SExtractorPhotAperture) == u.quantity.Quantity
-        if tel.gain and tel.pixelScale and tel.SExtractorSeeing and tel.SExtractorPhotAperture:
+        assert type(self.tel.gain) == u.quantity.Quantity
+        assert type(self.tel.pixelScale) == u.quantity.Quantity
+        assert type(self.tel.SExtractorSeeing) == u.quantity.Quantity
+        assert type(self.tel.SExtractorPhotAperture) == u.quantity.Quantity
+        if self.tel.gain and self.tel.pixelScale and self.tel.SExtractorSeeing and self.tel.SExtractorPhotAperture:
             ## Set up file names
-            SExtractorDefaultFile = os.path.join(config.pathIQMonExec, "default.sex")
-            SExtractorConfigFile = os.path.join(config.pathTemp, self.rawFileBasename+".sex")
+            SExtractorDefaultFile = os.path.join(self.config.pathIQMonExec, "default.sex")
+            SExtractorConfigFile = os.path.join(self.config.pathTemp, self.rawFileBasename+".sex")
             self.tempFiles.append(SExtractorConfigFile)
-            SExtractorCatalog = os.path.join(config.pathTemp, self.rawFileBasename+".cat")
+            SExtractorCatalog = os.path.join(self.config.pathTemp, self.rawFileBasename+".cat")
             self.tempFiles.append(SExtractorCatalog)
-            PhotometryCatalogFile_xy = os.path.join(config.pathTemp, self.rawFileBasename+"PhotCat_xy.txt")
+            PhotometryCatalogFile_xy = os.path.join(self.config.pathTemp, self.rawFileBasename+"PhotCat_xy.txt")
             self.tempFiles.append(PhotometryCatalogFile_xy)
 
             ## Create PhotometryCatalogFile_xy file for SExtractor Association
@@ -730,15 +734,15 @@ class Image(object):
                 if re.match("CATALOG_NAME\s+", line):
                     newline = "CATALOG_NAME     "+SExtractorCatalog+"\n"
                 if re.match("PARAMETERS_NAME\s+", line):
-                    newline = "PARAMETERS_NAME  "+os.path.join(config.pathIQMonExec, "default.param")+"\n"
+                    newline = "PARAMETERS_NAME  "+os.path.join(self.config.pathIQMonExec, "default.param")+"\n"
                 if re.match("PHOT_APERTURES\s+", line):
-                    newline = "PHOT_APERTURES   "+str(tel.SExtractorPhotAperture.to(u.pix).value)+"\n"
+                    newline = "PHOT_APERTURES   "+str(self.tel.SExtractorPhotAperture.to(u.pix).value)+"\n"
                 if re.match("GAIN\s+", line):
-                    newline = "GAIN             "+str(tel.gain.value)+"\n"
+                    newline = "GAIN             "+str(self.tel.gain.value)+"\n"
                 if re.match("PIXEL_SCALE\s+", line):
-                    newline = "PIXEL_SCALE      "+str(tel.pixelScale.value)+"\n"
+                    newline = "PIXEL_SCALE      "+str(self.tel.pixelScale.value)+"\n"
                 if re.match("SEEING_FWHM\s+", line):
-                    newline = "SEEING_FWHM      "+str(tel.SExtractorSeeing.to(u.arcsec).value)+"\n"
+                    newline = "SEEING_FWHM      "+str(self.tel.SExtractorSeeing.to(u.arcsec).value)+"\n"
                 if re.match("ASSOC_NAME\s+", line):
                     newline = "ASSOC_NAME       "+PhotometryCatalogFile_xy+"\n"
                 NewConfig.write(newline)
@@ -746,24 +750,24 @@ class Image(object):
             NewConfig.close()
 
             ## Run SExtractor
-            logger.info("Invoking SExtractor.")
+            self.logger.info("Invoking SExtractor.")
             SExtractorCommand = ["sex", self.workingFile, "-c", SExtractorConfigFile]
             try:
                 SExSTDOUT = subprocess32.check_output(SExtractorCommand, stderr=subprocess32.STDOUT, timeout=30)
             except:
-                logger.warning("SExtractor error.")
+                self.logger.warning("SExtractor error.")
             else:
                 for line in SExSTDOUT.split("\n"):
                     line.replace("[1A", "")
                     line.replace("[1M>", "")
                     if not re.match(".*Setting up background map.*", line) and not re.match(".*Line:\s[0-9]*.*", line):
-                        logger.debug("  "+line)
+                        self.logger.debug("  "+line)
                 ## Extract Number of Stars from SExtractor Output
                 pos = SExSTDOUT.find("sextracted ")
                 IsSExCount = re.match("\s*([0-9]+)\s+", SExSTDOUT[pos+11:pos+21])
                 if IsSExCount:
                     self.nSExtracted = int(IsSExCount.group(1))
-                    logger.info("SExtractor found {0} sources.".format(self.nSExtracted))
+                    self.logger.info("SExtractor found {0} sources.".format(self.nSExtracted))
                 else:
                     self.nSExtracted = None
                 ## Extract Background Level from SExtractor Output
@@ -771,26 +775,26 @@ class Image(object):
                 IsSExBkgnd = re.match("\s*([0-9\.]+)\s*", SExSTDOUT[pos+11:pos+21])
                 if IsSExBkgnd:
                     self.SExBackground = float(IsSExBkgnd.group(1))
-                    logger.info("SExtractor background is {0:.1f}".format(self.SExBackground))
+                    self.logger.info("SExtractor background is {0:.1f}".format(self.SExBackground))
                 else:
                     self.SExBackground = None
                 ## Extract Background RMS from SExtractor Output
                 IsSExBRMS = re.match("\s*RMS:\s([0-9\.]+)\s*", SExSTDOUT[pos+21:pos+37])
                 if IsSExBRMS:
                     self.SExBRMS = float(IsSExBRMS.group(1))
-                    logger.info("SExtractor background RMS is {0:.1f}".format(self.SExBRMS))
+                    self.logger.info("SExtractor background RMS is {0:.1f}".format(self.SExBRMS))
                 else:
                     self.SExBRMS = None
 
                 ## If No Output Catalog Created ...
                 if not os.path.exists(SExtractorCatalog):
-                    logger.warning("SExtractor failed to create catalog.")
+                    self.logger.warning("SExtractor failed to create catalog.")
                     self.SExtractorCatalog = None
                 else:
                     self.SExtractorCatalog = SExtractorCatalog
 
                 ## Read Catalog
-                logger.debug("Reading SExtractor output catalog.")
+                self.logger.debug("Reading SExtractor output catalog.")
                 self.SExtractorResults = ascii.read(self.SExtractorCatalog, Reader=ascii.sextractor.SExtractor)
                 SExImageRadius = []
                 SExAngleInImage = []
@@ -800,15 +804,15 @@ class Image(object):
                 self.SExtractorResults.add_column(table.Column(data=SExImageRadius, name='ImageRadius'))
                 self.SExtractorResults.add_column(table.Column(data=SExAngleInImage, name='AngleInImage'))
                 self.nStarsSEx = len(self.SExtractorResults)
-                logger.info("Read in {0} stars from SExtractor catalog.".format(self.nStarsSEx))
+                self.logger.info("Read in {0} stars from SExtractor catalog.".format(self.nStarsSEx))
         else:
-            logger.warning("Telescope proerties not set.")
+            self.logger.warning("Telescope proerties not set.")
 
 
     ##-------------------------------------------------------------------------
     ## Determine Image FWHM from SExtractor Catalog
     ##-------------------------------------------------------------------------
-    def DetermineFWHM(self, logger):
+    def DetermineFWHM(self):
         '''
         Determine typical FWHM of image from SExtractor results.
         '''
@@ -826,9 +830,9 @@ class Image(object):
                 self.FWHM = np.median(CentralFWHMs) * u.pix
                 self.ellipticity = np.median(CentralEllipticities)
             else:
-                logger.warning("Not enough stars detected in central region of image to form median FWHM.")
-            logger.info("Median FWHM in inner region is {0:.2f} pixels".format(self.FWHM.to(u.pix).value))
-            logger.info("Median Ellipticity in inner region is {0:.2f}".format(self.ellipticity))
+                self.logger.warning("Not enough stars detected in central region of image to form median FWHM.")
+            self.logger.info("Median FWHM in inner region is {0:.2f} pixels".format(self.FWHM.to(u.pix).value))
+            self.logger.info("Median Ellipticity in inner region is {0:.2f}".format(self.ellipticity))
         else:
             self.FWHM = None
             self.ellipticity = None
@@ -849,15 +853,15 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Make JPEG of Image
     ##-------------------------------------------------------------------------
-    def MakeJPEG(self, jpegFileName, tel, config, logger, marked=False, rotate=False, binning=1):
+    def MakeJPEG(self, jpegFileName, marked=False, rotate=False, binning=1):
         '''
         Make jpegs of image.
         '''
-        jpegFile = os.path.join(config.pathPlots, jpegFileName)
+        jpegFile = os.path.join(self.config.pathPlots, jpegFileName)
         if marked:
-            logger.info("Making marked jpeg with binning factor of {0}.".format(binning))
+            self.logger.info("Making marked jpeg with binning factor of {0}.".format(binning))
         else:
-            logger.info("Making jpeg with binning factor of {0}.".format(binning))
+            self.logger.info("Making jpeg with binning factor of {0}.".format(binning))
         if os.path.exists(jpegFile): os.remove(jpegFile)
         binningString = str(1./binning*100)+"%"
         JPEGcommand = ["convert", "-contrast-stretch", "0.9%,1%", "-compress", "JPEG", "-quality", "70", "-stroke", "red", "-fill", "none", "-resize", binningString]
@@ -878,233 +882,231 @@ class Image(object):
                 if self.imageFlipped:
                     JPEGcommand.append("-flop")
             else:
-                logger.warning("No position angle value found.  Not rotating JPEG.")
+                self.logger.warning("No position angle value found.  Not rotating JPEG.")
         JPEGcommand.append(self.workingFile)
         JPEGcommand.append(jpegFile)
         try:        
             ConvertSTDOUT = subprocess32.check_output(JPEGcommand, stderr=subprocess32.STDOUT, timeout=30)
         except:
-            logger.warning("Failed to create jpeg.")
+            self.logger.warning("Failed to create jpeg.")
         else:
             for line in ConvertSTDOUT.split("\n"):
                 if len(line) > 0:
-                    logger.debug(line)
+                    self.logger.debug(line)
             self.jpegFileNames.append(jpegFileName)
 
 
     ##-------------------------------------------------------------------------
     ## Clean Up by Deleting Temporary Files
     ##-------------------------------------------------------------------------
-    def CleanUp(self, logger):
+    def CleanUp(self):
         '''
         Clean up by deleting temporary files.
         '''
-        logger.info("Cleaning Up Temporary Files.")
+        self.logger.info("Cleaning Up Temporary Files.")
         for item in self.tempFiles:
             if os.path.exists(item):
-                logger.debug("Deleting {0}".format(item))
+                self.logger.debug("Deleting {0}".format(item))
                 os.remove(item)
 
     ##-------------------------------------------------------------------------
     ## Append Line With Image Info to HTML File List
     ##-------------------------------------------------------------------------
-    def AddWebLogEntry(self, tel, config, logger):
+    def AddWebLogEntry(self, htmlImageList):
         '''
         This function adds one line to the HTML table of images.  The line
         contains the image info extracted by IQMon.
         '''
-        if self.htmlImageList:
-            ## If HTML file does not yet exist, create it and insert header
-            ## from template file.
-            if not os.path.exists(self.htmlImageList):
-                logger.debug("HTML files does not exist.  Creating it.")
-                HTML = open(self.htmlImageList, 'w')
-                HTMLheader = open(os.path.join(config.pathIQMonExec, "ImageListHeader.html"), 'r')
-                header = HTMLheader.read()
-                header = header.replace("telescopename", tel.longName)
-                header = header.replace("FWHMunits", str(tel.unitsForFWHM.unit))
-                HTMLheader.close()
-                HTML.write(header)
-                HTML.close()
-            ## If HTML file does exist, we need to strip off the lines which
-            ## end the file, so we can append more data to the table.
-            else:
-                logger.debug("HTML file exists.  Copying contents.")
-                HTML = open(self.htmlImageList, 'r')
-                existingContent = HTML.read().split("\n")
-                HTML.close()
-                HTML = open(self.htmlImageList, 'w')
-                for line in existingContent:
-                    IsEndTable = re.match("\s*</table>\s*", line)
-                    IsEndBody = re.match("\s*</body>\s*", line)
-                    IsEndHTML = re.match("\s*</html>\s*", line)
-                    if not IsEndTable and not IsEndBody and not IsEndHTML:
-                        HTML.write(line)
-            ## Write Lines for this Image to HTML File
-            logger.info("Adding image data to HTML log file.")
-            HTML = open(self.htmlImageList, 'a')
-            HTML.write("    <tr>\n")
-            HTML.write("      <td style='color:black;text-align:left'>{0}</td>\n".format(self.dateObs))
-            if len(self.jpegFileNames) == 0:
-                HTML.write("      <td style='color:black;text-align:left'>{0}</td>\n".format(self.rawFileBasename))
-            elif len(self.jpegFileNames) == 1:
-                HTML.write("      <td style='color:black;text-align:left'><a href='{0}'>{1}</a></td>\n".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]), self.rawFileBasename))
-            elif len(self.jpegFileNames) >= 2:
-                HTML.write("      <td style='color:black;text-align:left'><a href='{0}'>{1}</a> (<a href='{2}'>JPEG2</a>)</td>\n".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]), self.rawFileBasename, os.path.join("..", "..", "Plots", self.jpegFileNames[1])))                
-            if self.targetAlt and self.targetAz and self.airmass and self.moonSep and self.moonPhase:
-                HTML.write("      <td style='color:black'>{0:.1f}</td>\n".format(self.targetAlt.to(u.deg).value))
-                HTML.write("      <td style='color:black'>{0:.1f}</td>\n".format(self.targetAz.to(u.deg).value))
-                HTML.write("      <td style='color:{0}'>{1:.2f}</td>\n".format("black", self.airmass))
-                HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format("black", self.moonSep.to(u.deg).value))
-                HTML.write("      <td style='color:black'>{0:.1f}</td>\n".format(self.moonPhase))
-            else:
-                HTML.write("      <td style='color:black'>{0}</td>\n".format(""))
-                HTML.write("      <td style='color:black'>{0}</td>\n".format(""))
-                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
-                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
-                HTML.write("      <td style='color:black'>{0}</td>\n".format(""))
-            if self.FWHM and self.ellipticity:
-                if tel.unitsForFWHM.unit == u.arcsec:
-                    FWHM_for_HTML = (self.FWHM * u.radian.to(u.arcsec)*tel.pixelSize.to(u.mm)/tel.focalLength.to(u.mm)).value
-                else:
-                    FWHM_for_HTML = self.FWHM.value
-                HTML.write("      <td style='color:{0}'>{1:.2f}</td>\n".format("black", FWHM_for_HTML))
-                HTML.write("      <td style='color:{0}'>{1:.2f}</td>\n".format("black", self.ellipticity))
-            else:
-                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
-                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
-            if self.SExBackground and self.SExBRMS:
-                HTML.write("      <td style='color:{0}'>{1:.1f} [{2:.1f}]</td>\n".format("black", self.SExBackground, self.SExBRMS))
-            else:
-                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
-            if self.pointingError:
-                HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format("black", self.pointingError.arcmins))
-            else:
-                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
-            if self.positionAngle:
-                HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format("black", self.positionAngle.to(u.deg).value))
-            else:
-                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
-            if self.zeroPoint:
-                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", self.zeroPoint))
-            else:
-                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
-            if self.nStarsSEx:
-                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", self.nStarsSEx))
-            else:
-                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
-            if self.processTime:
-                HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format("black", self.processTime))
-            else:
-                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
-            HTML.write("    </tr>\n")
-            HTML.write("  </table>\n")
-            HTML.write("</body>\n")
-            HTML.write("</html>\n")
+        ## If HTML file does not yet exist, create it and insert header
+        ## from template file.
+        if not os.path.exists(htmlImageList):
+            self.logger.debug("HTML files does not exist.  Creating it.")
+            HTML = open(htmlImageList, 'w')
+            HTMLheader = open(os.path.join(self.config.pathIQMonExec, "ImageListHeader.html"), 'r')
+            header = HTMLheader.read()
+            header = header.replace("telescopename", self.tel.longName)
+            header = header.replace("FWHMunits", str(self.tel.unitsForFWHM.unit))
+            HTMLheader.close()
+            HTML.write(header)
             HTML.close()
+        ## If HTML file does exist, we need to strip off the lines which
+        ## end the file, so we can append more data to the table.
+        else:
+            self.logger.debug("HTML file exists.  Copying contents.")
+            HTML = open(htmlImageList, 'r')
+            existingContent = HTML.read().split("\n")
+            HTML.close()
+            HTML = open(htmlImageList, 'w')
+            for line in existingContent:
+                IsEndTable = re.match("\s*</table>\s*", line)
+                IsEndBody = re.match("\s*</body>\s*", line)
+                IsEndHTML = re.match("\s*</html>\s*", line)
+                if not IsEndTable and not IsEndBody and not IsEndHTML:
+                    HTML.write(line)
+        ## Write Lines for this Image to HTML File
+        self.logger.info("Adding image data to HTML log file.")
+        HTML = open(htmlImageList, 'a')
+        HTML.write("    <tr>\n")
+        HTML.write("      <td style='color:black;text-align:left'>{0}</td>\n".format(self.dateObs))
+        if len(self.jpegFileNames) == 0:
+            HTML.write("      <td style='color:black;text-align:left'>{0}</td>\n".format(self.rawFileBasename))
+        elif len(self.jpegFileNames) == 1:
+            HTML.write("      <td style='color:black;text-align:left'><a href='{0}'>{1}</a></td>\n".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]), self.rawFileBasename))
+        elif len(self.jpegFileNames) >= 2:
+            HTML.write("      <td style='color:black;text-align:left'><a href='{0}'>{1}</a> (<a href='{2}'>JPEG2</a>)</td>\n".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]), self.rawFileBasename, os.path.join("..", "..", "Plots", self.jpegFileNames[1])))                
+        if self.targetAlt and self.targetAz and self.airmass and self.moonSep and self.moonPhase:
+            HTML.write("      <td style='color:black'>{0:.1f}</td>\n".format(self.targetAlt.to(u.deg).value))
+            HTML.write("      <td style='color:black'>{0:.1f}</td>\n".format(self.targetAz.to(u.deg).value))
+            HTML.write("      <td style='color:{0}'>{1:.2f}</td>\n".format("black", self.airmass))
+            HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format("black", self.moonSep.to(u.deg).value))
+            HTML.write("      <td style='color:black'>{0:.1f}</td>\n".format(self.moonPhase))
+        else:
+            HTML.write("      <td style='color:black'>{0}</td>\n".format(""))
+            HTML.write("      <td style='color:black'>{0}</td>\n".format(""))
+            HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+            HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+            HTML.write("      <td style='color:black'>{0}</td>\n".format(""))
+        if self.FWHM and self.ellipticity:
+            if self.tel.unitsForFWHM.unit == u.arcsec:
+                FWHM_for_HTML = (self.FWHM * u.radian.to(u.arcsec)*self.tel.pixelSize.to(u.mm)/self.tel.focalLength.to(u.mm)).value
+            else:
+                FWHM_for_HTML = self.FWHM.value
+            HTML.write("      <td style='color:{0}'>{1:.2f}</td>\n".format("black", FWHM_for_HTML))
+            HTML.write("      <td style='color:{0}'>{1:.2f}</td>\n".format("black", self.ellipticity))
+        else:
+            HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+            HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+        if self.SExBackground and self.SExBRMS:
+            HTML.write("      <td style='color:{0}'>{1:.1f} [{2:.1f}]</td>\n".format("black", self.SExBackground, self.SExBRMS))
+        else:
+            HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+        if self.pointingError:
+            HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format("black", self.pointingError.arcmins))
+        else:
+            HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+        if self.positionAngle:
+            HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format("black", self.positionAngle.to(u.deg).value))
+        else:
+            HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+        if self.zeroPoint:
+            HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", self.zeroPoint))
+        else:
+            HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+        if self.nStarsSEx:
+            HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", self.nStarsSEx))
+        else:
+            HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+        if self.processTime:
+            HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format("black", self.processTime))
+        else:
+            HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+        HTML.write("    </tr>\n")
+        HTML.write("  </table>\n")
+        HTML.write("</body>\n")
+        HTML.write("</html>\n")
+        HTML.close()
 
 
     ##-------------------------------------------------------------------------
     ## Append Line With Image Info to Summary Text File
     ##-------------------------------------------------------------------------
-    def AddSummaryEntry(self, logger):
-        if self.summaryFile:
-            logger.info("Writing Summary File Entry.")
-            logger.debug("Summary File: {0}".format(self.summaryFile))
-            ## Read in previous data
-            if not os.path.exists(self.summaryFile):
-                logger.info("Making new astropy table object")
-                SummaryTable = table.Table(names=("ExpStart", "File", "FWHM (pix)", "Ellipticity", 
-                                           "Alt (deg)", "Az (deg)", "Airmass", "PointingError (arcmin)", 
-                                           "ZeroPoint", "nStars", "Background", "Background RMS"),
-                                     dtypes=('a22', 'a120', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'i4', 'f4', 'f4'),
-                                     masked=True)
-            else:
-                logger.info("Reading astropy table object from file: {0}".format(self.summaryFile))
-                SummaryTable = ascii.read(self.summaryFile)
-            ## Astropy table writer can not write None to table initialized
-            ## with type.  If any outputs are None, change to some value.
-            tableMask = np.zeros(12)
-            ## dateObs
-            if self.dateObs: dateObs = self.dateObs
-            else: 
-                dateObs = ""
-                tableMask[0] = True
-            ## FileName
-            if self.rawFileName: rawFileName = self.rawFileName
-            else: 
-                rawFileName = ""
-                tableMask[1] = True
-            ## FWHM
-            if self.FWHM: FWHM = self.FWHM.to(u.pix).value
-            else:
-                FWHM = 0.
-                tableMask[2] = True
-            ## Ellipticity
-            if self.ellipticity: ellipticity = self.ellipticity
-            else:
-                ellipticity = 0.
-                tableMask[3] = True
-            ## Target Alt
-            if self.targetAlt: targetAlt = self.targetAlt.to(u.deg).value
-            else:
-                targetAlt = 0.
-                tableMask[4] = True
-            ## Target Az
-            if self.targetAz: targetAz = self.targetAz.to(u.deg).value
-            else:
-                targetAz = 0.
-                tableMask[5] = True
-            ## Airmass
-            if self.airmass: airmass = self.airmass
-            else:
-                airmass = 0.
-                tableMask[6] = True
-            ## Pointing Error
-            if self.pointingError: pointingError = self.pointingError.arcmins
-            else:
-                pointingError = 0.
-                tableMask[7] = True
-            ## Zero Point
-            if self.zeroPoint: zeroPoint = self.zeroPoint
-            else:
-                zeroPoint = 0.
-                tableMask[8] = True
-            ## nStarsSEx
-            if self.nStarsSEx: nStarsSEx = self.nStarsSEx
-            else: 
-                nStarsSEx = 0.
-                tableMask[9] = True
-            ## SExtractor Background
-            if self.SExBackground: SExBackground = self.SExBackground
-            else:
-                SExBackground = 0.
-                tableMask[10] = True
-            ## SExtractor Background RMS
-            if self.SExBRMS: SExBRMS = self.SExBRMS
-            else:
-                SExBRMS = 0.
-                tableMask[11] = True
-            ## Add row to table
-            logger.debug("Writing new row to log table.")
-            SummaryTable.add_row((dateObs, rawFileName,
-                                  FWHM, ellipticity,
-                                  targetAlt, targetAz,
-                                  airmass, pointingError,
-                                  zeroPoint, nStarsSEx,
-                                  SExBackground, SExBRMS),
-                                  mask=tableMask)
-            ## Write Table to File
-            logger.info("Writing new summary file.")
-            ascii.write(SummaryTable, self.summaryFile,
-                        Writer=ascii.basic.Basic)
+    def AddSummaryEntry(self, summaryFile):
+        self.logger.info("Writing Summary File Entry.")
+        self.logger.debug("Summary File: {0}".format(summaryFile))
+        ## Read in previous data
+        if not os.path.exists(summaryFile):
+            self.logger.info("Making new astropy table object")
+            SummaryTable = table.Table(names=("ExpStart", "File", "FWHM (pix)", "Ellipticity", 
+                                       "Alt (deg)", "Az (deg)", "Airmass", "PointingError (arcmin)", 
+                                       "ZeroPoint", "nStars", "Background", "Background RMS"),
+                                 dtypes=('a22', 'a120', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'i4', 'f4', 'f4'),
+                                 masked=True)
+        else:
+            self.logger.info("Reading astropy table object from file: {0}".format(summaryFile))
+            SummaryTable = ascii.read(summaryFile)
+        ## Astropy table writer can not write None to table initialized
+        ## with type.  If any outputs are None, change to some value.
+        tableMask = np.zeros(12)
+        ## dateObs
+        if self.dateObs: dateObs = self.dateObs
+        else: 
+            dateObs = ""
+            tableMask[0] = True
+        ## FileName
+        if self.rawFileName: rawFileName = self.rawFileName
+        else: 
+            rawFileName = ""
+            tableMask[1] = True
+        ## FWHM
+        if self.FWHM: FWHM = self.FWHM.to(u.pix).value
+        else:
+            FWHM = 0.
+            tableMask[2] = True
+        ## Ellipticity
+        if self.ellipticity: ellipticity = self.ellipticity
+        else:
+            ellipticity = 0.
+            tableMask[3] = True
+        ## Target Alt
+        if self.targetAlt: targetAlt = self.targetAlt.to(u.deg).value
+        else:
+            targetAlt = 0.
+            tableMask[4] = True
+        ## Target Az
+        if self.targetAz: targetAz = self.targetAz.to(u.deg).value
+        else:
+            targetAz = 0.
+            tableMask[5] = True
+        ## Airmass
+        if self.airmass: airmass = self.airmass
+        else:
+            airmass = 0.
+            tableMask[6] = True
+        ## Pointing Error
+        if self.pointingError: pointingError = self.pointingError.arcmins
+        else:
+            pointingError = 0.
+            tableMask[7] = True
+        ## Zero Point
+        if self.zeroPoint: zeroPoint = self.zeroPoint
+        else:
+            zeroPoint = 0.
+            tableMask[8] = True
+        ## nStarsSEx
+        if self.nStarsSEx: nStarsSEx = self.nStarsSEx
+        else: 
+            nStarsSEx = 0.
+            tableMask[9] = True
+        ## SExtractor Background
+        if self.SExBackground: SExBackground = self.SExBackground
+        else:
+            SExBackground = 0.
+            tableMask[10] = True
+        ## SExtractor Background RMS
+        if self.SExBRMS: SExBRMS = self.SExBRMS
+        else:
+            SExBRMS = 0.
+            tableMask[11] = True
+        ## Add row to table
+        self.logger.debug("Writing new row to log table.")
+        SummaryTable.add_row((dateObs, rawFileName,
+                              FWHM, ellipticity,
+                              targetAlt, targetAz,
+                              airmass, pointingError,
+                              zeroPoint, nStarsSEx,
+                              SExBackground, SExBRMS),
+                              mask=tableMask)
+        ## Write Table to File
+        self.logger.info("Writing new summary file.")
+        ascii.write(SummaryTable, summaryFile,
+                    Writer=ascii.basic.Basic)
 
 
     ##-------------------------------------------------------------------------
     ## Calcualte Process Time
     ##-------------------------------------------------------------------------
-    def CalculateProcessTime(self, logger):
+    def CalculateProcessTime(self):
         self.endProcessTime = time.time()
         self.processTime = self.endProcessTime - self.startProcessTime
-        logger.info("IQMon processing time = {0:.1f} seconds".format(self.processTime))
+        self.logger.info("IQMon processing time = {0:.1f} seconds".format(self.processTime))
 
