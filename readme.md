@@ -30,15 +30,28 @@ If the image contains a WCS, the module can also compare the WCS coordinates of 
     * Runs roughly 2x faster than v0.X.
 * **v0.X** (frozen 2013/07/15)
     * Initial version, not under version control.
-    * Works on VYSOS Data.
-    * Implemented using functions instead of objects.
-    * Reports image pointing info (alt, az, moon angle)
+    * Deployed on live VYSOS data.
     * Analyzes image with SExtractor
         * Reports FWHM, ellipticity, background, number of stars detected
-    * Can solve image with astrometry.net (poor error handling)
+    * Reports image pointing info (alt, az, moon angle)
+    * Can solve image with astrometry.net (with poor error handling)
     * Reports pointing error and position angle
     * Makes jpegs of image and cropped version with circles overlayed on stars found by SExtractor
     * Makes HTML and text file versions of results with one line per image, usually one night of images per file.
+
+
+## Planned Features
+
+… in no particular order:
+
+* Add color coding of HTML output table to mark images with poor FWHM, ellipticity, and pointing error
+* Improved error handling and timeout on astrometry.net call.
+* Add method to write image analysis results to MySQL database
+    * Add method to make HTML table from database of images rather than image by image.
+* Implement reading of raw DSLR images via dcraw.
+* Refine WCS by adding distortion terms.
+* Determine zero point of image by comparing SExtractor photometry with catalog magnitudes (using UCAC4).
+
 
 ## Code Structure
 
@@ -54,89 +67,74 @@ IQMon functionality centers around the use of three objects:  IQMon.Config, IQMo
 
 A typical code to use IQMon on a single image might be structured something like this:
 
-    def listDarks():
-        ## define a function to return a list of the paths
-        ## to dark file(s) on your system
-        return Darks
+```
+def listDarks():
+    ## define a function to return a list of the paths
+    ## to dark file(s) on your system
+    return Darks
 
-    def main():
-        ## main program, possibly set up command line argument
-        ## to accept the filename of the fits image you want to analyze
-        FitsFile = "/path/to/fits/file"
-        
-        ## Establish IQMon Configuration
-        config = IQMon.Config()  ## This reads configuration info in
-                                 ## your $HOME/.IQMonConfig file
-        ## Create Telescope Object
-        tel = IQMon.Telescope()
-        ## Define your telescope's properties
-        tel.name = "MyTelescope"
-        tel.longName = "MyReallyExcellentTelescope"
-        tel.focalLength = 735.*u.mm
-        tel.pixelSize = 9.0*u.micron
-        tel.aperture = 135.*u.mm
-        tel.gain = 1.6 / u.adu
-        tel.unitsForFWHM = 1.*u.pix
-        tel.ROI = "[1024:3072,1024:3072]"
-        tel.thresholdFWHM = 2.5*u.pix
-        tel.thresholdPointingErr = 5.0*u.arcmin
-        tel.thresholdEllipticity = 0.30
-        tel.pixelScale = tel.pixelSize.to(u.mm) / tel.focalLength.to(u.mm) * u.radian.to(u.arcsec) * u.arcsec / u.pix
-        tel.fRatio = tel.focalLength.to(u.mm) / tel.aperture.to(u.mm)
-        tel.SExtractorPhotAperture = 6.0*u.pix
-        tel.SExtractorSeeing = 2.0*u.arcsec
-        tel.site = ephem.Observer()
-        
-        ## Create IQMon.Image Object
-        image = IQMon.Image(FitsFile, tel, config)  ## Create image object
-                
-        ## Create Filenames and set verbosity
-        IQMonLogFileName = "/path/to/my/log"
-        htmlImageList = "/path/to/my/HTML/output"
-        summaryFile = "/path/to/my/text/output"
-        FullFrameJPEG = "/path/to/full/frame/jpeg"
-        CropFrameJPEG = "/path/to/crop/frame/jpeg"
-        verbose = True
-        
-        ## Perform Actual Image Analysis
-        image.MakeLogger(IQMonLogFileName, args.verbose)
-        image.logger.info("###### Processing Image:  %s ######", FitsFilename)
-        image.logger.info("Setting telescope variable to %s", telescope)
-        image.tel.CheckUnits()
-        image.ReadImage()           ## Create working copy of image (don't edit raw file!)
-        image.GetHeader()           ## Extract values from header
-        image.MakeJPEG(FullFrameJPEG, rotate=True, binning=2)
-        if not image.imageWCS:      ## If no WCS found in header ...
-            image.SolveAstrometry() ## Solve Astrometry
-            image.GetHeader()       ## Refresh Header
-        image.DeterminePointingError() ## Calculate Pointing Error
-        darks = ListDarks(image)    ## List dark files
-        image.DarkSubtract(darks)   ## Dark Subtract Image
-        image.Crop()                ## Crop Image
-        image.GetHeader()           ## Refresh Header
-        image.RunSExtractor()       ## Run SExtractor
-        image.DetermineFWHM()       ## Determine FWHM from SExtractor results
-        image.MakeJPEG(CropFrameJPEG, marked=True, binning=1)
-        image.CleanUp()             ## Cleanup (delete) temporary files.
-        image.CalculateProcessTime()## Calculate how long it took to process this image
-        image.AddWebLogEntry(htmlImageList) ## Add line for this image to HTML table
-        image.AddSummaryEntry(summaryFile)  ## Add line for this image to text table
-
-
-
-
-
-## Planned Features
-
-… in no particular order:
-
-* Add color coding of HTML output table to allow marking of poor FWHM, ellipticity, and pointing error
-* Robust error handling and timeout on astrometry.net call.
-* Add method to write image analysis results to MySQL database
-    * Add method to make HTML table from database of images rather than image by image.  This would not be a method of image, but either of telescope or config or perhaps a new object.
-* Implement reading of raw DSLR images via dcraw.
-* Refine WCS by adding distortion terms.
-* Determine zero point of image by comparing SExtractor photometry with catalog magnitudes (using UCAC4).
+def main():
+    ## main program
+    FitsFile = "/path/to/fits/file"
+    
+    ## Establish IQMon Configuration
+    config = IQMon.Config()  ## This reads configuration info in
+                             ## your $HOME/.IQMonConfig file
+    ## Create Telescope Object
+    tel = IQMon.Telescope()
+    ## Define your telescope's properties
+    tel.name = "MyTelescope"
+    tel.longName = "MyReallyExcellentTelescope"
+    tel.focalLength = 735.*u.mm
+    tel.pixelSize = 9.0*u.micron
+    tel.aperture = 135.*u.mm
+    tel.gain = 1.6 / u.adu
+    tel.unitsForFWHM = 1.*u.pix
+    tel.ROI = "[1024:3072,1024:3072]"
+    tel.thresholdFWHM = 2.5*u.pix
+    tel.thresholdPointingErr = 5.0*u.arcmin
+    tel.thresholdEllipticity = 0.30
+    tel.pixelScale = tel.pixelSize.to(u.mm) / tel.focalLength.to(u.mm) * u.radian.to(u.arcsec) * u.arcsec / u.pix
+    tel.fRatio = tel.focalLength.to(u.mm) / tel.aperture.to(u.mm)
+    tel.SExtractorPhotAperture = 6.0*u.pix
+    tel.SExtractorSeeing = 2.0*u.arcsec
+    tel.site = ephem.Observer()
+    
+    ## Create IQMon.Image Object
+    image = IQMon.Image(FitsFile, tel, config)  ## Create image object
+            
+    ## Create Filenames and set verbosity
+    IQMonLogFileName = "/path/to/my/log"
+    htmlImageList = "/path/to/my/HTML/output"
+    summaryFile = "/path/to/my/text/output"
+    FullFrameJPEG = "/path/to/full/frame/jpeg"
+    CropFrameJPEG = "/path/to/crop/frame/jpeg"
+    verbose = True
+    
+    ## Perform Actual Image Analysis
+    image.MakeLogger(IQMonLogFileName, args.verbose)
+    image.logger.info("###### Processing Image:  %s ######", FitsFilename)
+    image.logger.info("Setting telescope variable to %s", telescope)
+    image.tel.CheckUnits()
+    image.ReadImage()           ## Create working copy of image (don't edit raw file!)
+    image.GetHeader()           ## Extract values from header
+    image.MakeJPEG(FullFrameJPEG, rotate=True, binning=2)
+    if not image.imageWCS:      ## If no WCS found in header ...
+        image.SolveAstrometry() ## Solve Astrometry
+        image.GetHeader()       ## Refresh Header
+    image.DeterminePointingError() ## Calculate Pointing Error
+    darks = ListDarks(image)    ## List dark files
+    image.DarkSubtract(darks)   ## Dark Subtract Image
+    image.Crop()                ## Crop Image
+    image.GetHeader()           ## Refresh Header
+    image.RunSExtractor()       ## Run SExtractor
+    image.DetermineFWHM()       ## Determine FWHM from SExtractor results
+    image.MakeJPEG(CropFrameJPEG, marked=True, binning=1)
+    image.CleanUp()             ## Cleanup (delete) temporary files.
+    image.CalculateProcessTime()## Calculate how long it took to process this image
+    image.AddWebLogEntry(htmlImageList) ## Add line for this image to HTML table
+    image.AddSummaryEntry(summaryFile)  ## Add line for this image to text table
+```
 
 ## License Terms
 

@@ -104,23 +104,25 @@ class Telescope(object):
     of calls to the IQMon.Image object and it's methods.
 
     Properties:
-      name:          a short name for the telescope
-      longName:      a long name for the telescope
-      focalLength:   
-      pixelSize:     
+      name:          A short name for the telescope
+      longName:      A long name for the telescope
+      focalLength:   The focal length of the telescope
+      pixelSize:     The size of the pixels in the CCD camera
       pixelScale:    The estimated pixel scale of the telescope in arcsec per
                      pixel.  This should be an astropy Unit object with a value
                      and units.
-      fRatio:        
-      aperture:      
+      fRatio:        The F/ratio of the telescope.
+      aperture:      The aperture of the telescope.
       gain:          The gain (in electrons per ADU) of the CCD.
-      nXPix:         
-      nYPix:         
-      site:          a pyephem site object defining the site of the telescope
-      unitsForFWHM:  
-      ROI:           the "region of interest" to crop the image to.  Format
+      nXPix:         The number of pixels in the X direction of the CCD.
+      nYPix:         The number of pixels in the Y direction of the CCD.
+      site:          A pyephem site object defining the site of the telescope
+      unitsForFWHM:  A quantity with the units for the FWHM output.  The units
+                     should be reducible to either pixels or arcseconds.
+      ROI:           The "region of interest" to crop the image to.  Format
                      should be '[x1:x2,y1:y2]' or 'x1:x2,y1:y2'.
-      thresholdFWHM: 
+      thresholdFWHM: The FWHM above which the image should be flagged in the
+                     HTML output log.
       thresholdPointingErr:   
       thresholdEllipticity:   
       SExtractorPhotAperture: 
@@ -822,12 +824,14 @@ class Image(object):
             IQRadiusFactor = 1.0
             DiagonalRadius = math.sqrt((self.nXPix/2)**2+(self.nYPix/2)**2)
             IQRadius = DiagonalRadius*IQRadiusFactor
-            CentralFWHMs = []
-            CentralEllipticities = []
-            for star in self.SExtractorResults:
-                if star['ImageRadius'] <= IQRadius:
-                    CentralFWHMs.append(star['FWHM_IMAGE'])
-                    CentralEllipticities.append(star['ELLIPTICITY'])   
+            CentralFWHMs = [star['FWHM_IMAGE'] for star in self.SExtractorResults if star['ImageRadius'] <= IQRadius]
+            CentralEllipticities = [star['ELLIPTICITY'] for star in self.SExtractorResults if star['ImageRadius'] <= IQRadius]
+#             CentralFWHMs = []
+#             CentralEllipticities = []
+#             for star in self.SExtractorResults:
+#                 if star['ImageRadius'] <= IQRadius:
+#                     CentralFWHMs.append(star['FWHM_IMAGE'])
+#                     CentralEllipticities.append(star['ELLIPTICITY'])   
             if len(CentralFWHMs) > 3:
                 self.FWHM = np.median(CentralFWHMs) * u.pix
                 self.ellipticity = np.median(CentralEllipticities)
@@ -838,7 +842,6 @@ class Image(object):
         else:
             self.FWHM = None
             self.ellipticity = None
-
 
 
     ##-------------------------------------------------------------------------
@@ -910,6 +913,7 @@ class Image(object):
             if os.path.exists(item):
                 self.logger.debug("Deleting {0}".format(item))
                 os.remove(item)
+
 
     ##-------------------------------------------------------------------------
     ## Append Line With Image Info to HTML File List
