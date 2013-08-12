@@ -837,6 +837,7 @@ class Image(object):
                 self.ellipticity = np.median(CentralEllipticities)
             else:
                 self.logger.warning("Not enough stars detected in central region of image to form median FWHM.")
+            self.logger.debug("Using {0} stars in central region to determine FWHM and ellipticity.".format(len(CentralFWHMs)))
             self.logger.info("Median FWHM in inner region is {0:.2f} pixels".format(self.FWHM.to(u.pix).value))
             self.logger.info("Median Ellipticity in inner region is {0:.2f}".format(self.ellipticity))
         else:
