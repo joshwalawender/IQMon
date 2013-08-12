@@ -46,8 +46,6 @@ If the image contains a WCS, the module can also compare the WCS coordinates of 
 
 * Add color coding of HTML output table to mark images with poor FWHM, ellipticity, and pointing error
 * Improved error handling and timeout on astrometry.net call.
-* Add method to write image analysis results to MySQL database
-    * Add method to make HTML table from database of images rather than image by image.
 * Implement reading of raw DSLR images via dcraw.
 * Refine WCS by adding distortion terms.
 * Determine zero point of image by comparing SExtractor photometry with catalog magnitudes (using UCAC4).
