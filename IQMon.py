@@ -91,6 +91,32 @@ class Config(object):
 #             if IsCatalogPath:
 #                 self.pathCatalog = os.path.abspath(IsCatalogPath.group(1))
 
+        ## Create Log Path if it doesn't exist
+        SplitPath = [self.pathLog]
+        CreatePaths = []
+        while not os.path.exists(SplitPath[0]):
+            CreatePaths.append(SplitPath[0])
+            SplitPath = os.path.split(SplitPath[0])
+        while len(CreatePaths) > 0:
+            os.mkdir(CreatePaths.pop())
+        ## Create Plots Path if it doesn't exist
+        SplitPath = [self.pathPlots]
+        CreatePaths = []
+        while not os.path.exists(SplitPath[0]):
+            CreatePaths.append(SplitPath[0])
+            SplitPath = os.path.split(SplitPath[0])
+        while len(CreatePaths) > 0:
+            os.mkdir(CreatePaths.pop())
+        ## Create temp Path if it doesn't exist
+        SplitPath = [self.pathTemp]
+        CreatePaths = []
+        while not os.path.exists(SplitPath[0]):
+            CreatePaths.append(SplitPath[0])
+            SplitPath = os.path.split(SplitPath[0])
+        while len(CreatePaths) > 0:
+            os.mkdir(CreatePaths.pop())
+
+
 
 ##-----------------------------------------------------------------------------
 ## Define Telescope object to hold telescope information
@@ -622,11 +648,13 @@ class Image(object):
             AstrometrySTDOUT = subprocess32.check_output(AstrometryCommand, 
                                stderr=subprocess32.STDOUT, timeout=20)
             EndTime = time.time()
-#         except TimeoutExpired:
+#         except subprocess32.TimeoutExpired:
 #             self.logger.warning("Astrometry.net timed out")
 #             self.astrometrySolved = False
-        except:
+        except subprocess32.CalledProcessError:
             self.logger.warning("Astrometry.net failed.")
+            for line in CalledProcessError.output.split("\n"):
+                self.logger.error(line)
             self.astrometrySolved = False
         else:
             ProcessTime = EndTime - StartTime
@@ -758,6 +786,10 @@ class Image(object):
             SExtractorCommand = ["sex", self.workingFile, "-c", SExtractorConfigFile]
             try:
                 SExSTDOUT = subprocess32.check_output(SExtractorCommand, stderr=subprocess32.STDOUT, timeout=30)
+            except subprocess32.CalledProcessError:
+                self.logger.warning("SExtractor failed.")
+                for line in CalledProcessError.output.split("\n"):
+                    self.logger.error(line)
             except:
                 self.logger.warning("SExtractor error.")
             else:
@@ -893,6 +925,10 @@ class Image(object):
         JPEGcommand.append(jpegFile)
         try:        
             ConvertSTDOUT = subprocess32.check_output(JPEGcommand, stderr=subprocess32.STDOUT, timeout=30)
+        except subprocess32.CalledProcessError:
+            self.logger.warning("Failed to create jpeg.")
+            for line in CalledProcessError.output.split("\n"):
+                self.logger.error(line)
         except:
             self.logger.warning("Failed to create jpeg.")
         else:
