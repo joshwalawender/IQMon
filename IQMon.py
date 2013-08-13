@@ -648,14 +648,16 @@ class Image(object):
             AstrometrySTDOUT = subprocess32.check_output(AstrometryCommand, 
                                stderr=subprocess32.STDOUT, timeout=20)
             EndTime = time.time()
-#         except subprocess32.TimeoutExpired:
-#             self.logger.warning("Astrometry.net timed out")
-#             self.astrometrySolved = False
-        except subprocess32.CalledProcessError:
+        except subprocess32.TimeoutExpired as e:
+            self.logger.warning("Astrometry.net timed out")
+            self.astrometrySolved = False
+        except subprocess32.CalledProcessError as e:
             self.logger.warning("Astrometry.net failed.")
-            for line in CalledProcessError.output.split("\n"):
+            for line in e.output.split("\n"):
                 self.logger.error(line)
             self.astrometrySolved = False
+        except:
+            self.logger.error("solve-field process failed: {0} {1} {2}".format(sys.exc_info()[0], sys.exc_info()[1], sys.exc_info()[2]))
         else:
             ProcessTime = EndTime - StartTime
             self.logger.debug("Astrometry.net Processing Time: %.1f s", ProcessTime)
@@ -786,12 +788,12 @@ class Image(object):
             SExtractorCommand = ["sex", self.workingFile, "-c", SExtractorConfigFile]
             try:
                 SExSTDOUT = subprocess32.check_output(SExtractorCommand, stderr=subprocess32.STDOUT, timeout=30)
-            except subprocess32.CalledProcessError:
-                self.logger.warning("SExtractor failed.")
-                for line in CalledProcessError.output.split("\n"):
+            except subprocess32.CalledProcessError as e:
+                self.logger.error("SExtractor failed.")
+                for line in e.output.split("\n"):
                     self.logger.error(line)
             except:
-                self.logger.warning("SExtractor error.")
+                self.logger.error("SExtractor process failed: {0} {1} {2}".format(sys.exc_info()[0], sys.exc_info()[1], sys.exc_info()[2]))
             else:
                 for line in SExSTDOUT.split("\n"):
                     line.replace("[1A", "")
@@ -925,12 +927,16 @@ class Image(object):
         JPEGcommand.append(jpegFile)
         try:        
             ConvertSTDOUT = subprocess32.check_output(JPEGcommand, stderr=subprocess32.STDOUT, timeout=30)
-        except subprocess32.CalledProcessError:
-            self.logger.warning("Failed to create jpeg.")
-            for line in CalledProcessError.output.split("\n"):
+        except subprocess32.CalledProcessError as e:
+            self.logger.error("Failed to create jpeg.")
+            for line in e.output.split("\n"):
+                self.logger.error(line)
+        except OSError as e:
+            self.logger.error("Failed to create jpeg.")
+            for line in e.strerror.split("\n"):
                 self.logger.error(line)
         except:
-            self.logger.warning("Failed to create jpeg.")
+            self.logger.error("Convert process failed: {0} {1} {2}".format(sys.exc_info()[0], sys.exc_info()[1], sys.exc_info()[2]))
         else:
             for line in ConvertSTDOUT.split("\n"):
                 if len(line) > 0:
