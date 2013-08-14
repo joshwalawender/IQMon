@@ -996,13 +996,16 @@ class Image(object):
         self.logger.info("Adding image data to HTML log file.")
         HTML = open(htmlImageList, 'a')
         HTML.write("    <tr>\n")
+        ## Write Observation Date and Time
         HTML.write("      <td style='color:black;text-align:left'>{0}</td>\n".format(self.dateObs))
+        ## Write Filename (and links to jpegs)
         if len(self.jpegFileNames) == 0:
             HTML.write("      <td style='color:black;text-align:left'>{0}</td>\n".format(self.rawFileBasename))
         elif len(self.jpegFileNames) == 1:
             HTML.write("      <td style='color:black;text-align:left'><a href='{0}'>{1}</a></td>\n".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]), self.rawFileBasename))
         elif len(self.jpegFileNames) >= 2:
             HTML.write("      <td style='color:black;text-align:left'><a href='{0}'>{1}</a> (<a href='{2}'>JPEG2</a>)</td>\n".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]), self.rawFileBasename, os.path.join("..", "..", "Plots", self.jpegFileNames[1])))                
+        ## Write Alt, Az, airmass, moon separation, and moon phase
         if self.targetAlt and self.targetAz and self.airmass and self.moonSep and self.moonPhase:
             HTML.write("      <td style='color:black'>{0:.1f}</td>\n".format(self.targetAlt.to(u.deg).value))
             HTML.write("      <td style='color:black'>{0:.1f}</td>\n".format(self.targetAz.to(u.deg).value))
@@ -1015,36 +1018,61 @@ class Image(object):
             HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
             HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
             HTML.write("      <td style='color:black'>{0}</td>\n".format(""))
+        ## Write FWHM and ellipticity
         if self.FWHM and self.ellipticity:
+            ## Decide whether to flag FWHM value with red color
+            if self.FWHM > self.tel.thresholdFWHM:
+                colorFWHM = "red"
+            else:
+                colorFWHM = "black"
+            ## Decide whether to flag ellipticity value with red color
+            if self.ellipticity > self.tel.thresholdEllipticity:
+                colorEllipticity = "red"
+            else:
+                colorEllipticity = "black"
+            ## Convert FWHM value to appropriate units for HTML output
             if self.tel.unitsForFWHM.unit == u.arcsec:
                 FWHM_for_HTML = (self.FWHM * u.radian.to(u.arcsec)*self.tel.pixelSize.to(u.mm)/self.tel.focalLength.to(u.mm)).value
             else:
                 FWHM_for_HTML = self.FWHM.value
-            HTML.write("      <td style='color:{0}'>{1:.2f}</td>\n".format("black", FWHM_for_HTML))
-            HTML.write("      <td style='color:{0}'>{1:.2f}</td>\n".format("black", self.ellipticity))
+            ## Write HTML
+            HTML.write("      <td style='color:{0}'>{1:.2f}</td>\n".format(colorFWHM, FWHM_for_HTML))
+            HTML.write("      <td style='color:{0}'>{1:.2f}</td>\n".format(colorEllipticity, self.ellipticity))
         else:
             HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
             HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+        ## Write SExtractor background and background RMS
         if self.SExBackground and self.SExBRMS:
-            HTML.write("      <td style='color:{0}'>{1:.1f} [{2:.1f}]</td>\n".format("black", self.SExBackground, self.SExBRMS))
+            HTML.write("      <td style='color:{0}'>{1:.0f} [{2:.0f}]</td>\n".format("black", self.SExBackground, self.SExBRMS))
         else:
             HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+        ## Write pointing error
         if self.pointingError:
-            HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format("black", self.pointingError.arcmins))
+            ## Decide whether to flag pointing error value with red color
+            if self.pointingError.arcmins > self.tel.thresholdPointingErr.to(u.arcmin).value:
+                colorPointingError = "red"
+            else:
+                colorPointingError = "black"
+            ## Write HTML
+            HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format(colorPointingError, self.pointingError.arcmins))
         else:
             HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+        ## Write WCS position angle
         if self.positionAngle:
             HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format("black", self.positionAngle.to(u.deg).value))
         else:
             HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+        ## Write zero point
         if self.zeroPoint:
             HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", self.zeroPoint))
         else:
             HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+        ## Write number of stars detected by SExtractor
         if self.nStarsSEx:
             HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", self.nStarsSEx))
         else:
             HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+        ## Write process time
         if self.processTime:
             HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format("black", self.processTime))
         else:
