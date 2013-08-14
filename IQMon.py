@@ -1021,12 +1021,12 @@ class Image(object):
         ## Write FWHM and ellipticity
         if self.FWHM and self.ellipticity:
             ## Decide whether to flag FWHM value with red color
-            if self.FWHM > self.thresholdFWHM:
+            if self.FWHM > self.tel.thresholdFWHM:
                 colorFWHM = "red"
             else:
                 colorFWHM = "black"
             ## Decide whether to flag ellipticity value with red color
-            if self.ellipticity > self.thresholdEllipticity:
+            if self.ellipticity > self.tel.thresholdEllipticity:
                 colorEllipticity = "red"
             else:
                 colorEllipticity = "black"
@@ -1049,7 +1049,7 @@ class Image(object):
         ## Write pointing error
         if self.pointingError:
             ## Decide whether to flag pointing error value with red color
-            if self.pointingError > self.thresholdPointingErr:
+            if self.pointingError > self.tel.thresholdPointingErr:
                 colorPointingError = "red"
             else:
                 colorPointingError = "black"
