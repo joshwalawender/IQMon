@@ -107,7 +107,7 @@ def main():
     verbose = True
     
     ## Perform Actual Image Analysis
-    image.MakeLogger(IQMonLogFileName, args.verbose)
+    image.MakeLogger(IQMonLogFileName, verbose)
     image.logger.info("###### Processing Image:  %s ######", FitsFilename)
     image.logger.info("Setting telescope variable to %s", telescope)
     image.tel.CheckUnits()
