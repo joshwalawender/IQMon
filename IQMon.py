@@ -1049,7 +1049,7 @@ class Image(object):
         ## Write pointing error
         if self.pointingError:
             ## Decide whether to flag pointing error value with red color
-            if self.pointingError > self.tel.thresholdPointingErr:
+            if self.pointingError.arcmins > self.tel.thresholdPointingErr.to(u.arcmin).value:
                 colorPointingError = "red"
             else:
                 colorPointingError = "black"
