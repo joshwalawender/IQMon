@@ -20,13 +20,12 @@ If the image contains a WCS, the module can also compare the WCS coordinates of 
 * astrometry.net solver (<http://astrometry.net>)
 
 * matplotlib (Should be bundled with most python installations)
-* subprocess32
+* subprocess
 
 ## Version History
 
-* **v1.0** (released on github.com 2013/08/??)
-    * Rewritten as object oriented code.  Implements most capabilities of v0.1.
-    * Does not color code HTML table with alerts to poor values of FWHM, pointing error, etc.
+* **v1.0** (released on github.com 2013/08/14)
+    * Rewritten as object oriented code.  Implements most capabilities of v0.X.
     * Runs roughly 2x faster than v0.X.
 * **v0.X** (frozen 2013/07/15)
     * Initial version, not under version control.
@@ -44,8 +43,6 @@ If the image contains a WCS, the module can also compare the WCS coordinates of 
 
 … in no particular order:
 
-* Add color coding of HTML output table to mark images with poor FWHM, ellipticity, and pointing error
-* Improved error handling and timeout on astrometry.net call.
 * Implement reading of raw DSLR images via dcraw.
 * Refine WCS by adding distortion terms.
 * Determine zero point of image by comparing SExtractor photometry with catalog magnitudes (using UCAC4).
@@ -110,7 +107,7 @@ def main():
     verbose = True
     
     ## Perform Actual Image Analysis
-    image.MakeLogger(IQMonLogFileName, args.verbose)
+    image.MakeLogger(IQMonLogFileName, verbose)
     image.logger.info("###### Processing Image:  %s ######", FitsFilename)
     image.logger.info("Setting telescope variable to %s", telescope)
     image.tel.CheckUnits()

@@ -14,7 +14,7 @@ import os
 import re
 import shutil
 import time
-import subprocess32
+import subprocess
 import logging
 import math
 import numpy as np
@@ -645,13 +645,10 @@ class Image(object):
 
         try:
             StartTime = time.time()
-            AstrometrySTDOUT = subprocess32.check_output(AstrometryCommand, 
-                               stderr=subprocess32.STDOUT, timeout=20)
+            AstrometrySTDOUT = subprocess.check_output(AstrometryCommand, 
+                               stderr=subprocess.STDOUT)
             EndTime = time.time()
-        except subprocess32.TimeoutExpired as e:
-            self.logger.warning("Astrometry.net timed out")
-            self.astrometrySolved = False
-        except subprocess32.CalledProcessError as e:
+        except subprocess.CalledProcessError as e:
             self.logger.warning("Astrometry.net failed.")
             for line in e.output.split("\n"):
                 self.logger.error(line)
@@ -787,8 +784,8 @@ class Image(object):
             self.logger.info("Invoking SExtractor.")
             SExtractorCommand = ["sex", self.workingFile, "-c", SExtractorConfigFile]
             try:
-                SExSTDOUT = subprocess32.check_output(SExtractorCommand, stderr=subprocess32.STDOUT, timeout=30)
-            except subprocess32.CalledProcessError as e:
+                SExSTDOUT = subprocess.check_output(SExtractorCommand, stderr=subprocess.STDOUT)
+            except subprocess.CalledProcessError as e:
                 self.logger.error("SExtractor failed.")
                 for line in e.output.split("\n"):
                     self.logger.error(line)
@@ -926,8 +923,8 @@ class Image(object):
         JPEGcommand.append(self.workingFile)
         JPEGcommand.append(jpegFile)
         try:        
-            ConvertSTDOUT = subprocess32.check_output(JPEGcommand, stderr=subprocess32.STDOUT, timeout=30)
-        except subprocess32.CalledProcessError as e:
+            ConvertSTDOUT = subprocess.check_output(JPEGcommand, stderr=subprocess.STDOUT)
+        except subprocess.CalledProcessError as e:
             self.logger.error("Failed to create jpeg.")
             for line in e.output.split("\n"):
                 self.logger.error(line)
