@@ -1173,7 +1173,7 @@ class Image(object):
         ## Write Table to File
         self.logger.info("Writing new summary file.")
         ascii.write(SummaryTable, summaryFile,
-                    Writer=ascii.basic.Basic)
+                    Writer=ascii.FixedWidth)
 
 
     ##-------------------------------------------------------------------------
