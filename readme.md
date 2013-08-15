@@ -24,7 +24,7 @@ If the image contains a WCS, the module can also compare the WCS coordinates of 
 
 ## Version History
 
-* **v1.0** (released on github.com 2013/08/??)
+* **v1.0** (released on github.com 2013/08/14)
     * Rewritten as object oriented code.  Implements most capabilities of v0.X.
     * Runs roughly 2x faster than v0.X.
 * **v0.X** (frozen 2013/07/15)
