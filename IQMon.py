@@ -1093,7 +1093,7 @@ class Image(object):
             SummaryTable = table.Table(names=("ExpStart", "File", "FWHM (pix)", "Ellipticity", 
                                        "Alt (deg)", "Az (deg)", "Airmass", "PointingError (arcmin)", 
                                        "ZeroPoint", "nStars", "Background", "Background RMS"),
-                                 dtypes=('a22', 'a120', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'i4', 'f4', 'f4'),
+                                 dtypes=('S22', 'S100', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'i4', 'f4', 'f4'),
                                  masked=True)
         else:
             self.logger.info("Reading astropy table object from file: {0}".format(summaryFile))
@@ -1107,9 +1107,10 @@ class Image(object):
             dateObs = ""
             tableMask[0] = True
         ## FileName
-        if self.rawFileName: rawFileName = self.rawFileName
+        if self.rawFileName:
+            rawFileName = self.rawFileName.ljust(100)
         else: 
-            rawFileName = ""
+            rawFileName = "".ljust(100)
             tableMask[1] = True
         ## FWHM
         if self.FWHM: FWHM = self.FWHM.to(u.pix).value
