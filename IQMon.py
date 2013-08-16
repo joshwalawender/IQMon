@@ -1097,7 +1097,11 @@ class Image(object):
                                  masked=True)
         else:
             self.logger.info("Reading astropy table object from file: {0}".format(summaryFile))
-            SummaryTable = ascii.read(summaryFile)
+            SummaryTable = ascii.read(summaryFile,
+                                      converters={
+                                      'ExpStart': [ascii.convert_numpy('S22')],
+                                      'File': [ascii.convert_numpy('S100')]
+                                      })
         ## Astropy table writer can not write None to table initialized
         ## with type.  If any outputs are None, change to some value.
         tableMask = np.zeros(12)
