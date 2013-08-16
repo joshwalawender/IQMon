@@ -1162,7 +1162,7 @@ class Image(object):
             SExBRMS = 0.
             tableMask[11] = True
         ## Add row to table
-        self.logger.debug("Writing new row to log table.")
+        self.logger.debug("Writing new row to log table.  Filename: {0}".format(rawFileName))
         SummaryTable.add_row((dateObs, rawFileName,
                               FWHM, ellipticity,
                               targetAlt, targetAz,
@@ -1173,7 +1173,7 @@ class Image(object):
         ## Write Table to File
         self.logger.info("Writing new summary file.")
         ascii.write(SummaryTable, summaryFile,
-                    Writer=ascii.FixedWidth)
+                    Writer=ascii.basic.Basic)
 
 
     ##-------------------------------------------------------------------------
