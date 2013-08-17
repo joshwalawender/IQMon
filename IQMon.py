@@ -1093,11 +1093,15 @@ class Image(object):
             SummaryTable = table.Table(names=("ExpStart", "File", "FWHM (pix)", "Ellipticity", 
                                        "Alt (deg)", "Az (deg)", "Airmass", "PointingError (arcmin)", 
                                        "ZeroPoint", "nStars", "Background", "Background RMS"),
-                                 dtypes=('a22', 'a120', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'i4', 'f4', 'f4'),
+                                 dtypes=('S22', 'S100', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'i4', 'f4', 'f4'),
                                  masked=True)
         else:
             self.logger.info("Reading astropy table object from file: {0}".format(summaryFile))
-            SummaryTable = ascii.read(summaryFile)
+            SummaryTable = ascii.read(summaryFile,
+                                      converters={
+                                      'ExpStart': [ascii.convert_numpy('S22')],
+                                      'File': [ascii.convert_numpy('S100')]
+                                      })
         ## Astropy table writer can not write None to table initialized
         ## with type.  If any outputs are None, change to some value.
         tableMask = np.zeros(12)
@@ -1107,9 +1111,10 @@ class Image(object):
             dateObs = ""
             tableMask[0] = True
         ## FileName
-        if self.rawFileName: rawFileName = self.rawFileName
+        if self.rawFileName:
+            rawFileName = self.rawFileName.ljust(100)
         else: 
-            rawFileName = ""
+            rawFileName = "".ljust(100)
             tableMask[1] = True
         ## FWHM
         if self.FWHM: FWHM = self.FWHM.to(u.pix).value
@@ -1162,7 +1167,7 @@ class Image(object):
             SExBRMS = 0.
             tableMask[11] = True
         ## Add row to table
-        self.logger.debug("Writing new row to log table.")
+        self.logger.debug("Writing new row to log table.  Filename: {0}".format(rawFileName))
         SummaryTable.add_row((dateObs, rawFileName,
                               FWHM, ellipticity,
                               targetAlt, targetAz,
