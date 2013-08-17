@@ -1021,12 +1021,12 @@ class Image(object):
             if self.FWHM > self.tel.thresholdFWHM:
                 colorFWHM = "red"
             else:
-                colorFWHM = "black"
+                colorFWHM = "green"
             ## Decide whether to flag ellipticity value with red color
             if self.ellipticity > self.tel.thresholdEllipticity:
                 colorEllipticity = "red"
             else:
-                colorEllipticity = "black"
+                colorEllipticity = "green"
             ## Convert FWHM value to appropriate units for HTML output
             if self.tel.unitsForFWHM.unit == u.arcsec:
                 FWHM_for_HTML = (self.FWHM * u.radian.to(u.arcsec)*self.tel.pixelSize.to(u.mm)/self.tel.focalLength.to(u.mm)).value
@@ -1049,7 +1049,7 @@ class Image(object):
             if self.pointingError.arcmins > self.tel.thresholdPointingErr.to(u.arcmin).value:
                 colorPointingError = "red"
             else:
-                colorPointingError = "black"
+                colorPointingError = "green"
             ## Write HTML
             HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format(colorPointingError, self.pointingError.arcmins))
         else:
