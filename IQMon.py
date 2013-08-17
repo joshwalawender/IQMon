@@ -988,7 +988,7 @@ class Image(object):
                 IsEndBody = re.match("\s*</body>\s*", line)
                 IsEndHTML = re.match("\s*</html>\s*", line)
                 if not IsEndTable and not IsEndBody and not IsEndHTML:
-                    HTML.write(line)
+                    HTML.write(line+"\n")
         ## Write Lines for this Image to HTML File
         self.logger.info("Adding image data to HTML log file.")
         HTML = open(htmlImageList, 'a')
