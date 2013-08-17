@@ -1019,22 +1019,22 @@ class Image(object):
         if self.FWHM and self.ellipticity:
             ## Decide whether to flag FWHM value with red color
             if self.FWHM > self.tel.thresholdFWHM:
-                colorFWHM = "red"
+                colorFWHM = "#FF5C33"
             else:
-                colorFWHM = "green"
+                colorFWHM = "#70DB70"
             ## Decide whether to flag ellipticity value with red color
             if self.ellipticity > self.tel.thresholdEllipticity:
-                colorEllipticity = "red"
+                colorEllipticity = "#FF5C33"
             else:
-                colorEllipticity = "green"
+                colorEllipticity = "#70DB70"
             ## Convert FWHM value to appropriate units for HTML output
             if self.tel.unitsForFWHM.unit == u.arcsec:
                 FWHM_for_HTML = (self.FWHM * u.radian.to(u.arcsec)*self.tel.pixelSize.to(u.mm)/self.tel.focalLength.to(u.mm)).value
             else:
                 FWHM_for_HTML = self.FWHM.value
             ## Write HTML
-            HTML.write("      <td style='color:{0}'>{1:.2f}</td>\n".format(colorFWHM, FWHM_for_HTML))
-            HTML.write("      <td style='color:{0}'>{1:.2f}</td>\n".format(colorEllipticity, self.ellipticity))
+            HTML.write("      <td style='background-color:{0}'>{1:.2f}</td>\n".format(colorFWHM, FWHM_for_HTML))
+            HTML.write("      <td style='background-color:{0}'>{1:.2f}</td>\n".format(colorEllipticity, self.ellipticity))
         else:
             HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
             HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
@@ -1047,11 +1047,11 @@ class Image(object):
         if self.pointingError:
             ## Decide whether to flag pointing error value with red color
             if self.pointingError.arcmins > self.tel.thresholdPointingErr.to(u.arcmin).value:
-                colorPointingError = "red"
+                colorPointingError = "#FF5C33"
             else:
-                colorPointingError = "green"
+                colorPointingError = "#70DB70"
             ## Write HTML
-            HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format(colorPointingError, self.pointingError.arcmins))
+            HTML.write("      <td style='background-color:{0}'>{1:.1f}</td>\n".format(colorPointingError, self.pointingError.arcmins))
         else:
             HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
         ## Write WCS position angle
