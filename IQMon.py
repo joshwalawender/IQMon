@@ -1036,8 +1036,8 @@ class Image(object):
             HTML.write("      <td style='background-color:{0}'>{1:.2f}</td>\n".format(colorFWHM, FWHM_for_HTML))
             HTML.write("      <td style='background-color:{0}'>{1:.2f}</td>\n".format(colorEllipticity, self.ellipticity))
         else:
-            HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
-            HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+            HTML.write("      <td style='color:{0}'>{1}</td>\n".format("#FF5C33", ""))
+            HTML.write("      <td style='color:{0}'>{1}</td>\n".format("#FF5C33", ""))
         ## Write SExtractor background and background RMS
         if self.SExBackground and self.SExBRMS:
             HTML.write("      <td style='color:{0}'>{1:.0f} [{2:.0f}]</td>\n".format("black", self.SExBackground, self.SExBRMS))
@@ -1053,7 +1053,7 @@ class Image(object):
             ## Write HTML
             HTML.write("      <td style='background-color:{0}'>{1:.1f}</td>\n".format(colorPointingError, self.pointingError.arcmins))
         else:
-            HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+            HTML.write("      <td style='color:{0}'>{1}</td>\n".format("#FF5C33", ""))
         ## Write WCS position angle
         if self.positionAngle:
             HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format("black", self.positionAngle.to(u.deg).value))
