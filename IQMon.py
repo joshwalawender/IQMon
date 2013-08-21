@@ -901,28 +901,66 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Make JPEG of Image
     ##-------------------------------------------------------------------------
-    def MakeJPEG(self, jpegFileName, marked=False, rotate=False, binning=1):
+    def MakeJPEG(self, jpegFileName, markStars=False, markPointing=False, rotate=False, binning=1):
         '''
         Make jpegs of image.
         '''
         jpegFile = os.path.join(self.config.pathPlots, jpegFileName)
-        if marked:
-            self.logger.info("Making marked jpeg with binning factor of {0}.".format(binning))
-        else:
-            self.logger.info("Making jpeg with binning factor of {0}.".format(binning))
+        self.logger.info("Making jpeg with binning factor of {0}.".format(binning))
         if os.path.exists(jpegFile): os.remove(jpegFile)
         binningString = str(1./binning*100)+"%"
-        JPEGcommand = ["convert", "-contrast-stretch", "0.9%,1%", "-compress", "JPEG", "-quality", "70", "-stroke", "red", "-fill", "none", "-resize", binningString]
-        if marked:
+        JPEGcommand = ["convert", "-contrast-stretch", "0.9%,1%", "-compress", "JPEG", "-quality", "70", "-resize", binningString]
+        if markPointing and self.imageWCS and self.coordinate_header:
+            self.logger.info("Marking target pointing in jpeg.")
+            markSize = 30
+            ## Mark Central Pixel with a White Cross
+            JPEGcommand.append("-stroke")
+            JPEGcommand.append("white")
+            JPEGcommand.append("-fill")
+            JPEGcommand.append("none")
+            pixelCenter = [self.nXPix/2/binning, self.nYPix/2/binning]
+            JPEGcommand.append('-draw')
+            JPEGcommand.append("line %d,%d %d,%d" % (pixelCenter[0]-markSize, pixelCenter[1],
+                               pixelCenter[0]+markSize, pixelCenter[1]))
+            JPEGcommand.append('-draw')
+            JPEGcommand.append("line %d,%d %d,%d" % (pixelCenter[0], pixelCenter[1]-markSize,
+                               pixelCenter[0], pixelCenter[1]+markSize))
+            ## Mark WCS of Target with a Red X
+            JPEGcommand.append("-stroke")
+            JPEGcommand.append("red")
+            JPEGcommand.append("-fill")
+            JPEGcommand.append("none")
+            ## This next block of code seems to make the call to wcs_world2pix
+            ## happy, but I'm not sure I understand why.
+            foo = np.array([[self.coordinate_header.ra.hours*15., self.coordinate_header.dec.radians*180./math.pi], 
+                            [self.coordinate_header.ra.hours*15., self.coordinate_header.dec.radians*180./math.pi]])
+            targetPixel = (self.imageWCS.wcs_world2pix(foo, 1)[0])/2
+            JPEGcommand.append('-draw')
+            JPEGcommand.append("line %d,%d %d,%d" % (targetPixel[0]-markSize, targetPixel[1]-markSize,
+                               targetPixel[0]+markSize, targetPixel[1]+markSize))
+            JPEGcommand.append('-draw')
+            JPEGcommand.append("line %d,%d %d,%d" % (targetPixel[0]+markSize, targetPixel[1]-markSize,
+                               targetPixel[0]-markSize, targetPixel[1]+markSize))
+        if markStars and self.SExtractorResults:
+            self.logger.info("Marking stars found by SExtractor in jpeg.")
+            JPEGcommand.append("-stroke")
+            JPEGcommand.append("red")
+            JPEGcommand.append("-fill")
+            JPEGcommand.append("none")
             if self.FWHM:
                 MarkRadius=max([4, 2*math.ceil(self.FWHM.value)])
             else:
                 MarkRadius = 4
+            nStarsMarked = 0
             for star in self.SExtractorResults:
-                MarkXPos = star['X_IMAGE']
-                MarkYPos = self.nXPix - star['Y_IMAGE']
-                JPEGcommand.append('-draw')
-                JPEGcommand.append("circle %d,%d %d,%d" % (MarkXPos, MarkYPos, MarkXPos+MarkRadius, MarkYPos))
+                nStarsMarked += 1
+                if nStarsMarked <= 5000:
+                    MarkXPos = star['X_IMAGE']
+                    MarkYPos = self.nXPix - star['Y_IMAGE']
+                    JPEGcommand.append('-draw')
+                    JPEGcommand.append("circle %d,%d %d,%d" % (MarkXPos, MarkYPos, MarkXPos+MarkRadius, MarkYPos))
+                else:
+                    logger.warning("Only marked first 5000 stars found in image.")
         if rotate:
             if self.positionAngle:
                 JPEGcommand.append("-rotate")
