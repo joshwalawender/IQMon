@@ -245,6 +245,17 @@ class Telescope(object):
         else:
             assert float(self.fRatio)
 
+
+    ##-------------------------------------------------------------------------
+    ## Define astropy.units Equivalency for Arcseconds and Pixels
+    ##-------------------------------------------------------------------------
+    def DefinePixelScale(self):
+        self.pixelScaleEquivalency = [(u.pix, u.arcsec,
+                       lambda pix: (pix*u.radian.to(u.arcsec)*self.pixelSize/self.focalLength).decompose().value,
+                       lambda arcsec: (arcsec/u.radian.to(u.arcsec)*self.focalLength/self.pixelSize).decompose().value
+                       )]
+
+
 ##-----------------------------------------------------------------------------
 ## Define Image object which holds information and methods for analysis
 ##-----------------------------------------------------------------------------
@@ -1018,8 +1029,8 @@ class Image(object):
         ## Write FWHM and ellipticity
         if self.FWHM and self.ellipticity:
             ## Decide whether to flag FWHM value with red color
-            if self.FWHM > self.tel.thresholdFWHM:
-                colorFWHM = "#FF5C33"
+            if self.FWHM > self.tel.thresholdFWHM.to(u.pix, equivalencies=self.tel.pixelScaleEquivalency):
+                colorFWHM = "red"
             else:
                 colorFWHM = "#70DB70"
             ## Decide whether to flag ellipticity value with red color
@@ -1111,10 +1122,9 @@ class Image(object):
             dateObs = ""
             tableMask[0] = True
         ## FileName
-        if self.rawFileName:
-            rawFileName = self.rawFileName.ljust(100)
+        if self.rawFileName: rawFileName = self.rawFileName
         else: 
-            rawFileName = "".ljust(100)
+            rawFileName = ""
             tableMask[1] = True
         ## FWHM
         if self.FWHM: FWHM = self.FWHM.to(u.pix).value
@@ -1189,3 +1199,4 @@ class Image(object):
         self.processTime = self.endProcessTime - self.startProcessTime
         self.logger.info("IQMon processing time = {0:.1f} seconds".format(self.processTime))
 
+    
