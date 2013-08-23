@@ -1071,7 +1071,7 @@ class Image(object):
         if self.FWHM and self.ellipticity:
             ## Decide whether to flag FWHM value with red color
             if self.FWHM > self.tel.thresholdFWHM.to(u.pix, equivalencies=self.tel.pixelScaleEquivalency):
-                colorFWHM = "red"
+                colorFWHM = "#FF5C33"
             else:
                 colorFWHM = "#70DB70"
             ## Decide whether to flag ellipticity value with red color
