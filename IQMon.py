@@ -911,7 +911,7 @@ class Image(object):
         binningString = str(1./binning*100)+"%"
         JPEGcommand = ["convert", "-contrast-stretch", "0.9%,1%", "-compress", "JPEG", "-quality", "70", "-resize", binningString]
         if markPointing and self.imageWCS and self.coordinate_header:
-            self.logger.info("Marking target pointing in jpeg.")
+            self.logger.debug("Marking target pointing in jpeg.")
             markSize = 30
             ## Mark Central Pixel with a White Cross
             JPEGcommand.append("-stroke")
@@ -942,7 +942,7 @@ class Image(object):
             JPEGcommand.append("line %d,%d %d,%d" % (targetPixel[0]+markSize, targetPixel[1]-markSize,
                                targetPixel[0]-markSize, targetPixel[1]+markSize))
         if markStars and self.SExtractorResults:
-            self.logger.info("Marking stars found by SExtractor in jpeg.")
+            self.logger.debug("Marking stars found by SExtractor in jpeg.")
             JPEGcommand.append("-stroke")
             JPEGcommand.append("red")
             JPEGcommand.append("-fill")
@@ -961,7 +961,8 @@ class Image(object):
                     JPEGcommand.append("circle %d,%d %d,%d" % (MarkXPos, MarkYPos, MarkXPos+MarkRadius, MarkYPos))
                 else:
                     logger.warning("Only marked first 5000 stars found in image.")
-        if rotate:
+        if rotate and self.positionAngle:
+            self.logger.debug("Rotating jpeg by {0:.1f} deg".format(self.positionAngle.to(u.deg).value))
             if self.positionAngle:
                 JPEGcommand.append("-rotate")
                 JPEGcommand.append(str(self.positionAngle.to(u.deg).value))
@@ -971,7 +972,8 @@ class Image(object):
                 self.logger.warning("No position angle value found.  Not rotating JPEG.")
         JPEGcommand.append(self.workingFile)
         JPEGcommand.append(jpegFile)
-        try:        
+        self.logger.debug("Issuing convert command to create jpeg.")
+        try:
             ConvertSTDOUT = subprocess.check_output(JPEGcommand, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
             self.logger.error("Failed to create jpeg.")
@@ -1168,7 +1170,6 @@ class Image(object):
                                           })
             except:
                 self.logger.critical("Failed to read summary file: {0} {1} {2}".format(sys.exc_info()[0], sys.exc_info()[1], sys.exc_info()[2]))
-        print(SummaryTable)
         ## Astropy table writer can not write None to table initialized
         ## with type.  If any outputs are None, change to some value.
         tableMask = np.zeros(12)
