@@ -960,7 +960,7 @@ class Image(object):
                     JPEGcommand.append('-draw')
                     JPEGcommand.append("circle %d,%d %d,%d" % (MarkXPos, MarkYPos, MarkXPos+MarkRadius, MarkYPos))
                 else:
-                    logger.warning("Only marked first 5000 stars found in image.")
+                    self.logger.warning("Only marked first 5000 stars found in image.")
         if rotate and self.positionAngle:
             self.logger.debug("Rotating jpeg by {0:.1f} deg".format(self.positionAngle.to(u.deg).value))
             if self.positionAngle:
