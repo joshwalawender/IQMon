@@ -1146,21 +1146,29 @@ class Image(object):
                                  masked=True)
         else:
             self.logger.info("Reading astropy table object from file: {0}".format(summaryFile))
-            SummaryTable = ascii.read(summaryFile,
-                                      converters={
-                                      'ExpStart': [ascii.convert_numpy('S22')],
-                                      'File': [ascii.convert_numpy('S100')],
-                                      'FWHM (pix)': [ascii.convert_numpy('f4')],
-                                      'Ellipticity': [ascii.convert_numpy('f4')],
-                                      'Alt (deg)': [ascii.convert_numpy('f4')],
-                                      'Az (deg)': [ascii.convert_numpy('f4')],
-                                      'Airmass': [ascii.convert_numpy('f4')],
-                                      'PointingError (arcmin)': [ascii.convert_numpy('f4')],
-                                      'ZeroPoint': [ascii.convert_numpy('f4')],
-                                      'nStars': [ascii.convert_numpy('i4')],
-                                      'Background': [ascii.convert_numpy('f4')],
-                                      'Background RMS': [ascii.convert_numpy('f4')]
-                                      })
+            try:
+                SummaryTable = ascii.read(summaryFile, guess=False,
+                                          header_start=0, data_start=1,
+                                          Reader=ascii.basic.Basic,
+                                          delimiter="\s",
+                                          fill_values=('--', '0'),
+                                          converters={
+                                          'ExpStart': [ascii.convert_numpy('S22')],
+                                          'File': [ascii.convert_numpy('S100')],
+                                          'FWHM (pix)': [ascii.convert_numpy('f4')],
+                                          'Ellipticity': [ascii.convert_numpy('f4')],
+                                          'Alt (deg)': [ascii.convert_numpy('f4')],
+                                          'Az (deg)': [ascii.convert_numpy('f4')],
+                                          'Airmass': [ascii.convert_numpy('f4')],
+                                          'PointingError (arcmin)': [ascii.convert_numpy('f4')],
+                                          'ZeroPoint': [ascii.convert_numpy('f4')],
+                                          'nStars': [ascii.convert_numpy('i4')],
+                                          'Background': [ascii.convert_numpy('f4')],
+                                          'Background RMS': [ascii.convert_numpy('f4')]
+                                          })
+            except:
+                self.logger.critical("Failed to read summary file: {0} {1} {2}".format(sys.exc_info()[0], sys.exc_info()[1], sys.exc_info()[2]))
+        print(SummaryTable)
         ## Astropy table writer can not write None to table initialized
         ## with type.  If any outputs are None, change to some value.
         tableMask = np.zeros(12)
