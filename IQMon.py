@@ -1149,7 +1149,17 @@ class Image(object):
             SummaryTable = ascii.read(summaryFile,
                                       converters={
                                       'ExpStart': [ascii.convert_numpy('S22')],
-                                      'File': [ascii.convert_numpy('S100')]
+                                      'File': [ascii.convert_numpy('S100')],
+                                      'FWHM (pix)': [ascii.convert_numpy('f4')],
+                                      'Ellipticity': [ascii.convert_numpy('f4')],
+                                      'Alt (deg)': [ascii.convert_numpy('f4')],
+                                      'Az (deg)': [ascii.convert_numpy('f4')],
+                                      'Airmass': [ascii.convert_numpy('f4')],
+                                      'PointingError (arcmin)': [ascii.convert_numpy('f4')],
+                                      'ZeroPoint': [ascii.convert_numpy('f4')],
+                                      'nStars': [ascii.convert_numpy('i4')],
+                                      'Background': [ascii.convert_numpy('f4')],
+                                      'Background RMS': [ascii.convert_numpy('f4')]
                                       })
         ## Astropy table writer can not write None to table initialized
         ## with type.  If any outputs are None, change to some value.
