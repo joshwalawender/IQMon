@@ -271,7 +271,7 @@ class Image(object):
 
     Methods:
     '''
-    def __init__(self, input, tel, config):
+    def __init__(self, input, tel=None, config=None):
         self.startProcessTime = time.time()
         if os.path.exists(input):
             FitsFileDirectory, FitsFilename = os.path.split(input)
@@ -285,11 +285,13 @@ class Image(object):
             self.rawFileDirectory = None
             raise IOError("File {0} does not exist".format(input))
         ## Confirm that input tel is an IQMon.Telescope object
-        assert type(tel) == Telescope
-        self.tel = tel
+        if tel:
+            assert type(tel) == Telescope
+            self.tel = tel
         ## Confirm that input config is an IQMon.Config object
-        assert type(config) == Config
-        self.config = config
+        if config:
+            assert type(config) == Config
+            self.config = config
         ## Initialize values to None
         self.logger = None
         self.workingFile = None
@@ -315,7 +317,7 @@ class Image(object):
         self.pointingError = None
         self.imageFlipped = None
         self.jpegFileNames = []
-
+        self.CheckImageFile = None
 
     ##-------------------------------------------------------------------------
     ## Make Logger Object
@@ -751,13 +753,15 @@ class Image(object):
         assert type(self.tel.SExtractorPhotAperture) == u.quantity.Quantity
         if self.tel.gain and self.tel.pixelScale and self.tel.SExtractorSeeing and self.tel.SExtractorPhotAperture:
             ## Set up file names
-            SExtractorDefaultFile = os.path.join(self.config.pathIQMonExec, "default.sex")
             SExtractorConfigFile = os.path.join(self.config.pathTemp, self.rawFileBasename+".sex")
             self.tempFiles.append(SExtractorConfigFile)
             SExtractorCatalog = os.path.join(self.config.pathTemp, self.rawFileBasename+".cat")
             self.tempFiles.append(SExtractorCatalog)
             PhotometryCatalogFile_xy = os.path.join(self.config.pathTemp, self.rawFileBasename+"PhotCat_xy.txt")
             self.tempFiles.append(PhotometryCatalogFile_xy)
+            CheckImageType = "-BACKGROUND"
+            self.CheckImageFile = os.path.join(self.config.pathPlots, self.rawFileBasename+"_bksub.fits")
+            self.tempFiles.append(self.CheckImageFile)
 
             ## Create PhotometryCatalogFile_xy file for SExtractor Association
             if os.path.exists(PhotometryCatalogFile_xy): os.remove(PhotometryCatalogFile_xy)
@@ -766,17 +770,39 @@ class Image(object):
             PhotCatFileObject.write("# This is a dummy file to keep SExtractor happy\n")
             PhotCatFileObject.write("0.0  0.0  0.0  0.0\n")
             PhotCatFileObject.close()
-
+            
             ## Make edits To default.sex based on telescope:
-            ## Read in default config file        
-            DefaultConfig = open(SExtractorDefaultFile, 'r')
+            ## Read in default config file
+            DefaultConfig = subprocess.check_output(["sex", "-dd"]).split("\n")
             NewConfig     = open(SExtractorConfigFile, 'w')
+            backgroundFilterSize = 2.*self.tel.SExtractorSeeing.to(u.arcsec).value / self.tel.pixelScale.value
+            self.logger.debug("Using background filter size of 2x seeing = {0:.1f} pixels.".format(backgroundFilterSize))
             for line in DefaultConfig:
                 newline = line
                 if re.match("CATALOG_NAME\s+", line):
                     newline = "CATALOG_NAME     "+SExtractorCatalog+"\n"
                 if re.match("PARAMETERS_NAME\s+", line):
                     newline = "PARAMETERS_NAME  "+os.path.join(self.config.pathIQMonExec, "default.param")+"\n"
+                if re.match("DETECT_MINAREA\s+", line) and (2.*self.tel.pixelScale.value > self.tel.SExtractorSeeing.to(u.arcsec).value):
+                    newline = "DETECT_MINAREA   "+"4"+"\n"
+                if re.match("DETECT_THRESH\s+", line):
+                    newline = "DETECT_THRESH    "+"5.0"+"\n"
+                if re.match("ANALYSIS_THRESH\s+", line):
+                    newline = "ANALYSIS_THRESH  "+"5.0"+"\n"
+                if re.match("FILTER\s+", line):
+                    newline = "FILTER           "+"N"+"\n"
+                if re.match("BACK_SIZE\s+", line):
+                    newline = "BACK_SIZE        {0:.1f}\n".format(backgroundFilterSize)
+                if re.match("ASSOC_NAME\s+", line):
+                    newline = "ASSOC_NAME       "+PhotometryCatalogFile_xy+"\n"
+                if re.match("ASSOC_NAME\s+", line):
+                    newline = "ASSOC_NAME       "+PhotometryCatalogFile_xy+"\n"
+                if re.match("ASSOCSELEC_TYPE\s+", line):
+                    newline = "ASSOCSELEC_TYPE  "+"ALL"+"\n"
+                if re.match("CHECKIMAGE_TYPE\s+", line):
+                    newline = "CHECKIMAGE_TYPE  "+CheckImageType+"\n"
+                if re.match("CHECKIMAGE_NAME\s+", line):
+                    newline = "CHECKIMAGE_NAME  "+self.CheckImageFile+"\n"
                 if re.match("PHOT_APERTURES\s+", line):
                     newline = "PHOT_APERTURES   "+str(self.tel.SExtractorPhotAperture.to(u.pix).value)+"\n"
                 if re.match("GAIN\s+", line):
@@ -785,10 +811,7 @@ class Image(object):
                     newline = "PIXEL_SCALE      "+str(self.tel.pixelScale.value)+"\n"
                 if re.match("SEEING_FWHM\s+", line):
                     newline = "SEEING_FWHM      "+str(self.tel.SExtractorSeeing.to(u.arcsec).value)+"\n"
-                if re.match("ASSOC_NAME\s+", line):
-                    newline = "ASSOC_NAME       "+PhotometryCatalogFile_xy+"\n"
-                NewConfig.write(newline)
-            DefaultConfig.close()
+                NewConfig.write(newline+"\n")
             NewConfig.close()
 
             ## Run SExtractor
@@ -901,7 +924,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Make JPEG of Image
     ##-------------------------------------------------------------------------
-    def MakeJPEG(self, jpegFileName, markStars=False, markPointing=False, rotate=False, binning=1):
+    def MakeJPEG(self, jpegFileName, markStars=False, markPointing=False, rotate=False, binning=1, backgroundSubtracted=False):
         '''
         Make jpegs of image.
         '''
@@ -971,7 +994,20 @@ class Image(object):
                     JPEGcommand.append("-flop")
             else:
                 self.logger.warning("No position angle value found.  Not rotating JPEG.")
-        JPEGcommand.append(self.workingFile)
+        if not backgroundSubtracted:
+            JPEGcommand.append(self.workingFile)
+        else:
+            JPEGcommand.append("-stroke")
+            JPEGcommand.append("none")
+            JPEGcommand.append("-fill")
+            JPEGcommand.append("white")
+            JPEGcommand.append("-pointsize")
+            JPEGcommand.append("28")
+            JPEGcommand.append('-font')
+            JPEGcommand.append('fixed')
+            JPEGcommand.append('-draw')
+            JPEGcommand.append("text {0},40 'Background Subtracted Image'".format(self.nXPix/2 - 170))
+            JPEGcommand.append(self.CheckImageFile)
         JPEGcommand.append(jpegFile)
         self.logger.debug("Issuing convert command to create jpeg.")
         try:
