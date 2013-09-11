@@ -179,6 +179,7 @@ class Telescope(object):
         self.fRatio = None
         self.SExtractorPhotAperture = None
         self.SExtractorSeeing = None
+        self.SExtractorSaturation = None
         self.site = None
         
     def CheckUnits(self):
@@ -212,6 +213,11 @@ class Telescope(object):
             assert self.gain.to(1/u.adu)
         else:
             self.gain *= 1./u.adu
+        ## Default SExtractorSaturation to units of ADU
+        if type(self.SExtractorSaturation) == u.quantity.Quantity:
+            assert self.SExtractorSaturation.to(u.adu)
+        else:
+            self.SExtractorSaturation *= u.adu
         ## Default unitsForFWHM to units of arcsec
         if type(self.unitsForFWHM) == u.quantity.Quantity:
             assert self.unitsForFWHM.unit in [u.arcsec, u.pix]
@@ -811,6 +817,9 @@ class Image(object):
                     newline = "GAIN             "+str(self.tel.gain.value)+"\n"
                 if re.match("PIXEL_SCALE\s+", line):
                     newline = "PIXEL_SCALE      "+str(self.tel.pixelScale.value)+"\n"
+                if self.tel.SExtractorSaturation:
+                    if re.match("SATUR_LEVEL\s+", line):
+                        newline = "SATUR_LEVEL      "+str(self.tel.SExtractorSaturation.to(u.adu).value)+"\n"
                 if re.match("SEEING_FWHM\s+", line):
                     newline = "SEEING_FWHM      "+str(self.tel.SExtractorSeeing.to(u.arcsec).value)+"\n"
                 NewConfig.write(newline+"\n")
