@@ -781,6 +781,8 @@ class Image(object):
                 newline = line
                 if re.match("CATALOG_NAME\s+", line):
                     newline = "CATALOG_NAME     "+SExtractorCatalog+"\n"
+                if re.match("CATALOG_TYPE\s+", line):
+                    newline = "CATALOG_TYPE     "+"FITS_LDAC"+"\n"
                 if re.match("PARAMETERS_NAME\s+", line):
                     newline = "PARAMETERS_NAME  "+os.path.join(self.config.pathIQMonExec, "default.param")+"\n"
                 if re.match("DETECT_MINAREA\s+", line) and (2.*self.tel.pixelScale.value > self.tel.SExtractorSeeing.to(u.arcsec).value):
@@ -862,9 +864,11 @@ class Image(object):
                 else:
                     self.SExtractorCatalog = SExtractorCatalog
 
-                ## Read Catalog
+                ## Read FITS_LDAC SExtractor Catalog
                 self.logger.debug("Reading SExtractor output catalog.")
-                self.SExtractorResults = ascii.read(self.SExtractorCatalog, Reader=ascii.sextractor.SExtractor)
+                hdu = fits.open(self.SExtractorCatalog)
+                self.SExtractorResults = table.Table(hdu[2].data)
+#                 self.SExtractorResults = ascii.read(self.SExtractorCatalog, Reader=ascii.sextractor.SExtractor)
                 SExImageRadius = []
                 SExAngleInImage = []
                 for star in self.SExtractorResults:
@@ -874,6 +878,7 @@ class Image(object):
                 self.SExtractorResults.add_column(table.Column(data=SExAngleInImage, name='AngleInImage'))
                 self.nStarsSEx = len(self.SExtractorResults)
                 self.logger.info("Read in {0} stars from SExtractor catalog.".format(self.nStarsSEx))
+
         else:
             self.logger.warning("Telescope proerties not set.")
 
