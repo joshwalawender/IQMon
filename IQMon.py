@@ -1102,8 +1102,10 @@ class Image(object):
             HTML.write("      <td style='color:black;text-align:left'>{0}</td>\n".format(self.rawFileBasename))
         elif len(self.jpegFileNames) == 1:
             HTML.write("      <td style='color:black;text-align:left'><a href='{0}'>{1}</a></td>\n".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]), self.rawFileBasename))
-        elif len(self.jpegFileNames) >= 2:
+        elif len(self.jpegFileNames) == 2:
             HTML.write("      <td style='color:black;text-align:left'><a href='{0}'>{1}</a> (<a href='{2}'>JPEG2</a>)</td>\n".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]), self.rawFileBasename, os.path.join("..", "..", "Plots", self.jpegFileNames[1])))                
+        elif len(self.jpegFileNames) >= 3:
+            HTML.write("      <td style='color:black;text-align:left'><a href='{0}'>{1}</a> (<a href='{2}'>JPEG2</a>)(<a href='{3}'>JPEG3</a>)</td>\n".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]), self.rawFileBasename, os.path.join("..", "..", "Plots", self.jpegFileNames[1], self.jpegFileNames[2])))
         ## Write Alt, Az, airmass, moon separation, and moon phase
         if self.targetAlt and self.targetAz and self.airmass and self.moonSep and self.moonPhase:
             HTML.write("      <td style='color:black'>{0:.1f}</td>\n".format(self.targetAlt.to(u.deg).value))
