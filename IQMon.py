@@ -561,6 +561,7 @@ class Image(object):
           fits using dcraw.
         '''
         self.workingFile = os.path.join(self.config.pathTemp, self.rawFileName)
+        self.workingFile = self.workingFile.replace(" ", "_")
         shutil.copy2(self.rawFile, self.workingFile)
         self.tempFiles.append(self.workingFile)
 
@@ -751,12 +752,15 @@ class Image(object):
         assert type(self.tel.SExtractorPhotAperture) == u.quantity.Quantity
         if self.tel.gain and self.tel.pixelScale and self.tel.SExtractorSeeing and self.tel.SExtractorPhotAperture:
             ## Set up file names
+            workingFileDirectory, workinfFileName = os.path.split(self.workingFile)
+            workingFileBasename, workingFileExt = os.path.splitext(workinfFileName)
+            
             SExtractorDefaultFile = os.path.join(self.config.pathIQMonExec, "default.sex")
-            SExtractorConfigFile = os.path.join(self.config.pathTemp, self.rawFileBasename+".sex")
+            SExtractorConfigFile = os.path.join(self.config.pathTemp, workingFileBasename+".sex")
             self.tempFiles.append(SExtractorConfigFile)
-            SExtractorCatalog = os.path.join(self.config.pathTemp, self.rawFileBasename+".cat")
+            SExtractorCatalog = os.path.join(self.config.pathTemp, workingFileBasename+".cat")
             self.tempFiles.append(SExtractorCatalog)
-            PhotometryCatalogFile_xy = os.path.join(self.config.pathTemp, self.rawFileBasename+"PhotCat_xy.txt")
+            PhotometryCatalogFile_xy = os.path.join(self.config.pathTemp, workingFileBasename+"PhotCat_xy.txt")
             self.tempFiles.append(PhotometryCatalogFile_xy)
 
             ## Create PhotometryCatalogFile_xy file for SExtractor Association
