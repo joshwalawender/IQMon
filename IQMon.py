@@ -938,7 +938,7 @@ class Image(object):
             ## happy, but I'm not sure I understand why.
             foo = np.array([[self.coordinate_header.ra.hours*15., self.coordinate_header.dec.radians*180./math.pi], 
                             [self.coordinate_header.ra.hours*15., self.coordinate_header.dec.radians*180./math.pi]])
-            targetPixel = (self.imageWCS.wcs_world2pix(foo, 1)[0])/2
+            targetPixel = (self.imageWCS.wcs_world2pix(foo, 1)[0])/binning
             JPEGcommand.append('-draw')
             JPEGcommand.append("line %d,%d %d,%d" % (targetPixel[0]-markSize, targetPixel[1]-markSize,
                                targetPixel[0]+markSize, targetPixel[1]+markSize))
