@@ -689,7 +689,7 @@ class Image(object):
                 os.rename(NewFile, NewFitsFile)
                 self.astrometrySolved = True
                 ## Update header history
-                hdulist = fits.open(self.workingFile, mode="update")
+                hdulist = fits.open(self.workingFile, mode="update", ignore_missing_end=True)
                 now = time.gmtime()
                 hdulist[0].header['history'] = "Solved by Astrometry.net at {0}".format(time.strftime("%Y-%m-%dT%H:%M:%S UTC"))
                 hdulist.close()
