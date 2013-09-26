@@ -794,8 +794,8 @@ class Image(object):
             NewConfig.close()
 
             ## Run SExtractor
-            self.logger.info("Invoking SExtractor.")
             SExtractorCommand = ["sex", self.workingFile, "-c", SExtractorConfigFile]
+            self.logger.info("Invoking SExtractor: {}".format(repr(SExtractorCommand)))
             try:
                 SExSTDOUT = subprocess.check_output(SExtractorCommand, stderr=subprocess.STDOUT)
             except subprocess.CalledProcessError as e:
