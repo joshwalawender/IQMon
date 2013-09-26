@@ -635,7 +635,7 @@ class Image(object):
                 y2 = int(MatchROI.group(4))
                 self.logger.info("Cropping Image To [{0}:{1},{2}:{3}]".format(x1, x2, y1, y2))
                 hdulist = fits.open(self.workingFile, mode="update")
-                hdulist[0].data = hdulist[0].data[x1:x2,y1:y2]
+                hdulist[0].data = hdulist[0].data[y1:y2,x1:x2]
                 hdulist.flush()
                 hdulist.close()
 
