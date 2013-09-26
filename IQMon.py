@@ -350,7 +350,7 @@ class Image(object):
         '''
         Get information from the image fits header.
         '''
-        hdulist = fits.open(self.workingFile)
+        hdulist = fits.open(self.workingFile, ignore_missing_end=True)
         self.header = hdulist[0].header
         self.image = hdulist[0].data
         hdulist.close()
@@ -688,6 +688,7 @@ class Image(object):
                 if os.path.exists(NewFitsFile): os.remove(NewFitsFile)
                 os.rename(NewFile, NewFitsFile)
                 self.astrometrySolved = True
+                self.workingFile = NewFitsFile
                 ## Update header history
 #                 hdulist = fits.open(self.workingFile, mode="update", ignore_missing_end=True)
 #                 now = time.gmtime()
