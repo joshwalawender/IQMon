@@ -561,7 +561,6 @@ class Image(object):
           fits using dcraw.
         '''
         self.workingFile = os.path.join(self.config.pathTemp, self.rawFileName)
-        self.workingFile = self.workingFile.replace(" ", "_")
         shutil.copy2(self.rawFile, self.workingFile)
         self.tempFiles.append(self.workingFile)
 
@@ -690,10 +689,11 @@ class Image(object):
                 os.rename(NewFile, NewFitsFile)
                 self.astrometrySolved = True
                 ## Update header history
-                hdulist = fits.open(self.workingFile, mode="update", ignore_missing_end=True)
-                now = time.gmtime()
-                hdulist[0].header['history'] = "Solved by Astrometry.net at {0}".format(time.strftime("%Y-%m-%dT%H:%M:%S UTC"))
-                hdulist.close()
+#                 hdulist = fits.open(self.workingFile, mode="update", ignore_missing_end=True)
+#                 now = time.gmtime()
+#                 hdulist[0].header['history'] = "Solved by Astrometry.net at {0}".format(time.strftime("%Y-%m-%dT%H:%M:%S UTC"))
+#                 hdulist.flush()
+#                 hdulist.close()
             ## Add files created by astrometry.net to tempFiles list
             self.tempFiles.append(os.path.join(self.config.pathTemp, self.rawFileBasename+".axy"))
             self.tempFiles.append(os.path.join(self.config.pathTemp, self.rawFileBasename+".wcs"))
@@ -752,15 +752,12 @@ class Image(object):
         assert type(self.tel.SExtractorPhotAperture) == u.quantity.Quantity
         if self.tel.gain and self.tel.pixelScale and self.tel.SExtractorSeeing and self.tel.SExtractorPhotAperture:
             ## Set up file names
-            workingFileDirectory, workinfFileName = os.path.split(self.workingFile)
-            workingFileBasename, workingFileExt = os.path.splitext(workinfFileName)
-            
             SExtractorDefaultFile = os.path.join(self.config.pathIQMonExec, "default.sex")
-            SExtractorConfigFile = os.path.join(self.config.pathTemp, workingFileBasename+".sex")
+            SExtractorConfigFile = os.path.join(self.config.pathTemp, self.rawFileBasename+".sex")
             self.tempFiles.append(SExtractorConfigFile)
-            SExtractorCatalog = os.path.join(self.config.pathTemp, workingFileBasename+".cat")
+            SExtractorCatalog = os.path.join(self.config.pathTemp, self.rawFileBasename+".cat")
             self.tempFiles.append(SExtractorCatalog)
-            PhotometryCatalogFile_xy = os.path.join(self.config.pathTemp, workingFileBasename+"PhotCat_xy.txt")
+            PhotometryCatalogFile_xy = os.path.join(self.config.pathTemp, self.rawFileBasename+"PhotCat_xy.txt")
             self.tempFiles.append(PhotometryCatalogFile_xy)
 
             ## Create PhotometryCatalogFile_xy file for SExtractor Association
@@ -938,7 +935,7 @@ class Image(object):
             ## happy, but I'm not sure I understand why.
             foo = np.array([[self.coordinate_header.ra.hours*15., self.coordinate_header.dec.radians*180./math.pi], 
                             [self.coordinate_header.ra.hours*15., self.coordinate_header.dec.radians*180./math.pi]])
-            targetPixel = (self.imageWCS.wcs_world2pix(foo, 1)[0])/binning
+            targetPixel = (self.imageWCS.wcs_world2pix(foo, 1)[0])/2
             JPEGcommand.append('-draw')
             JPEGcommand.append("line %d,%d %d,%d" % (targetPixel[0]-markSize, targetPixel[1]-markSize,
                                targetPixel[0]+markSize, targetPixel[1]+markSize))
