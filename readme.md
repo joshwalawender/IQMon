@@ -24,6 +24,13 @@ If the image contains a WCS, the module can also compare the WCS coordinates of 
 
 ## Version History
 
+* **V1.0.2**
+    * Fixed bug in jpeg creation which would crash when many (>~5000) stars were to be marked.  Now marks first 5000 stars.
+    * Fixed bug in color coding of HTML.
+* **v1.0.1**
+    * Added astropy units converter between pixels and arcseconds to handle internal conversion of pixel scale.
+    * Fixed bug in jpeg creation.  Will now handle rotation and marked stars.
+    * Fixed bug when reading in summary text file.
 * **v1.0** (released on github.com 2013/08/14)
     * Rewritten as object oriented code.  Implements most capabilities of v0.X.
     * Runs roughly 2x faster than v0.X.
