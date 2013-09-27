@@ -350,7 +350,7 @@ class Image(object):
         '''
         Get information from the image fits header.
         '''
-        hdulist = fits.open(self.workingFile)
+        hdulist = fits.open(self.workingFile, ignore_missing_end=True)
         self.header = hdulist[0].header
         self.image = hdulist[0].data
         hdulist.close()
@@ -635,7 +635,7 @@ class Image(object):
                 y2 = int(MatchROI.group(4))
                 self.logger.info("Cropping Image To [{0}:{1},{2}:{3}]".format(x1, x2, y1, y2))
                 hdulist = fits.open(self.workingFile, mode="update")
-                hdulist[0].data = hdulist[0].data[x1:x2,y1:y2]
+                hdulist[0].data = hdulist[0].data[y1:y2,x1:x2]
                 hdulist.flush()
                 hdulist.close()
 
@@ -676,7 +676,7 @@ class Image(object):
                 if IsFieldCenter:
                     self.logger.info("Astrometry.net field center is: %s", IsFieldCenter.group(1))
             else:
-                for line in AstrometrySTDOUT:
+                for line in AstrometrySTDOUT.split("\n"):
                     self.logger.warning("  %s" % line)
             NewFile = self.workingFile.replace(self.fileExt, ".new")
             NewFitsFile = self.workingFile.replace(self.fileExt, ".new.fits")
@@ -688,11 +688,13 @@ class Image(object):
                 if os.path.exists(NewFitsFile): os.remove(NewFitsFile)
                 os.rename(NewFile, NewFitsFile)
                 self.astrometrySolved = True
+                self.workingFile = NewFitsFile
                 ## Update header history
-                hdulist = fits.open(self.workingFile, mode="update", ignore_missing_end=True)
-                now = time.gmtime()
-                hdulist[0].header['history'] = "Solved by Astrometry.net at {0}".format(time.strftime("%Y-%m-%dT%H:%M:%S UTC"))
-                hdulist.close()
+#                 hdulist = fits.open(self.workingFile, mode="update", ignore_missing_end=True)
+#                 now = time.gmtime()
+#                 hdulist[0].header['history'] = "Solved by Astrometry.net at {0}".format(time.strftime("%Y-%m-%dT%H:%M:%S UTC"))
+#                 hdulist.flush()
+#                 hdulist.close()
             ## Add files created by astrometry.net to tempFiles list
             self.tempFiles.append(os.path.join(self.config.pathTemp, self.rawFileBasename+".axy"))
             self.tempFiles.append(os.path.join(self.config.pathTemp, self.rawFileBasename+".wcs"))
@@ -792,8 +794,8 @@ class Image(object):
             NewConfig.close()
 
             ## Run SExtractor
-            self.logger.info("Invoking SExtractor.")
             SExtractorCommand = ["sex", self.workingFile, "-c", SExtractorConfigFile]
+            self.logger.info("Invoking SExtractor: {}".format(repr(SExtractorCommand)))
             try:
                 SExSTDOUT = subprocess.check_output(SExtractorCommand, stderr=subprocess.STDOUT)
             except subprocess.CalledProcessError as e:

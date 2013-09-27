@@ -24,7 +24,11 @@ If the image contains a WCS, the module can also compare the WCS coordinates of 
 
 ## Version History
 
-* **V1.0.2**
+* **v1.0.3**
+    * Fixed handling of spaces in filenames by repalcing spaces in input file name with underscores when making working file.
+    * Fixed bug in MakeJPEG which hard coded a binning of 2x2.
+    * Added flag to ignore missing end card in fits header after running astrometry.net.
+* **v1.0.2**
     * Fixed bug in jpeg creation which would crash when many (>~5000) stars were to be marked.  Now marks first 5000 stars.
     * Fixed bug in color coding of HTML.
 * **v1.0.1**
