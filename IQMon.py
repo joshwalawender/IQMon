@@ -676,7 +676,7 @@ class Image(object):
                 if IsFieldCenter:
                     self.logger.info("Astrometry.net field center is: %s", IsFieldCenter.group(1))
             else:
-                for line in AstrometrySTDOUT:
+                for line in AstrometrySTDOUT.split("\n"):
                     self.logger.warning("  %s" % line)
             NewFile = self.workingFile.replace(self.fileExt, ".new")
             NewFitsFile = self.workingFile.replace(self.fileExt, ".new.fits")
