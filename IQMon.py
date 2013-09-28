@@ -1071,7 +1071,7 @@ class Image(object):
         ## If HTML file does not yet exist, create it and insert header
         ## from template file.
         if not os.path.exists(htmlImageList):
-            self.logger.debug("HTML files does not exist.  Creating it.")
+            self.logger.debug("HTML file does not exist.  Creating it.")
             HTML = open(htmlImageList, 'w')
             header = ['<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">',
                       '<html lang="en">',
@@ -1127,7 +1127,8 @@ class Image(object):
             header.append('        </tr>')
             header.append('    </body>')
             header.append('</html>')
-            HTML.write(header)
+            for headerline in header:
+                HTML.write(headerline)
             HTML.close()
         ## If HTML file does exist, we need to strip off the lines which
         ## end the file, so we can append more data to the table.
