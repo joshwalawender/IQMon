@@ -783,8 +783,8 @@ class Image(object):
             ## Read in default config file
             DefaultConfig = subprocess.check_output(["sex", "-dd"]).split("\n")
             NewConfig     = open(SExtractorConfigFile, 'w')
-            backgroundFilterSize = 2.*self.tel.SExtractorSeeing.to(u.arcsec).value / self.tel.pixelScale.value
-            self.logger.debug("Using background filter size of 2x seeing = {0:.1f} pixels.".format(backgroundFilterSize))
+            backgroundFilterSize = 5.*self.tel.SExtractorSeeing.to(u.arcsec).value / self.tel.pixelScale.value
+            self.logger.debug("Using background filter size of 5x seeing = {0:.1f} pixels.".format(backgroundFilterSize))
             for line in DefaultConfig:
                 newline = line
                 if re.match("CATALOG_NAME\s+", line):
@@ -1159,7 +1159,7 @@ class Image(object):
             elif len(self.jpegFileNames) == 2:
                 HTML.write("      <td style='color:black;text-align:left'><a href='{0}'>{1}</a> (<a href='{2}'>JPEG2</a>)</td>\n".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]), self.rawFileBasename, os.path.join("..", "..", "Plots", self.jpegFileNames[1])))                
             elif len(self.jpegFileNames) >= 3:
-                HTML.write("      <td style='color:black;text-align:left'><a href='{0}'>{1}</a> (<a href='{2}'>JPEG2</a>)(<a href='{3}'>JPEG3</a>)</td>\n".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]), self.rawFileBasename, os.path.join("..", "..", "Plots", self.jpegFileNames[1], self.jpegFileNames[2])))
+                HTML.write("      <td style='color:black;text-align:left'><a href='{0}'>{1}</a> (<a href='{2}'>JPEG2</a>)(<a href='{3}'>JPEG3</a>)</td>\n".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]), self.rawFileBasename, os.path.join("..", "..", "Plots", self.jpegFileNames[1]), os.path.join("..", "..", "Plots", self.jpegFileNames[2])))
         ## Write Alt, Az, airmass, moon separation, and moon phase
         if "Alt" in fields:
             if self.targetAlt:
