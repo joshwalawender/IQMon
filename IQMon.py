@@ -1202,6 +1202,7 @@ class Image(object):
                 HTML.write("      <td style='background-color:{0}'>{1:.2f}</td>\n".format(colorFWHM, FWHM_for_HTML))
             else:
                 HTML.write("      <td style='color:{0}'>{1}</td>\n".format("#FF5C33", ""))
+        if "elliptiticty" in fields:
             if self.ellipticity:
                 ## Decide whether to flag ellipticity value with red color
                 if self.ellipticity > self.tel.thresholdEllipticity:
