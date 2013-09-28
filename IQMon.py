@@ -1067,7 +1067,7 @@ class Image(object):
         This function adds one line to the HTML table of images.  The line
         contains the image info extracted by IQMon.
         '''
-        if not fields: fields=["Date and Time", "Filename", "Alt", "Az", "Airmass", "MoonSep", "MoonIllum", "FWHM", "ellipticity", "Background", "PErr", "PosAng", "nStars", "ProcessTime"]
+        if not fields: fields=["Date and Time", "Filename", "Alt", "Az", "Airmass", "MoonSep", "MoonIllum", "FWHM", "ellipticity", "Background", "PErr", "PosAng", "ZeroPoint", "nStars", "ProcessTime"]
         ## If HTML file does not yet exist, create it and insert header
         ## from template file.
         if not os.path.exists(htmlImageList):
@@ -1202,7 +1202,7 @@ class Image(object):
                 HTML.write("      <td style='background-color:{0}'>{1:.2f}</td>\n".format(colorFWHM, FWHM_for_HTML))
             else:
                 HTML.write("      <td style='color:{0}'>{1}</td>\n".format("#FF5C33", ""))
-        if "elliptiticty" in fields:
+        if "ellipticity" in fields:
             if self.ellipticity:
                 ## Decide whether to flag ellipticity value with red color
                 if self.ellipticity > self.tel.thresholdEllipticity:
