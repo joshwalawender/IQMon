@@ -783,7 +783,7 @@ class Image(object):
             ## Read in default config file
             DefaultConfig = subprocess.check_output(["sex", "-dd"]).split("\n")
             NewConfig     = open(SExtractorConfigFile, 'w')
-            backgroundFilterSize = 5.*self.tel.SExtractorSeeing.to(u.arcsec).value / self.tel.pixelScale.value
+            backgroundFilterSize = max(5.*self.tel.SExtractorSeeing.to(u.arcsec).value / self.tel.pixelScale.value, 5.)
             self.logger.debug("Using background filter size of 5x seeing = {0:.1f} pixels.".format(backgroundFilterSize))
             for line in DefaultConfig:
                 newline = line
@@ -1098,6 +1098,10 @@ class Image(object):
                 header.append('        <th style="width:150px">Exposure Start<br>(Date and Time UT)</th>')
             if "Filename" in fields:
                 header.append('        <th style="width:420px">Image File Name</th>')
+            if "Target" in fields:
+                header.append('        <th style="width:120px">Target Name</th>')
+            if "ExpTime" in fields:
+                header.append('        <th style="width:50px">Exp Time (s)</th>')
             if "Alt" in fields:
                 header.append('        <th style="width:50px">Alt (deg)</th>')
             if "Az" in fields:
@@ -1161,6 +1165,18 @@ class Image(object):
                 HTML.write("      <td style='color:black;text-align:left'><a href='{0}'>{1}</a> (<a href='{2}'>JPEG2</a>)</td>\n".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]), self.rawFileBasename, os.path.join("..", "..", "Plots", self.jpegFileNames[1])))                
             elif len(self.jpegFileNames) >= 3:
                 HTML.write("      <td style='color:black;text-align:left'><a href='{0}'>{1}</a> (<a href='{2}'>JPEG2</a>)(<a href='{3}'>JPEG3</a>)</td>\n".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]), self.rawFileBasename, os.path.join("..", "..", "Plots", self.jpegFileNames[1]), os.path.join("..", "..", "Plots", self.jpegFileNames[2])))
+        ## Write Target Name
+        if "Target" in fields:
+            if self.objectName:
+                HTML.write("      <td style='color:black'>{0:}</td>\n".format(self.objectName))
+            else:
+                HTML.write("      <td style='color:black'>{0}</td>\n".format(""))
+        ## Write Exposure Time
+        if "ExpTime" in fields:
+            if self.exptime:
+                HTML.write("      <td style='color:black'>{0:.1f}</td>\n".format(self.exptime.to(u.s).value))
+            else:
+                HTML.write("      <td style='color:black'>{0}</td>\n".format(""))
         ## Write Alt, Az, airmass, moon separation, and moon phase
         if "Alt" in fields:
             if self.targetAlt:
