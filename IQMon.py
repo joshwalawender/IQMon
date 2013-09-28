@@ -1062,21 +1062,71 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Append Line With Image Info to HTML File List
     ##-------------------------------------------------------------------------
-    def AddWebLogEntry(self, htmlImageList):
+    def AddWebLogEntry(self, htmlImageList, fields=None):
         '''
         This function adds one line to the HTML table of images.  The line
         contains the image info extracted by IQMon.
         '''
+        if not fields: fields=["Date and Time", "Filename", "Alt", "Az", "Airmass", "MoonSep", "MoonIllum", "FWHM", "ellipticity", "Background", "PErr", "PosAng", "nStars", "ProcessTime"]
         ## If HTML file does not yet exist, create it and insert header
         ## from template file.
         if not os.path.exists(htmlImageList):
             self.logger.debug("HTML files does not exist.  Creating it.")
             HTML = open(htmlImageList, 'w')
-            HTMLheader = open(os.path.join(self.config.pathIQMonExec, "ImageListHeader.html"), 'r')
-            header = HTMLheader.read()
-            header = header.replace("telescopename", self.tel.longName)
-            header = header.replace("FWHMunits", str(self.tel.unitsForFWHM.unit))
-            HTMLheader.close()
+            header = ['<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">',
+                      '<html lang="en">',
+                      '<head>',
+                      '    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">',
+                      '    <title>IQMon Results</title>',
+                      '    <style>',
+                      '        table',
+                      '        {',
+                      '            border-collapse:collapse;',
+                      '        }',
+                      '        table,th,td',
+                      '        {',
+                      '            border:1px solid black;',
+                      '            text-align:center;',
+                      '        }',
+                      '    </style>',
+                      '</head>',
+                      '<body>',
+                      '    <h2>IQMon Results for {}</h2>'.format(self.tel.longName),
+                      '    <table>',
+                      '        <tr>']
+            if "Date and Time" in fields:
+                header.append('        <th style="width:150px">Exposure Start<br>(Date and Time UT)</th>')
+            if "Filename" in fields:
+                header.append('        <th style="width:420px">Image File Name</th>')
+            if "Alt" in fields:
+                header.append('        <th style="width:50px">Alt (deg)</th>')
+            if "Az" in fields:
+                header.append('        <th style="width:50px">Az (deg)</th>')
+            if "Airmass" in fields:
+                header.append('        <th style="width:50px">Airmass</th>')
+            if "MoonSep" in fields:
+                header.append('        <th style="width:50px">Moon Sep (deg)</th>')
+            if "MoonIllum" in fields:
+                header.append('        <th style="width:50px">Moon Illum. (%)</th>')
+            if "FWHM" in fields:
+                header.append('        <th style="width:60px">FWHM ({})</th>'.format(str(self.tel.unitsForFWHM.unit)))
+            if "ellipticity" in fields:
+                header.append('        <th style="width:50px">Ellip.</th>')
+            if "Background" in fields:
+                header.append('        <th style="width:70px">Background<br>[RMS]</th>')
+            if "PErr" in fields:
+                header.append('        <th style="width:70px">Pointing Error (arcmin)</th>')
+            if "PosAng" in fields:
+                header.append('        <th style="width:50px">WCS Pos. Angle</th>')
+            if "ZeroPoint" in fields:
+                header.append('        <th style="width:50px">Zero Point (mag)</th>')
+            if "nStars" in fields:
+                header.append('        <th style="width:50px">N Stars</th>')
+            if "ProcessTime" in fields:
+                header.append('        <th style="width:50px">Process Time (sec)</th>')
+            header.append('        </tr>')
+            header.append('    </body>')
+            header.append('</html>')
             HTML.write(header)
             HTML.close()
         ## If HTML file does exist, we need to strip off the lines which
@@ -1098,88 +1148,112 @@ class Image(object):
         HTML = open(htmlImageList, 'a')
         HTML.write("    <tr>\n")
         ## Write Observation Date and Time
-        HTML.write("      <td style='color:black;text-align:left'>{0}</td>\n".format(self.dateObs))
+        if "Date and Time" in fields:
+            HTML.write("      <td style='color:black;text-align:left'>{0}</td>\n".format(self.dateObs))
         ## Write Filename (and links to jpegs)
-        if len(self.jpegFileNames) == 0:
-            HTML.write("      <td style='color:black;text-align:left'>{0}</td>\n".format(self.rawFileBasename))
-        elif len(self.jpegFileNames) == 1:
-            HTML.write("      <td style='color:black;text-align:left'><a href='{0}'>{1}</a></td>\n".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]), self.rawFileBasename))
-        elif len(self.jpegFileNames) == 2:
-            HTML.write("      <td style='color:black;text-align:left'><a href='{0}'>{1}</a> (<a href='{2}'>JPEG2</a>)</td>\n".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]), self.rawFileBasename, os.path.join("..", "..", "Plots", self.jpegFileNames[1])))                
-        elif len(self.jpegFileNames) >= 3:
-            HTML.write("      <td style='color:black;text-align:left'><a href='{0}'>{1}</a> (<a href='{2}'>JPEG2</a>)(<a href='{3}'>JPEG3</a>)</td>\n".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]), self.rawFileBasename, os.path.join("..", "..", "Plots", self.jpegFileNames[1], self.jpegFileNames[2])))
+        if "Filename" in fields:
+            if len(self.jpegFileNames) == 0:
+                HTML.write("      <td style='color:black;text-align:left'>{0}</td>\n".format(self.rawFileBasename))
+            elif len(self.jpegFileNames) == 1:
+                HTML.write("      <td style='color:black;text-align:left'><a href='{0}'>{1}</a></td>\n".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]), self.rawFileBasename))
+            elif len(self.jpegFileNames) == 2:
+                HTML.write("      <td style='color:black;text-align:left'><a href='{0}'>{1}</a> (<a href='{2}'>JPEG2</a>)</td>\n".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]), self.rawFileBasename, os.path.join("..", "..", "Plots", self.jpegFileNames[1])))                
+            elif len(self.jpegFileNames) >= 3:
+                HTML.write("      <td style='color:black;text-align:left'><a href='{0}'>{1}</a> (<a href='{2}'>JPEG2</a>)(<a href='{3}'>JPEG3</a>)</td>\n".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]), self.rawFileBasename, os.path.join("..", "..", "Plots", self.jpegFileNames[1], self.jpegFileNames[2])))
         ## Write Alt, Az, airmass, moon separation, and moon phase
-        if self.targetAlt and self.targetAz and self.airmass and self.moonSep and self.moonPhase:
-            HTML.write("      <td style='color:black'>{0:.1f}</td>\n".format(self.targetAlt.to(u.deg).value))
-            HTML.write("      <td style='color:black'>{0:.1f}</td>\n".format(self.targetAz.to(u.deg).value))
-            HTML.write("      <td style='color:{0}'>{1:.2f}</td>\n".format("black", self.airmass))
-            HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format("black", self.moonSep.to(u.deg).value))
-            HTML.write("      <td style='color:black'>{0:.1f}</td>\n".format(self.moonPhase))
-        else:
-            HTML.write("      <td style='color:black'>{0}</td>\n".format(""))
-            HTML.write("      <td style='color:black'>{0}</td>\n".format(""))
-            HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
-            HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
-            HTML.write("      <td style='color:black'>{0}</td>\n".format(""))
+        if "Alt" in fields:
+            if self.targetAlt:
+                HTML.write("      <td style='color:black'>{0:.1f}</td>\n".format(self.targetAlt.to(u.deg).value))
+            else:
+                HTML.write("      <td style='color:black'>{0}</td>\n".format(""))
+        if "Az" in fields:
+            if self.targetAz:
+                HTML.write("      <td style='color:black'>{0:.1f}</td>\n".format(self.targetAz.to(u.deg).value))
+            else:
+                HTML.write("      <td style='color:black'>{0}</td>\n".format(""))
+        if "Airmass" in fields:
+            if self.targetAz:
+                HTML.write("      <td style='color:{0}'>{1:.2f}</td>\n".format("black", self.airmass))
+            else:
+                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+        if "MoonSep" in fields:
+            if self.moonSep:
+                HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format("black", self.moonSep.to(u.deg).value))
+            else:
+                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+        if "MoonIllum" in fields:
+            if self.moonPhase:
+                HTML.write("      <td style='color:black'>{0:.1f}</td>\n".format(self.moonPhase))
+            else:
+                HTML.write("      <td style='color:black'>{0}</td>\n".format(""))
         ## Write FWHM and ellipticity
-        if self.FWHM and self.ellipticity:
-            ## Decide whether to flag FWHM value with red color
-            if self.FWHM > self.tel.thresholdFWHM.to(u.pix, equivalencies=self.tel.pixelScaleEquivalency):
-                colorFWHM = "#FF5C33"
+        if "FWHM" in fields:
+            if self.FWHM:
+                ## Decide whether to flag FWHM value with red color
+                if self.FWHM > self.tel.thresholdFWHM.to(u.pix, equivalencies=self.tel.pixelScaleEquivalency):
+                    colorFWHM = "#FF5C33"
+                else:
+                    colorFWHM = "#70DB70"
+                ## Convert FWHM value to appropriate units for HTML output
+                if self.tel.unitsForFWHM.unit == u.arcsec:
+                    FWHM_for_HTML = (self.FWHM * u.radian.to(u.arcsec)*self.tel.pixelSize.to(u.mm)/self.tel.focalLength.to(u.mm)).value
+                else:
+                    FWHM_for_HTML = self.FWHM.value
+                HTML.write("      <td style='background-color:{0}'>{1:.2f}</td>\n".format(colorFWHM, FWHM_for_HTML))
             else:
-                colorFWHM = "#70DB70"
-            ## Decide whether to flag ellipticity value with red color
-            if self.ellipticity > self.tel.thresholdEllipticity:
-                colorEllipticity = "#FF5C33"
+                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("#FF5C33", ""))
+            if self.ellipticity:
+                ## Decide whether to flag ellipticity value with red color
+                if self.ellipticity > self.tel.thresholdEllipticity:
+                    colorEllipticity = "#FF5C33"
+                else:
+                    colorEllipticity = "#70DB70"
+                HTML.write("      <td style='background-color:{0}'>{1:.2f}</td>\n".format(colorEllipticity, self.ellipticity))
             else:
-                colorEllipticity = "#70DB70"
-            ## Convert FWHM value to appropriate units for HTML output
-            if self.tel.unitsForFWHM.unit == u.arcsec:
-                FWHM_for_HTML = (self.FWHM * u.radian.to(u.arcsec)*self.tel.pixelSize.to(u.mm)/self.tel.focalLength.to(u.mm)).value
-            else:
-                FWHM_for_HTML = self.FWHM.value
-            ## Write HTML
-            HTML.write("      <td style='background-color:{0}'>{1:.2f}</td>\n".format(colorFWHM, FWHM_for_HTML))
-            HTML.write("      <td style='background-color:{0}'>{1:.2f}</td>\n".format(colorEllipticity, self.ellipticity))
-        else:
-            HTML.write("      <td style='color:{0}'>{1}</td>\n".format("#FF5C33", ""))
-            HTML.write("      <td style='color:{0}'>{1}</td>\n".format("#FF5C33", ""))
+                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("#FF5C33", ""))
         ## Write SExtractor background and background RMS
-        if self.SExBackground and self.SExBRMS:
-            HTML.write("      <td style='color:{0}'>{1:.0f} [{2:.0f}]</td>\n".format("black", self.SExBackground, self.SExBRMS))
-        else:
-            HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
-        ## Write pointing error
-        if self.pointingError:
-            ## Decide whether to flag pointing error value with red color
-            if self.pointingError.arcmins > self.tel.thresholdPointingErr.to(u.arcmin).value:
-                colorPointingError = "#FF5C33"
+        if "Background" in fields:
+            if self.SExBackground and self.SExBRMS:
+                HTML.write("      <td style='color:{0}'>{1:.0f} [{2:.0f}]</td>\n".format("black", self.SExBackground, self.SExBRMS))
             else:
-                colorPointingError = "#70DB70"
-            ## Write HTML
-            HTML.write("      <td style='background-color:{0}'>{1:.1f}</td>\n".format(colorPointingError, self.pointingError.arcmins))
-        else:
-            HTML.write("      <td style='color:{0}'>{1}</td>\n".format("#FF5C33", ""))
+                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+        ## Write pointing error
+        if "PErr" in fields:
+            if self.pointingError:
+                ## Decide whether to flag pointing error value with red color
+                if self.pointingError.arcmins > self.tel.thresholdPointingErr.to(u.arcmin).value:
+                    colorPointingError = "#FF5C33"
+                else:
+                    colorPointingError = "#70DB70"
+                ## Write HTML
+                HTML.write("      <td style='background-color:{0}'>{1:.1f}</td>\n".format(colorPointingError, self.pointingError.arcmins))
+            else:
+                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("#FF5C33", ""))
         ## Write WCS position angle
-        if self.positionAngle:
-            HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format("black", self.positionAngle.to(u.deg).value))
-        else:
-            HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+        if "PosAng" in fields:
+            if self.positionAngle:
+                HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format("black", self.positionAngle.to(u.deg).value))
+            else:
+                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
         ## Write zero point
-        if self.zeroPoint:
-            HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", self.zeroPoint))
-        else:
-            HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+        if "ZeroPoint" in fields:
+            if self.zeroPoint:
+                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", self.zeroPoint))
+            else:
+                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
         ## Write number of stars detected by SExtractor
-        if self.nStarsSEx:
-            HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", self.nStarsSEx))
-        else:
-            HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+        if "nStars" in fields:
+            if self.nStarsSEx:
+                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", self.nStarsSEx))
+            else:
+                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
         ## Write process time
-        if self.processTime:
-            HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format("black", self.processTime))
-        else:
-            HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+        if "ProcessTime" in fields:
+            if self.processTime:
+                HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format("black", self.processTime))
+            else:
+                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+        ## Complete Table
         HTML.write("    </tr>\n")
         HTML.write("  </table>\n")
         HTML.write("</body>\n")
