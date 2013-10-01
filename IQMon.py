@@ -991,7 +991,8 @@ class Image(object):
             else:
                 MarkRadius = 4
             nStarsMarked = 0
-            for star in self.SExtractorResults:
+            sortedSExtractorResults = np.sort(self.SExtractorResults, order=['MAG_AUTO'])
+            for star in sortedSExtractorResults:
                 nStarsMarked += 1
                 if nStarsMarked <= 5000:
                     MarkXPos = star['X_IMAGE']
@@ -999,7 +1000,7 @@ class Image(object):
                     JPEGcommand.append('-draw')
                     JPEGcommand.append("circle %d,%d %d,%d" % (MarkXPos, MarkYPos, MarkXPos+MarkRadius, MarkYPos))
                 else:
-                    self.logger.warning("Only marked first 5000 stars found in image.")
+                    self.logger.warning("Only marked brigtest 5000 stars found in image.")
                     break
         if rotate and self.positionAngle:
             self.logger.debug("Rotating jpeg by {0:.1f} deg".format(self.positionAngle.to(u.deg).value))
