@@ -24,6 +24,11 @@ If the image contains a WCS, the module can also compare the WCS coordinates of 
 
 ## Version History
 
+* **v1.0.4**
+	* MakeJPEG now marks the brightest 5000 stars rather than the first 5000 in the table.  Also annotates image to let viewer know more stars were detected.
+	* added option to HTML output to choose which columns are displayed
+	* other minor bug fixes and tweaks
+	* fixed bug where axes in crop were reversed
 * **v1.0.3**
     * Fixed handling of spaces in filenames by repalcing spaces in input file name with underscores when making working file.
     * Fixed bug in MakeJPEG which hard coded a binning of 2x2.
