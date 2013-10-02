@@ -829,7 +829,8 @@ class Image(object):
 
             ## Run SExtractor
             SExtractorCommand = ["sex", self.workingFile, "-c", SExtractorConfigFile]
-            self.logger.info("Invoking SExtractor: {}".format(repr(SExtractorCommand)))
+            self.logger.info("Invoking SExtractor")
+            self.logger.debug("SExtractor command: {}".format(repr(SExtractorCommand)))
             try:
                 SExSTDOUT = subprocess.check_output(SExtractorCommand, stderr=subprocess.STDOUT)
             except subprocess.CalledProcessError as e:
@@ -945,7 +946,7 @@ class Image(object):
         Make jpegs of image.
         '''
         jpegFile = os.path.join(self.config.pathPlots, jpegFileName)
-        self.logger.info("Making jpeg with binning factor of {0}.".format(binning))
+        self.logger.info("Making jpeg (binning = {0}): {1}.".format(binning, jpegFileName))
         if os.path.exists(jpegFile): os.remove(jpegFile)
         binningString = str(1./binning*100)+"%"
         JPEGcommand = ["convert", "-contrast-stretch", "0.9%,1%", "-compress", "JPEG", "-quality", "70", "-resize", binningString]
@@ -991,15 +992,17 @@ class Image(object):
             else:
                 MarkRadius = 4
             nStarsMarked = 0
-            for star in self.SExtractorResults:
+            nStarsLimit = 5000
+            sortedSExtractorResults = np.sort(self.SExtractorResults, order=['MAG_AUTO'])
+            for star in sortedSExtractorResults:
                 nStarsMarked += 1
-                if nStarsMarked <= 5000:
+                if nStarsMarked <= nStarsLimit:
                     MarkXPos = star['X_IMAGE']
                     MarkYPos = self.nXPix - star['Y_IMAGE']
                     JPEGcommand.append('-draw')
                     JPEGcommand.append("circle %d,%d %d,%d" % (MarkXPos, MarkYPos, MarkXPos+MarkRadius, MarkYPos))
                 else:
-                    self.logger.warning("Only marked first 5000 stars found in image.")
+                    self.logger.warning("Only marked brigtest {} stars found in image.".format(nStarsLimit))
                     break
         if rotate and self.positionAngle:
             self.logger.debug("Rotating jpeg by {0:.1f} deg".format(self.positionAngle.to(u.deg).value))
@@ -1022,10 +1025,22 @@ class Image(object):
             JPEGcommand.append('-font')
             JPEGcommand.append('fixed')
             JPEGcommand.append('-draw')
-            JPEGcommand.append("text {0},40 'Background Subtracted Image'".format(self.nXPix/2 - 170))
+            JPEGcommand.append("text {0},80 'Background Subtracted Image'".format(self.nXPix/2 - 170))
             JPEGcommand.append(self.CheckImageFile)
+        if markStars and nStarsMarked > nStarsLimit:
+            JPEGcommand.append("-stroke")
+            JPEGcommand.append("none")
+            JPEGcommand.append("-fill")
+            JPEGcommand.append("white")
+            JPEGcommand.append("-pointsize")
+            JPEGcommand.append("28")
+            JPEGcommand.append('-font')
+            JPEGcommand.append('fixed')
+            JPEGcommand.append('-draw')
+            JPEGcommand.append("text {},40 'Marked {} brightest stars out of {}.'".format(self.nXPix/2 - 170, nStarsLimit, self.nSExtracted))
         JPEGcommand.append(jpegFile)
         self.logger.debug("Issuing convert command to create jpeg.")
+#         self.logger.debug("Command: {}".format(repr(JPEGcommand)))
         try:
             ConvertSTDOUT = subprocess.check_output(JPEGcommand, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
