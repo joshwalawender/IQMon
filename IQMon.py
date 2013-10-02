@@ -945,6 +945,8 @@ class Image(object):
         '''
         Make jpegs of image.
         '''
+        nStarsMarked = 0
+        nStarsLimit = 5000
         jpegFile = os.path.join(self.config.pathPlots, jpegFileName)
         self.logger.info("Making jpeg (binning = {0}): {1}.".format(binning, jpegFileName))
         if os.path.exists(jpegFile): os.remove(jpegFile)
@@ -991,8 +993,6 @@ class Image(object):
                 MarkRadius=max([4, 2*math.ceil(self.FWHM.value)])
             else:
                 MarkRadius = 4
-            nStarsMarked = 0
-            nStarsLimit = 5000
             sortedSExtractorResults = np.sort(self.SExtractorResults, order=['MAG_AUTO'])
             for star in sortedSExtractorResults:
                 nStarsMarked += 1
