@@ -945,6 +945,8 @@ class Image(object):
         '''
         Make jpegs of image.
         '''
+        nStarsMarked = 0
+        nStarsLimit = 5000
         jpegFile = os.path.join(self.config.pathPlots, jpegFileName)
         self.logger.info("Making jpeg (binning = {0}): {1}.".format(binning, jpegFileName))
         if os.path.exists(jpegFile): os.remove(jpegFile)
@@ -974,7 +976,7 @@ class Image(object):
             ## happy, but I'm not sure I understand why.
             foo = np.array([[self.coordinate_header.ra.hours*15., self.coordinate_header.dec.radians*180./math.pi], 
                             [self.coordinate_header.ra.hours*15., self.coordinate_header.dec.radians*180./math.pi]])
-            targetPixel = (self.imageWCS.wcs_world2pix(foo, 1)[0])/2
+            targetPixel = (self.imageWCS.wcs_world2pix(foo, 1)[0])/binning
             JPEGcommand.append('-draw')
             JPEGcommand.append("line %d,%d %d,%d" % (targetPixel[0]-markSize, targetPixel[1]-markSize,
                                targetPixel[0]+markSize, targetPixel[1]+markSize))
@@ -991,8 +993,6 @@ class Image(object):
                 MarkRadius=max([4, 2*math.ceil(self.FWHM.value)])
             else:
                 MarkRadius = 4
-            nStarsMarked = 0
-            nStarsLimit = 5000
             sortedSExtractorResults = np.sort(self.SExtractorResults, order=['MAG_AUTO'])
             for star in sortedSExtractorResults:
                 nStarsMarked += 1
