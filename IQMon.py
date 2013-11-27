@@ -964,20 +964,33 @@ class Image(object):
         JPEGcommand = ["convert", "-contrast-stretch", "0.9%,1%", "-compress", "JPEG", "-quality", "70", "-resize", binningString]
         if markPointing and self.imageWCS and self.coordinate_header:
             self.logger.debug("Marking target pointing in jpeg.")
-            markSize = 30
-            ## Mark Central Pixel with a White Circle
+            ## Make markSize 180 arcseconds (3 arcmin)
+            markSize = (180*u.arcsec/self.tel.pixelScale).value/binning
+            ## Mark Central Pixel with a White Cross
             JPEGcommand.append("-stroke")
             JPEGcommand.append("white")
             JPEGcommand.append("-fill")
             JPEGcommand.append("none")
             pixelCenter = [self.nXPix/2/binning, self.nYPix/2/binning]
             self.logger.debug("Marking central pixel of JPEG: {:.1f},{:.1f}".format(pixelCenter[0], pixelCenter[1]))
+#             JPEGcommand.append('-draw')
+#             JPEGcommand.append("circle %d,%d %d,%d" % (pixelCenter[0], pixelCenter[1],
+#                                pixelCenter[0]+markSize, pixelCenter[1]))
             JPEGcommand.append('-draw')
-            JPEGcommand.append("circle %d,%d %d,%d" % (pixelCenter[0], pixelCenter[1],
-                               pixelCenter[0]+markSize, pixelCenter[1]))
-            ## Mark WCS of Target with a Blue Circle
+            JPEGcommand.append("line %d,%d %d,%d" % (pixelCenter[0], pixelCenter[1]+markSize,
+                               pixelCenter[0], pixelCenter[1]+markSize*0.3))
+            JPEGcommand.append('-draw')
+            JPEGcommand.append("line %d,%d %d,%d" % (pixelCenter[0]+markSize, pixelCenter[1],
+                               pixelCenter[0]+markSize*0.3, pixelCenter[1]))
+            JPEGcommand.append('-draw')
+            JPEGcommand.append("line %d,%d %d,%d" % (pixelCenter[0], pixelCenter[1]-markSize,
+                               pixelCenter[0], pixelCenter[1]-markSize*0.3))
+            JPEGcommand.append('-draw')
+            JPEGcommand.append("line %d,%d %d,%d" % (pixelCenter[0]-markSize, pixelCenter[1],
+                               pixelCenter[0]-markSize*0.3, pixelCenter[1]))
+            ## Mark WCS of Target with a green Circle
             JPEGcommand.append("-stroke")
-            JPEGcommand.append("blue")
+            JPEGcommand.append("green")
             JPEGcommand.append("-fill")
             JPEGcommand.append("none")
             ## This next block of code seems to make the call to wcs_world2pix
@@ -987,26 +1000,22 @@ class Image(object):
             targetPixel = (self.imageWCS.wcs_world2pix(foo, 1)[0])
             self.logger.debug("Pixel of target on raw image: {:.1f},{:.1f}".format(targetPixel[0], targetPixel[1]))
             ## Adjust target pixel value for different origin in ImageMagick
-            print(self.original_nXPix)
             TargetXPos = targetPixel[0]
             if not self.cropped:
                 TargetYPos = self.nXPix - targetPixel[1]
             else:
                 TargetYPos = self.original_nXPix - targetPixel[1]
-            print(TargetXPos, TargetYPos)
             ## Adjust target pixel value for cropping
             if self.cropped:
                 TargetXPos = TargetXPos - self.crop_x1
                 TargetYPos = TargetYPos - self.crop_y1
-            print(TargetXPos, TargetYPos)
             ## Adjust target pixel value for binning
             TargetXPos = TargetXPos/binning
             TargetYPos = TargetYPos/binning
-            print(TargetXPos, TargetYPos)
             self.logger.debug("Marking pixel of target on JPEG: {:.1f},{:.1f}".format(TargetXPos, TargetYPos))
             JPEGcommand.append('-draw')
             JPEGcommand.append("circle %d,%d %d,%d" % (TargetXPos, TargetYPos,
-                               TargetXPos+markSize*1.1, TargetYPos))
+                               TargetXPos+markSize, TargetYPos))
         if markStars and self.SExtractorResults:
             self.logger.debug("Marking stars found by SExtractor in jpeg.")
             JPEGcommand.append("-stroke")
