@@ -955,21 +955,23 @@ class Image(object):
         if markPointing and self.imageWCS and self.coordinate_header:
             self.logger.debug("Marking target pointing in jpeg.")
             markSize = 30
-            ## Mark Central Pixel with a White Cross
+            ## Mark Central Pixel with a White Circle
             JPEGcommand.append("-stroke")
             JPEGcommand.append("white")
             JPEGcommand.append("-fill")
             JPEGcommand.append("none")
             pixelCenter = [self.nXPix/2/binning, self.nYPix/2/binning]
             JPEGcommand.append('-draw')
-            JPEGcommand.append("line %d,%d %d,%d" % (pixelCenter[0]-markSize, pixelCenter[1],
-                               pixelCenter[0]+markSize, pixelCenter[1]))
-            JPEGcommand.append('-draw')
-            JPEGcommand.append("line %d,%d %d,%d" % (pixelCenter[0], pixelCenter[1]-markSize,
-                               pixelCenter[0], pixelCenter[1]+markSize))
-            ## Mark WCS of Target with a Red X
+            JPEGcommand.append("circle %d,%d %d,%d" % (pixelCenter[0], pixelCenter[1],
+                               pixelCenter[0]+markSize, pixelCenter[1]+markSize))
+#             JPEGcommand.append("line %d,%d %d,%d" % (pixelCenter[0]-markSize, pixelCenter[1],
+#                                pixelCenter[0]+markSize, pixelCenter[1]))
+#             JPEGcommand.append('-draw')
+#             JPEGcommand.append("line %d,%d %d,%d" % (pixelCenter[0], pixelCenter[1]-markSize,
+#                                pixelCenter[0], pixelCenter[1]+markSize))
+            ## Mark WCS of Target with a Blue Circle
             JPEGcommand.append("-stroke")
-            JPEGcommand.append("red")
+            JPEGcommand.append("blue")
             JPEGcommand.append("-fill")
             JPEGcommand.append("none")
             ## This next block of code seems to make the call to wcs_world2pix
@@ -978,11 +980,13 @@ class Image(object):
                             [self.coordinate_header.ra.hours*15., self.coordinate_header.dec.radians*180./math.pi]])
             targetPixel = (self.imageWCS.wcs_world2pix(foo, 1)[0])/binning
             JPEGcommand.append('-draw')
-            JPEGcommand.append("line %d,%d %d,%d" % (targetPixel[0]-markSize, targetPixel[1]-markSize,
+            JPEGcommand.append("circle %d,%d %d,%d" % (targetPixel[0], targetPixel[1],
                                targetPixel[0]+markSize, targetPixel[1]+markSize))
-            JPEGcommand.append('-draw')
-            JPEGcommand.append("line %d,%d %d,%d" % (targetPixel[0]+markSize, targetPixel[1]-markSize,
-                               targetPixel[0]-markSize, targetPixel[1]+markSize))
+#             JPEGcommand.append("line %d,%d %d,%d" % (targetPixel[0]-markSize, targetPixel[1]-markSize,
+#                                targetPixel[0]+markSize, targetPixel[1]+markSize))
+#             JPEGcommand.append('-draw')
+#             JPEGcommand.append("line %d,%d %d,%d" % (targetPixel[0]+markSize, targetPixel[1]-markSize,
+#                                targetPixel[0]-markSize, targetPixel[1]+markSize))
         if markStars and self.SExtractorResults:
             self.logger.debug("Marking stars found by SExtractor in jpeg.")
             JPEGcommand.append("-stroke")
