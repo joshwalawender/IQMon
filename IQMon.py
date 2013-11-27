@@ -981,7 +981,7 @@ class Image(object):
             targetPixel = (self.imageWCS.wcs_world2pix(foo, 1)[0])/binning
             JPEGcommand.append('-draw')
             JPEGcommand.append("circle %d,%d %d,%d" % (targetPixel[0], targetPixel[1],
-                               targetPixel[0]+markSize, targetPixel[1]+markSize))
+                               targetPixel[0]+markSize*1.1, targetPixel[1]+markSize*1.1))
 #             JPEGcommand.append("line %d,%d %d,%d" % (targetPixel[0]-markSize, targetPixel[1]-markSize,
 #                                targetPixel[0]+markSize, targetPixel[1]+markSize))
 #             JPEGcommand.append('-draw')
