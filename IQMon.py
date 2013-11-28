@@ -1031,7 +1031,7 @@ class Image(object):
                 nStarsMarked += 1
                 if nStarsMarked <= nStarsLimit:
                     MarkXPos = star['X_IMAGE']
-                    MarkYPos = self.nXPix - star['Y_IMAGE']
+                    MarkYPos = self.nYPix - star['Y_IMAGE']
                     JPEGcommand.append('-draw')
                     JPEGcommand.append("circle %d,%d %d,%d" % (MarkXPos, MarkYPos, MarkXPos+MarkRadius, MarkYPos))
                 else:
