@@ -181,6 +181,7 @@ class Telescope(object):
         self.SExtractorSeeing = None
         self.SExtractorSaturation = None
         self.site = None
+        self.pointingMarkerSize = 1*u.arcmin
         
     def CheckUnits(self):
         '''
@@ -965,7 +966,8 @@ class Image(object):
         if markPointing and self.imageWCS and self.coordinate_header:
             self.logger.debug("Marking target pointing in jpeg.")
             ## Make markSize 180 arcseconds (3 arcmin)
-            markSize = (180*u.arcsec/self.tel.pixelScale).value/binning
+#             markSize = (180*u.arcsec/self.tel.pixelScale).value/binning
+            markSize = (self.tel.pointingMarkerSize.to(u.arcsec)/self.tel.pixelScale).value/binning
             ## Mark Central Pixel with a White Cross
             JPEGcommand.append("-stroke")
             JPEGcommand.append("white")
