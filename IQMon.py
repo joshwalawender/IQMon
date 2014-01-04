@@ -181,6 +181,7 @@ class Telescope(object):
         self.SExtractorSeeing = None
         self.SExtractorSaturation = None
         self.site = None
+        self.pointingMarkerSize = 1*u.arcmin
         
     def CheckUnits(self):
         '''
@@ -324,6 +325,13 @@ class Image(object):
         self.imageFlipped = None
         self.jpegFileNames = []
         self.CheckImageFile = None
+        self.cropped = False
+        self.crop_x1 = None
+        self.crop_x2 = None
+        self.crop_y1 = None
+        self.crop_y2 = None
+        self.original_nXPix = None
+        self.original_nXPix = None
 
     ##-------------------------------------------------------------------------
     ## Make Logger Object
@@ -637,15 +645,18 @@ class Image(object):
             except:
                 self.logger.warning("Could not parse ROI string in telescope object.")
             else:
-                x1 = int(MatchROI.group(1))
-                x2 = int(MatchROI.group(2))
-                y1 = int(MatchROI.group(3))
-                y2 = int(MatchROI.group(4))
-                self.logger.info("Cropping Image To [{0}:{1},{2}:{3}]".format(x1, x2, y1, y2))
+                self.crop_x1 = int(MatchROI.group(1))
+                self.crop_x2 = int(MatchROI.group(2))
+                self.crop_y1 = int(MatchROI.group(3))
+                self.crop_y2 = int(MatchROI.group(4))
+                self.logger.info("Cropping Image To [{0}:{1},{2}:{3}]".format(self.crop_x1, self.crop_x2, self.crop_y1, self.crop_y2))
                 hdulist = fits.open(self.workingFile, mode="update")
-                hdulist[0].data = hdulist[0].data[y1:y2,x1:x2]
+                hdulist[0].data = hdulist[0].data[self.crop_y1:self.crop_y2,self.crop_x1:self.crop_x2]
                 hdulist.flush()
                 hdulist.close()
+                self.cropped = True
+                self.original_nXPix = self.nXPix
+                self.original_nYPix = self.nYPix
 
 
     ##-------------------------------------------------------------------------
@@ -954,39 +965,69 @@ class Image(object):
         JPEGcommand = ["convert", "-contrast-stretch", "0.9%,1%", "-compress", "JPEG", "-quality", "70", "-resize", binningString]
         if markPointing and self.imageWCS and self.coordinate_header:
             self.logger.debug("Marking target pointing in jpeg.")
-            markSize = 30
+            ## Make markSize 180 arcseconds (3 arcmin)
+#             markSize = (180*u.arcsec/self.tel.pixelScale).value/binning
+            markSize = (self.tel.pointingMarkerSize.to(u.arcsec)/self.tel.pixelScale).value/binning
             ## Mark Central Pixel with a White Cross
             JPEGcommand.append("-stroke")
             JPEGcommand.append("white")
+            JPEGcommand.append("-strokewidth")
+            JPEGcommand.append("3")
             JPEGcommand.append("-fill")
             JPEGcommand.append("none")
             pixelCenter = [self.nXPix/2/binning, self.nYPix/2/binning]
+            self.logger.debug("Marking central pixel of JPEG: {:.1f},{:.1f}".format(pixelCenter[0], pixelCenter[1]))
+#             JPEGcommand.append('-draw')
+#             JPEGcommand.append("circle %d,%d %d,%d" % (pixelCenter[0], pixelCenter[1],
+#                                pixelCenter[0]+markSize, pixelCenter[1]))
             JPEGcommand.append('-draw')
-            JPEGcommand.append("line %d,%d %d,%d" % (pixelCenter[0]-markSize, pixelCenter[1],
-                               pixelCenter[0]+markSize, pixelCenter[1]))
+            JPEGcommand.append("line %d,%d %d,%d" % (pixelCenter[0], pixelCenter[1]+markSize,
+                               pixelCenter[0], pixelCenter[1]+markSize*0.3))
+            JPEGcommand.append('-draw')
+            JPEGcommand.append("line %d,%d %d,%d" % (pixelCenter[0]+markSize, pixelCenter[1],
+                               pixelCenter[0]+markSize*0.3, pixelCenter[1]))
             JPEGcommand.append('-draw')
             JPEGcommand.append("line %d,%d %d,%d" % (pixelCenter[0], pixelCenter[1]-markSize,
-                               pixelCenter[0], pixelCenter[1]+markSize))
-            ## Mark WCS of Target with a Red X
+                               pixelCenter[0], pixelCenter[1]-markSize*0.3))
+            JPEGcommand.append('-draw')
+            JPEGcommand.append("line %d,%d %d,%d" % (pixelCenter[0]-markSize, pixelCenter[1],
+                               pixelCenter[0]-markSize*0.3, pixelCenter[1]))
+            ## Mark WCS of Target with a blue Circle
             JPEGcommand.append("-stroke")
-            JPEGcommand.append("red")
+            JPEGcommand.append("blue")
+            JPEGcommand.append("-strokewidth")
+            JPEGcommand.append("3")
             JPEGcommand.append("-fill")
             JPEGcommand.append("none")
             ## This next block of code seems to make the call to wcs_world2pix
             ## happy, but I'm not sure I understand why.
             foo = np.array([[self.coordinate_header.ra.hours*15., self.coordinate_header.dec.radians*180./math.pi], 
                             [self.coordinate_header.ra.hours*15., self.coordinate_header.dec.radians*180./math.pi]])
-            targetPixel = (self.imageWCS.wcs_world2pix(foo, 1)[0])/binning
+            targetPixel = (self.imageWCS.wcs_world2pix(foo, 1)[0])
+            self.logger.debug("Pixel of target on raw image: {:.1f},{:.1f}".format(targetPixel[0], targetPixel[1]))
+            ## Adjust target pixel value for different origin in ImageMagick
+            TargetXPos = targetPixel[0]
+            if not self.cropped:
+                TargetYPos = self.nXPix - targetPixel[1]
+            else:
+                TargetYPos = self.original_nXPix - targetPixel[1]
+            ## Adjust target pixel value for cropping
+            if self.cropped:
+                TargetXPos = TargetXPos - self.crop_x1
+                TargetYPos = TargetYPos - self.crop_y1
+            ## Adjust target pixel value for binning
+            TargetXPos = TargetXPos/binning
+            TargetYPos = TargetYPos/binning
+            self.logger.debug("Marking pixel of target on JPEG: {:.1f},{:.1f}".format(TargetXPos, TargetYPos))
             JPEGcommand.append('-draw')
-            JPEGcommand.append("line %d,%d %d,%d" % (targetPixel[0]-markSize, targetPixel[1]-markSize,
-                               targetPixel[0]+markSize, targetPixel[1]+markSize))
-            JPEGcommand.append('-draw')
-            JPEGcommand.append("line %d,%d %d,%d" % (targetPixel[0]+markSize, targetPixel[1]-markSize,
-                               targetPixel[0]-markSize, targetPixel[1]+markSize))
+            JPEGcommand.append("circle %d,%d %d,%d" % (TargetXPos, TargetYPos,
+                               TargetXPos+markSize/2, TargetYPos))
         if markStars and self.SExtractorResults:
             self.logger.debug("Marking stars found by SExtractor in jpeg.")
             JPEGcommand.append("-stroke")
             JPEGcommand.append("red")
+            JPEGcommand.append("-strokewidth")
+            JPEGcommand.append("1")
             JPEGcommand.append("-fill")
             JPEGcommand.append("none")
             if self.FWHM:
@@ -998,11 +1039,11 @@ class Image(object):
                 nStarsMarked += 1
                 if nStarsMarked <= nStarsLimit:
                     MarkXPos = star['X_IMAGE']
-                    MarkYPos = self.nXPix - star['Y_IMAGE']
+                    MarkYPos = self.nYPix - star['Y_IMAGE']
                     JPEGcommand.append('-draw')
                     JPEGcommand.append("circle %d,%d %d,%d" % (MarkXPos, MarkYPos, MarkXPos+MarkRadius, MarkYPos))
                 else:
-                    self.logger.warning("Only marked brigtest {} stars found in image.".format(nStarsLimit))
+                    self.logger.warning("Only marked brightest {} stars found in image.".format(nStarsLimit))
                     break
         if rotate and self.positionAngle:
             self.logger.debug("Rotating jpeg by {0:.1f} deg".format(self.positionAngle.to(u.deg).value))
@@ -1013,6 +1054,17 @@ class Image(object):
                     JPEGcommand.append("-flop")
             else:
                 self.logger.warning("No position angle value found.  Not rotating JPEG.")
+        if markPointing and self.imageWCS and self.coordinate_header:
+            JPEGcommand.append("-stroke")
+            JPEGcommand.append("none")
+            JPEGcommand.append("-fill")
+            JPEGcommand.append("white")
+            JPEGcommand.append("-pointsize")
+            JPEGcommand.append("28")
+            JPEGcommand.append('-font')
+            JPEGcommand.append('fixed')
+            JPEGcommand.append('-draw')
+            JPEGcommand.append("text 200,40 'Blue circle centered on target is {:.1f} arcmin diameter.'".format(self.tel.pointingMarkerSize.to(u.arcmin).value))
         if not backgroundSubtracted:
             JPEGcommand.append(self.workingFile)
         else:
@@ -1025,7 +1077,7 @@ class Image(object):
             JPEGcommand.append('-font')
             JPEGcommand.append('fixed')
             JPEGcommand.append('-draw')
-            JPEGcommand.append("text {0},80 'Background Subtracted Image'".format(self.nXPix/2 - 170))
+            JPEGcommand.append("text 200,120 'Background Subtracted Image'")
             JPEGcommand.append(self.CheckImageFile)
         if markStars and nStarsMarked > nStarsLimit:
             JPEGcommand.append("-stroke")
@@ -1037,7 +1089,7 @@ class Image(object):
             JPEGcommand.append('-font')
             JPEGcommand.append('fixed')
             JPEGcommand.append('-draw')
-            JPEGcommand.append("text {},40 'Marked {} brightest stars out of {}.'".format(self.nXPix/2 - 170, nStarsLimit, self.nSExtracted))
+            JPEGcommand.append("text 200,80 'Marked {} brightest stars out of {}.'".format(nStarsLimit, self.nSExtracted))
         JPEGcommand.append(jpegFile)
         self.logger.debug("Issuing convert command to create jpeg.")
 #         self.logger.debug("Command: {}".format(repr(JPEGcommand)))
