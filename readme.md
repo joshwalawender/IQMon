@@ -24,6 +24,8 @@ If the image contains a WCS, the module can also compare the WCS coordinates of 
 
 ## Version History
 
+* **v1.0.6**
+    * Tweaks related to marking up of jpeg files.  Better markers, user settable maker size, and marks are labeled.
 * **v1.0.5**
     * Bug fixes related to marking up of jpeg files.
 * **v1.0.4**
