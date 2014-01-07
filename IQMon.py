@@ -674,7 +674,7 @@ class Image(object):
         try:
             StartTime = time.time()
             AstrometrySTDOUT = subprocess.check_output(AstrometryCommand, 
-                               stderr=subprocess.STDOUT)
+                               stderr=subprocess.STDOUT, universal_newlines=True)
             EndTime = time.time()
         except subprocess.CalledProcessError as e:
             self.logger.warning("Astrometry.net failed.")
@@ -789,7 +789,7 @@ class Image(object):
             
             ## Make edits To default.sex based on telescope:
             ## Read in default config file
-            DefaultConfig = subprocess.check_output(["sex", "-dd"]).split("\n")
+            DefaultConfig = subprocess.check_output(["sex", "-dd"], universal_newlines=True).splitlines()
             NewConfig     = open(SExtractorConfigFile, 'w')
             backgroundFilterSize = max(5.*self.tel.SExtractorSeeing.to(u.arcsec).value / self.tel.pixelScale.value, 5.)
             self.logger.debug("Using background filter size of 5x seeing = {0:.1f} pixels.".format(backgroundFilterSize))
@@ -840,7 +840,7 @@ class Image(object):
             self.logger.info("Invoking SExtractor")
             self.logger.debug("SExtractor command: {}".format(repr(SExtractorCommand)))
             try:
-                SExSTDOUT = subprocess.check_output(SExtractorCommand, stderr=subprocess.STDOUT)
+                SExSTDOUT = subprocess.check_output(SExtractorCommand, stderr=subprocess.STDOUT, universal_newlines=True)
             except subprocess.CalledProcessError as e:
                 self.logger.error("SExtractor failed.")
                 for line in e.output.split("\n"):
@@ -1091,7 +1091,7 @@ class Image(object):
         self.logger.debug("Issuing convert command to create jpeg.")
 #         self.logger.debug("Command: {}".format(repr(JPEGcommand)))
         try:
-            ConvertSTDOUT = subprocess.check_output(JPEGcommand, stderr=subprocess.STDOUT)
+            ConvertSTDOUT = subprocess.check_output(JPEGcommand, stderr=subprocess.STDOUT, universal_newlines=True)
         except subprocess.CalledProcessError as e:
             self.logger.error("Failed to create jpeg.")
             for line in e.output.split("\n"):
