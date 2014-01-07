@@ -461,9 +461,7 @@ class Image(object):
                 ImageDEC = ":".join(ImageDEC.split(" "))
         self.logger.debug("Read pointing info from header: "+ImageRA+" "+ImageDEC)
         try:
-            self.coordinate_header = coords.ICRSCoordinates(
-                                                      ImageRA+" "+ImageDEC,
-                                                   unit=(u.hour, u.degree))
+            self.coordinate_header = coords.ICRS(ImageRA+" "+ImageDEC, unit=(u.hour, u.degree))
         except:
             self.logger.warning("Failed to read pointing info from header.")
             self.coordinate_header = None
@@ -745,8 +743,7 @@ class Image(object):
         if self.imageWCS and self.coordinate_header:
             centerWCS = self.imageWCS.wcs_pix2world([[self.nXPix/2, self.nYPix/2]], 1)
             self.logger.debug("Using coordinates of center point: {0} {1}".format(centerWCS[0][0], centerWCS[0][1]))
-            self.coordinate_WCS = coords.ICRSCoordinates(ra=centerWCS[0][0],
-                                                   dec=centerWCS[0][1],
+            self.coordinate_WCS = coords.ICRS(ra=centerWCS[0][0], dec=centerWCS[0][1],
                                                    unit=(u.degree, u.degree))
             self.pointingError = self.coordinate_WCS.separation(self.coordinate_header)
             self.logger.debug("Target Coordinates are:  %s %s",
