@@ -743,7 +743,12 @@ class Image(object):
         if self.imageWCS and self.coordinate_header:
             centerWCS = self.imageWCS.wcs_pix2world([[self.nXPix/2, self.nYPix/2]], 1)
             self.logger.debug("Using coordinates of center point: {0} {1}".format(centerWCS[0][0], centerWCS[0][1]))
+<<<<<<< HEAD
             self.coordinate_WCS = coords.ICRS(ra=centerWCS[0][0], dec=centerWCS[0][1],
+=======
+            self.coordinate_WCS = coords.ICRS(ra=centerWCS[0][0],
+                                                   dec=centerWCS[0][1],
+>>>>>>> 0ce4734a2f3db5624b7be1211e3f28d898777f6f
                                                    unit=(u.degree, u.degree))
             self.pointingError = self.coordinate_WCS.separation(self.coordinate_header)
             self.logger.debug("Target Coordinates are:  %s %s",
@@ -752,7 +757,7 @@ class Image(object):
             self.logger.debug("WCS of Central Pixel is: %s %s",
                          self.coordinate_WCS.ra.format(u.hour, sep=":", precision=1),
                          self.coordinate_WCS.dec.format(u.degree, sep=":", precision=1, alwayssign=True))
-            self.logger.info("Pointing Error is %.2f arcmin", self.pointingError.arcmins)
+            self.logger.info("Pointing Error is %.2f arcmin", self.pointingError.arcminute)
         else:
             self.logger.warning("Pointing error not calculated.")
 
@@ -998,8 +1003,8 @@ class Image(object):
             JPEGcommand.append("none")
             ## This next block of code seems to make the call to wcs_world2pix
             ## happy, but I'm not sure I understand why.
-            foo = np.array([[self.coordinate_header.ra.hours*15., self.coordinate_header.dec.radians*180./math.pi], 
-                            [self.coordinate_header.ra.hours*15., self.coordinate_header.dec.radians*180./math.pi]])
+            foo = np.array([[self.coordinate_header.ra.hour*15., self.coordinate_header.dec.radian*180./math.pi], 
+                            [self.coordinate_header.ra.hour*15., self.coordinate_header.dec.radian*180./math.pi]])
             targetPixel = (self.imageWCS.wcs_world2pix(foo, 1)[0])
             self.logger.debug("Pixel of target on raw image: {:.1f},{:.1f}".format(targetPixel[0], targetPixel[1]))
             ## Adjust target pixel value for different origin in ImageMagick
@@ -1303,12 +1308,12 @@ class Image(object):
         if "PErr" in fields:
             if self.pointingError:
                 ## Decide whether to flag pointing error value with red color
-                if self.pointingError.arcmins > self.tel.thresholdPointingErr.to(u.arcmin).value:
+                if self.pointingError.arcminute > self.tel.thresholdPointingErr.to(u.arcmin).value:
                     colorPointingError = "#FF5C33"
                 else:
                     colorPointingError = "#70DB70"
                 ## Write HTML
-                HTML.write("      <td style='background-color:{0}'>{1:.1f}</td>\n".format(colorPointingError, self.pointingError.arcmins))
+                HTML.write("      <td style='background-color:{0}'>{1:.1f}</td>\n".format(colorPointingError, self.pointingError.arcminute))
             else:
                 HTML.write("      <td style='color:{0}'>{1}</td>\n".format("#FF5C33", ""))
         ## Write WCS position angle
@@ -1420,7 +1425,7 @@ class Image(object):
             airmass = 0.
             tableMask[6] = True
         ## Pointing Error
-        if self.pointingError: pointingError = self.pointingError.arcmins
+        if self.pointingError: pointingError = self.pointingError.arcminute
         else:
             pointingError = 0.
             tableMask[7] = True
