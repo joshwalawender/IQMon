@@ -461,9 +461,8 @@ class Image(object):
                 ImageDEC = ":".join(ImageDEC.split(" "))
         self.logger.debug("Read pointing info from header: "+ImageRA+" "+ImageDEC)
         try:
-            self.coordinate_header = coords.ICRSCoordinates(
-                                                      ImageRA+" "+ImageDEC,
-                                                   unit=(u.hour, u.degree))
+            self.coordinate_header = coords.ICRS(ImageRA+" "+ImageDEC,
+                                                 unit=(u.hour, u.degree))
         except:
             self.logger.warning("Failed to read pointing info from header.")
             self.coordinate_header = None
