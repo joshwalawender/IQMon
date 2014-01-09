@@ -314,6 +314,7 @@ class Image(object):
         self.SExBackground = None
         self.SExBRMS = None
         self.tempFiles = []
+        self.SExtractorCatalog = None
         self.SExtractorResults = None
         self.nStarsSEx = None
         self.positionAngle = None
@@ -560,6 +561,17 @@ class Image(object):
             self.airmass = None
             self.logger.warning("Object position and Moon position not calculated.")
 
+    ##-------------------------------------------------------------------------
+    ## Add To Header
+    ##-------------------------------------------------------------------------
+    def EditHeader(self, keyword, value):
+        '''
+        Get information from the image fits header.
+        '''
+        hdulist = fits.open(self.workingFile, ignore_missing_end=True, mode='update')
+        hdulist[0].header[keyword] = value
+        hdulist.flush()
+
 
     ##-------------------------------------------------------------------------
     ## Read Image
@@ -743,13 +755,7 @@ class Image(object):
         if self.imageWCS and self.coordinate_header:
             centerWCS = self.imageWCS.wcs_pix2world([[self.nXPix/2, self.nYPix/2]], 1)
             self.logger.debug("Using coordinates of center point: {0} {1}".format(centerWCS[0][0], centerWCS[0][1]))
-<<<<<<< HEAD
-            self.coordinate_WCS = coords.ICRS(ra=centerWCS[0][0], dec=centerWCS[0][1],
-=======
-            self.coordinate_WCS = coords.ICRS(ra=centerWCS[0][0],
-                                                   dec=centerWCS[0][1],
->>>>>>> 0ce4734a2f3db5624b7be1211e3f28d898777f6f
-                                                   unit=(u.degree, u.degree))
+            self.coordinate_WCS = coords.ICRS(ra=centerWCS[0][0], dec=centerWCS[0][1], unit=(u.degree, u.degree))
             self.pointingError = self.coordinate_WCS.separation(self.coordinate_header)
             self.logger.debug("Target Coordinates are:  %s %s",
                          self.coordinate_header.ra.format(u.hour, sep=":", precision=1),
@@ -764,10 +770,11 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Run SExtractor
     ##-------------------------------------------------------------------------
-    def RunSExtractor(self):
+    def RunSExtractor(self, threshold=5.0):
         '''
         Run SExtractor on image.
         '''
+        assert float(threshold)
         assert type(self.tel.gain) == u.quantity.Quantity
         assert type(self.tel.pixelScale) == u.quantity.Quantity
         assert type(self.tel.SExtractorSeeing) == u.quantity.Quantity
@@ -776,8 +783,8 @@ class Image(object):
             ## Set up file names
             SExtractorConfigFile = os.path.join(self.config.pathTemp, self.rawFileBasename+".sex")
             self.tempFiles.append(SExtractorConfigFile)
-            SExtractorCatalog = os.path.join(self.config.pathTemp, self.rawFileBasename+".cat")
-            self.tempFiles.append(SExtractorCatalog)
+            self.SExtractorCatalog = os.path.join(self.config.pathTemp, self.rawFileBasename+".cat")
+            self.tempFiles.append(self.SExtractorCatalog)
             PhotometryCatalogFile_xy = os.path.join(self.config.pathTemp, self.rawFileBasename+"PhotCat_xy.txt")
             self.tempFiles.append(PhotometryCatalogFile_xy)
             CheckImageType = "-BACKGROUND"
@@ -795,13 +802,13 @@ class Image(object):
             ## Make edits To default.sex based on telescope:
             ## Read in default config file
             DefaultConfig = subprocess.check_output(["sex", "-dd"], universal_newlines=True).splitlines()
-            NewConfig     = open(SExtractorConfigFile, 'w')
+            NewConfig = open(SExtractorConfigFile, 'w')
             backgroundFilterSize = max(5.*self.tel.SExtractorSeeing.to(u.arcsec).value / self.tel.pixelScale.value, 5.)
             self.logger.debug("Using background filter size of 5x seeing = {0:.1f} pixels.".format(backgroundFilterSize))
             for line in DefaultConfig:
                 newline = line
                 if re.match("CATALOG_NAME\s+", line):
-                    newline = "CATALOG_NAME     "+SExtractorCatalog+"\n"
+                    newline = "CATALOG_NAME     "+self.SExtractorCatalog+"\n"
                 if re.match("CATALOG_TYPE\s+", line):
                     newline = "CATALOG_TYPE     "+"FITS_LDAC"+"\n"
                 if re.match("PARAMETERS_NAME\s+", line):
@@ -809,9 +816,9 @@ class Image(object):
                 if re.match("DETECT_MINAREA\s+", line) and (2.*self.tel.pixelScale.value > self.tel.SExtractorSeeing.to(u.arcsec).value):
                     newline = "DETECT_MINAREA   "+"4"+"\n"
                 if re.match("DETECT_THRESH\s+", line):
-                    newline = "DETECT_THRESH    "+"5.0"+"\n"
+                    newline = "DETECT_THRESH    {:.1f}\n".format(threshold)
                 if re.match("ANALYSIS_THRESH\s+", line):
-                    newline = "ANALYSIS_THRESH  "+"5.0"+"\n"
+                    newline = "ANALYSIS_THRESH  {:.1f}\n".format(threshold)
                 if re.match("FILTER\s+", line):
                     newline = "FILTER           "+"N"+"\n"
                 if re.match("BACK_SIZE\s+", line):
@@ -847,9 +854,9 @@ class Image(object):
             try:
                 SExSTDOUT = subprocess.check_output(SExtractorCommand, stderr=subprocess.STDOUT, universal_newlines=True)
             except subprocess.CalledProcessError as e:
-                self.logger.error("SExtractor failed.")
-                for line in e.output.split("\n"):
-                    self.logger.error(line)
+                self.logger.error("SExtractor failed.  Command: {}".format(e.cmd))
+                self.logger.error("SExtractor failed.  Returncode: {}".format(e.returncode))
+                self.logger.error("SExtractor failed.  Output: {}".format(e.output))
             except:
                 self.logger.error("SExtractor process failed: {0} {1} {2}".format(sys.exc_info()[0], sys.exc_info()[1], sys.exc_info()[2]))
             else:
@@ -883,17 +890,14 @@ class Image(object):
                     self.SExBRMS = None
 
                 ## If No Output Catalog Created ...
-                if not os.path.exists(SExtractorCatalog):
+                if not os.path.exists(self.SExtractorCatalog):
                     self.logger.warning("SExtractor failed to create catalog.")
                     self.SExtractorCatalog = None
-                else:
-                    self.SExtractorCatalog = SExtractorCatalog
 
                 ## Read FITS_LDAC SExtractor Catalog
                 self.logger.debug("Reading SExtractor output catalog.")
                 hdu = fits.open(self.SExtractorCatalog)
                 self.SExtractorResults = table.Table(hdu[2].data)
-#                 self.SExtractorResults = ascii.read(self.SExtractorCatalog, Reader=ascii.sextractor.SExtractor)
                 SExImageRadius = []
                 SExAngleInImage = []
                 for star in self.SExtractorResults:
@@ -921,12 +925,6 @@ class Image(object):
             IQRadius = DiagonalRadius*IQRadiusFactor
             CentralFWHMs = [star['FWHM_IMAGE'] for star in self.SExtractorResults if star['ImageRadius'] <= IQRadius]
             CentralEllipticities = [star['ELLIPTICITY'] for star in self.SExtractorResults if star['ImageRadius'] <= IQRadius]
-#             CentralFWHMs = []
-#             CentralEllipticities = []
-#             for star in self.SExtractorResults:
-#                 if star['ImageRadius'] <= IQRadius:
-#                     CentralFWHMs.append(star['FWHM_IMAGE'])
-#                     CentralEllipticities.append(star['ELLIPTICITY'])   
             if len(CentralFWHMs) > 3:
                 self.FWHM = np.median(CentralFWHMs) * u.pix
                 self.ellipticity = np.median(CentralEllipticities)
@@ -938,6 +936,65 @@ class Image(object):
         else:
             self.FWHM = None
             self.ellipticity = None
+
+
+    ##-------------------------------------------------------------------------
+    ## Run SCAMP
+    ##-------------------------------------------------------------------------
+    def RunSCAMP(self, catalog='USNO-B1', distortion_order=3):
+        '''
+        Run SCAMP on SExtractor output catalog.
+        '''
+#         ## Reduce number of stars in catalog if it is very large
+#         threshold = 5.0        ## assume default in RunSExtractor Above is 5.0
+#         niter = 0
+#         while self.nStarsSEx > 10000:
+#             niter += 1
+#             threshold += 5.0
+#             self.logger.info('Re-running SExtractor with threshold of {:.1f}'.format(threshold))
+#             self.RunSExtractor(threshold=threshold)
+#             if niter > 5:
+#                 break
+#         if (threshold > 5.0) and (self.nStarsSEx < 2000):
+#             threshold -= 5.0
+#             self.logger.info('Re-running SExtractor with threshold of {:.1f}'.format(threshold))
+#             self.RunSExtractor(threshold=threshold)
+#         self.logger.info('New SExtractor run results in {:d} stars'.format(self.nStarsSEx))
+
+        ## Set up SCAMP configuration file
+        checkplot_resx = 1200
+        checkplot_resy = 1200
+
+        SCAMPConfigFile = os.path.join(self.config.pathTemp, self.rawFileBasename+".scamp")
+        self.tempFiles.append(SCAMPConfigFile)
+        DefaultConfig = subprocess.check_output(["scamp", "-dd"], universal_newlines=True).splitlines()
+        NewConfig = open(SCAMPConfigFile, 'w')
+        for line in DefaultConfig:
+            newline = line
+            if re.match("CHECKPLOT_RES\s+", line):
+                newline = "CHECKPLOT_RES          {:d},{:d}      # Check-plot resolution (0 = default)\n".format(checkplot_resx, checkplot_resy)
+            if re.match("DISTORT_DEGREES\s+", line):
+                newline = "DISTORT_DEGREES        {:d}           # Polynom degree for each group\n".format(distortion_order)
+            if re.match("ASTREF_CATALOG\s+", line):
+                newline = "ASTREF_CATALOG         {}         # NONE, FILE, USNO-A1,USNO-A2,USNO-B1,\n".format(catalog)
+            NewConfig.write(newline+"\n")
+        NewConfig.close()
+
+        ## Run SCAMP
+        SCAMPCommand = ["scamp", self.SExtractorCatalog, "-c", SCAMPConfigFile]
+        self.logger.info("Invoking SCAMP")
+        self.logger.debug("SCAMP command: {}".format(repr(SCAMPCommand)))
+        try:
+            SCAMP_STDOUT = subprocess.check_output(SCAMPCommand, stderr=subprocess.STDOUT, universal_newlines=True)
+        except subprocess.CalledProcessError as e:
+            self.logger.error("SExtractor failed.  Command: {}".format(e.cmd))
+            self.logger.error("SExtractor failed.  Returncode: {}".format(e.returncode))
+            self.logger.error("SExtractor failed.  Output: {}".format(e.output))
+        except:
+            self.logger.error("SExtractor process failed: {0} {1} {2}".format(sys.exc_info()[0], sys.exc_info()[1], sys.exc_info()[2]))
+        else:
+            for line in SCAMP_STDOUT.split("\n"):
+                self.logger.debug("  "+line)
 
 
     ##-------------------------------------------------------------------------
