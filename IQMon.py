@@ -945,22 +945,6 @@ class Image(object):
         '''
         Run SCAMP on SExtractor output catalog.
         '''
-#         ## Reduce number of stars in catalog if it is very large
-#         threshold = 5.0        ## assume default in RunSExtractor Above is 5.0
-#         niter = 0
-#         while self.nStarsSEx > 10000:
-#             niter += 1
-#             threshold += 5.0
-#             self.logger.info('Re-running SExtractor with threshold of {:.1f}'.format(threshold))
-#             self.RunSExtractor(threshold=threshold)
-#             if niter > 5:
-#                 break
-#         if (threshold > 5.0) and (self.nStarsSEx < 2000):
-#             threshold -= 5.0
-#             self.logger.info('Re-running SExtractor with threshold of {:.1f}'.format(threshold))
-#             self.RunSExtractor(threshold=threshold)
-#         self.logger.info('New SExtractor run results in {:d} stars'.format(self.nStarsSEx))
-
         ## Set up SCAMP configuration file
         checkplot_resx = 1200
         checkplot_resy = 1200
@@ -977,12 +961,16 @@ class Image(object):
                 newline = "DISTORT_DEGREES        {:d}           # Polynom degree for each group\n".format(distortion_order)
             if re.match("ASTREF_CATALOG\s+", line):
                 newline = "ASTREF_CATALOG         {}         # NONE, FILE, USNO-A1,USNO-A2,USNO-B1,\n".format(catalog)
+            if re.match("CHECKPLOT_TYPE\s+", line):
+                newline = "CHECKPLOT_TYPE         {}\n".format('FGROUPS,DISTORTION,ASTR_REFERROR2D,ASTR_REFERROR1D,PHOT_ZPCORR')
+            if re.match("CHECKPLOT_NAME\s+", line):
+                newline = "CHECKPLOT_NAME         {}\n".format('fgroups,distort,astr_referror2d,astr_referror1d,phot_zpcorr')
             NewConfig.write(newline+"\n")
         NewConfig.close()
 
         ## Run SCAMP
         SCAMPCommand = ["scamp", self.SExtractorCatalog, "-c", SCAMPConfigFile]
-        self.logger.info("Invoking SCAMP")
+        self.logger.info("Invoking SCAMP using {} catalog with distortion polynomial of order {}.".format(catalog, distortion_order))
         self.logger.debug("SCAMP command: {}".format(repr(SCAMPCommand)))
         try:
             SCAMP_STDOUT = subprocess.check_output(SCAMPCommand, stderr=subprocess.STDOUT, universal_newlines=True)
