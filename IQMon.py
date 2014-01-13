@@ -450,6 +450,7 @@ class Image(object):
 
         ## Determine Image Size in Pixels
         self.nYPix, self.nXPix = self.image.shape
+        self.logger.debug('Image size is: {},{}'.format(self.nYPix, self.nXPix))
 
         ## Read Header Coordinates in to astropy coordinates object
         ImageRA  = self.header['RA']
