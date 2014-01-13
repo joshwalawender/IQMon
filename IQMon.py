@@ -694,6 +694,10 @@ class Image(object):
                                          AstrometrySTDOUT[pos+40:pos+75])
                 if IsFieldCenter:
                     self.logger.info("Astrometry.net field center is: %s", IsFieldCenter.group(1))
+                else:
+                    self.logger.warning("Could not parse field center from astrometry.net output.")
+                    for line in AstrometrySTDOUT.split("\n"):
+                        self.logger.warning("  %s" % line)
             else:
                 for line in AstrometrySTDOUT.split("\n"):
                     self.logger.warning("  %s" % line)
@@ -1008,9 +1012,9 @@ class Image(object):
             ## Adjust target pixel value for different origin in ImageMagick
             TargetXPos = targetPixel[0]
             if not self.cropped:
-                TargetYPos = self.nXPix - targetPixel[1]
+                TargetYPos = self.nYPix - targetPixel[1]
             else:
-                TargetYPos = self.original_nXPix - targetPixel[1]
+                TargetYPos = self.original_nYPix - targetPixel[1]
             ## Adjust target pixel value for cropping
             if self.cropped:
                 TargetXPos = TargetXPos - self.crop_x1
