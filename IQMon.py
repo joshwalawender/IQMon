@@ -817,7 +817,7 @@ class Image(object):
             SExtractorCommand.append('-FILTER')
             SExtractorCommand.append('{}'.format('N'))
             SExtractorCommand.append('-BACK_SIZE')
-            SExtractorCommand.append('{:.2}'.format(format(backgroundFilterSize)))
+            SExtractorCommand.append('{:.2f}'.format(backgroundFilterSize))
             SExtractorCommand.append('-ASSOC_NAME')
             SExtractorCommand.append('{}'.format(PhotometryCatalogFile_xy))
             SExtractorCommand.append('-ASSOCSELEC_TYPE')
@@ -849,11 +849,11 @@ class Image(object):
             except:
                 self.logger.error("SExtractor process failed: {0} {1} {2}".format(sys.exc_info()[0], sys.exc_info()[1], sys.exc_info()[2]))
             else:
-                for line in SExSTDOUT.split("\n"):
+                for line in SExSTDOUT.splitlines():
                     line.replace("[1A", "")
                     line.replace("[1M>", "")
                     if not re.match(".*Setting up background map.*", line) and not re.match(".*Line:\s[0-9]*.*", line):
-                        self.logger.info("  SExtractor Output: "+line)
+                        self.logger.info("  SExtractor Output: {}".format(line))
                 ## Extract Number of Stars from SExtractor Output
                 pos = SExSTDOUT.find("sextracted ")
                 IsSExCount = re.match("\s*([0-9]+)\s+", SExSTDOUT[pos+11:pos+21])
@@ -972,7 +972,7 @@ class Image(object):
         else:
             StartAstrometricStats = False
             EndAstrometricStats = False
-            for line in SCAMP_STDOUT.split("\n"):
+            for line in SCAMP_STDOUT.splitlines():
                 if re.search('Astrometric stats \(external\)', line):
                     StartAstrometricStats = True
                 if re.search('Generating astrometric plots', line):
@@ -986,7 +986,36 @@ class Image(object):
             self.SCAMP_catalog = mergedcat_name
 
         ## Populate FITS header with SCAMP derived header values in .head file
-#         HEaderFO = open()
+        HeaderFO = open(os.path.join(self.config.pathTemp, self.rawFileBasename+'.head'), 'r')
+        SCAMP_header = HeaderFO.readlines()
+        HeaderFO.close()
+
+        self.logger.info('Adding SCAMP header output to fits header.')
+        hdulist = fits.open(self.workingFile, ignore_missing_end=True, mode='update')
+        for line in SCAMP_header:
+            line.strip('\n')
+            line.strip('\r')
+            IsHeaderLine = re.match('([\w\d\s]{1,8})=\s(.{20})\s/\s(.+)', line)
+            IsCommentLine = re.match('COMMENT\s\s\s(.+)', line)
+            IsHistoryLine = re.match('HISTORY\s\s\s(.+)', line)
+            if IsHeaderLine:
+                self.logger.debug('  {} = {} / {}'.format(
+                                  IsHeaderLine.group(1), IsHeaderLine.group(2), IsHeaderLine.group(3)))
+                hdulist[0].header[IsHeaderLine.group(1)] = (IsHeaderLine.group(2), IsHeaderLine.group(3))
+            elif IsCommentLine:
+                self.logger.debug('  COMMENT   {}'.format(IsCommentLine.group(1)))
+                hdulist[0].header['COMMENT'] = IsCommentLine.group(1)
+            elif IsHistoryLine:
+                self.logger.debug('  HISTORY   {}'.format(IsHistoryLine.group(1)))
+                hdulist[0].header['HISTORY'] = IsHistoryLine.group(1)
+            elif re.search('END', line):
+                pass
+            elif re.match('COMMENT\s\s\s', line):
+                pass
+            else:
+                self.logger.debug('  Could not parse SCAMP header line: {}'.format(line))
+        hdulist.flush()
+
 
     ##-------------------------------------------------------------------------
     ## Determine Zero Point from SExtractor Catalog after SCAMP-refined astrometric solution
