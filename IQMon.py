@@ -942,7 +942,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Run SCAMP
     ##-------------------------------------------------------------------------
-    def RunSCAMP(self, catalog='USNO-B1', distortion_order=3):
+    def RunSCAMP(self, catalog='USNO-B1', distortion_order=3, mergedcat_name='scamp.cat', mergedcat_type='NONE'):
         '''
         Run SCAMP on SExtractor output catalog.
         '''
@@ -950,37 +950,31 @@ class Image(object):
         checkplot_resx = 1200
         checkplot_resy = 1200
 
-        SCAMPConfigFile = os.path.join(self.config.pathTemp, self.rawFileBasename+".scamp")
-        self.tempFiles.append(SCAMPConfigFile)
-        DefaultConfig = subprocess.check_output(["scamp", "-dd"], universal_newlines=True).splitlines()
-        NewConfig = open(SCAMPConfigFile, 'w')
-        for line in DefaultConfig:
-            newline = line
-            if re.match("CHECKPLOT_RES\s+", line):
-                newline = "CHECKPLOT_RES          {:d},{:d}      # Check-plot resolution (0 = default)\n".format(checkplot_resx, checkplot_resy)
-            if re.match("DISTORT_DEGREES\s+", line):
-                newline = "DISTORT_DEGREES        {:d}           # Polynom degree for each group\n".format(distortion_order)
-            if re.match("ASTREF_CATALOG\s+", line):
-                newline = "ASTREF_CATALOG         {}         # NONE, FILE, USNO-A1,USNO-A2,USNO-B1,\n".format(catalog)
-            if re.match("CHECKPLOT_TYPE\s+", line):
-                newline = "CHECKPLOT_TYPE         {}\n".format('FGROUPS,DISTORTION,ASTR_REFERROR2D,ASTR_REFERROR1D,PHOT_ZPCORR')
-            if re.match("CHECKPLOT_NAME\s+", line):
-                newline = "CHECKPLOT_NAME         {}\n".format('fgroups,distort,astr_referror2d,astr_referror1d,phot_zpcorr')
-            NewConfig.write(newline+"\n")
-        NewConfig.close()
-
-        ## Run SCAMP
-        SCAMPCommand = ["scamp", self.SExtractorCatalog, "-c", SCAMPConfigFile]
+        SCAMPCommand = ["scamp", self.SExtractorCatalog]
+        SCAMPCommand.append('-DISTORT_DEGREES')
+        SCAMPCommand.append('{:d}'.format(distortion_order))
+        SCAMPCommand.append('-ASTREF_CATALOG')
+        SCAMPCommand.append('{}'.format(catalog))
+        SCAMPCommand.append('-MERGEDOUTCAT_NAME')
+        SCAMPCommand.append('{}'.format(mergedcat_name))
+        SCAMPCommand.append('-MERGEDOUTCAT_TYPE')
+        SCAMPCommand.append('{}'.format(mergedcat_type))
+        SCAMPCommand.append('-CHECKPLOT_RES')
+        SCAMPCommand.append('{:d},{:d}'.format(checkplot_resx, checkplot_resy))
+        SCAMPCommand.append('-CHECKPLOT_TYPE')
+        SCAMPCommand.append('{}'.format('FGROUPS,DISTORTION,ASTR_REFERROR2D,ASTR_REFERROR1D,PHOT_ZPCORR'))
+        SCAMPCommand.append('-CHECKPLOT_NAME')
+        SCAMPCommand.append('{}'.format('fgroups,distortion,astr_referror2d,astr_referror1d,phot_zpcorr'))
         self.logger.info("Invoking SCAMP using {} catalog with distortion polynomial of order {}.".format(catalog, distortion_order))
         self.logger.debug("SCAMP command: {}".format(repr(SCAMPCommand)))
         try:
             SCAMP_STDOUT = subprocess.check_output(SCAMPCommand, stderr=subprocess.STDOUT, universal_newlines=True)
         except subprocess.CalledProcessError as e:
-            self.logger.error("SExtractor failed.  Command: {}".format(e.cmd))
-            self.logger.error("SExtractor failed.  Returncode: {}".format(e.returncode))
-            self.logger.error("SExtractor failed.  Output: {}".format(e.output))
+            self.logger.error("SCAMP failed.  Command: {}".format(e.cmd))
+            self.logger.error("SCAMP failed.  Returncode: {}".format(e.returncode))
+            self.logger.error("SCAMP failed.  Output: {}".format(e.output))
         except:
-            self.logger.error("SExtractor process failed: {0} {1} {2}".format(sys.exc_info()[0], sys.exc_info()[1], sys.exc_info()[2]))
+            self.logger.error("SCAMP process failed: {0} {1} {2}".format(sys.exc_info()[0], sys.exc_info()[1], sys.exc_info()[2]))
         else:
             for line in SCAMP_STDOUT.split("\n"):
                 self.logger.debug("  "+line)
