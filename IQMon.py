@@ -333,6 +333,7 @@ class Image(object):
         self.crop_y2 = None
         self.original_nXPix = None
         self.original_nXPix = None
+        self.SCAMP_catalog = None
 
     ##-------------------------------------------------------------------------
     ## Make Logger Object
@@ -782,11 +783,9 @@ class Image(object):
         assert type(self.tel.SExtractorPhotAperture) == u.quantity.Quantity
         if self.tel.gain and self.tel.pixelScale and self.tel.SExtractorSeeing and self.tel.SExtractorPhotAperture:
             ## Set up file names
-            SExtractorConfigFile = os.path.join(self.config.pathTemp, self.rawFileBasename+".sex")
-            self.tempFiles.append(SExtractorConfigFile)
             self.SExtractorCatalog = os.path.join(self.config.pathTemp, self.rawFileBasename+".cat")
             self.tempFiles.append(self.SExtractorCatalog)
-            PhotometryCatalogFile_xy = os.path.join(self.config.pathTemp, self.rawFileBasename+"PhotCat_xy.txt")
+            PhotometryCatalogFile_xy = os.path.join(self.config.pathTemp, self.rawFileBasename+"_PhotCat_xy.txt")
             self.tempFiles.append(PhotometryCatalogFile_xy)
             CheckImageType = "-BACKGROUND"
             self.CheckImageFile = os.path.join(self.config.pathPlots, self.rawFileBasename+"_bksub.fits")
@@ -802,7 +801,7 @@ class Image(object):
 
             ## Run SExtractor
             backgroundFilterSize = max(5.*self.tel.SExtractorSeeing.to(u.arcsec).value / self.tel.pixelScale.value, 5.)
-            SExtractorCommand = ["sex", self.workingFile, "-c", SExtractorConfigFile]
+            SExtractorCommand = ["sex", self.workingFile]
             SExtractorCommand.append('-CATALOG_NAME')
             SExtractorCommand.append('{}'.format(self.SExtractorCatalog))
             SExtractorCommand.append('-CATALOG_TYPE')
@@ -944,6 +943,10 @@ class Image(object):
         SCAMPCommand.append('{:d}'.format(distortion_order))
         SCAMPCommand.append('-ASTREF_CATALOG')
         SCAMPCommand.append('{}'.format(catalog))
+        SCAMPCommand.append('-SAVE_REFCATALOG')
+        SCAMPCommand.append('{}'.format('Y'))
+        SCAMPCommand.append('-REFOUT_CATPATH')
+        SCAMPCommand.append('{}'.format(self.config.pathTemp))
         SCAMPCommand.append('-MERGEDOUTCAT_NAME')
         SCAMPCommand.append('{}'.format(mergedcat_name))
         SCAMPCommand.append('-MERGEDOUTCAT_TYPE')
@@ -954,6 +957,8 @@ class Image(object):
         SCAMPCommand.append('{}'.format('FGROUPS,DISTORTION,ASTR_REFERROR2D,ASTR_REFERROR1D,PHOT_ZPCORR'))
         SCAMPCommand.append('-CHECKPLOT_NAME')
         SCAMPCommand.append('{}'.format('fgroups,distortion,astr_referror2d,astr_referror1d,phot_zpcorr'))
+        SCAMPCommand.append('-WRITE_XML')
+        SCAMPCommand.append('{}'.format('N'))
         self.logger.info("Invoking SCAMP using {} catalog with distortion polynomial of order {}.".format(catalog, distortion_order))
         self.logger.debug("SCAMP command: {}".format(repr(SCAMPCommand)))
         try:
@@ -976,10 +981,15 @@ class Image(object):
                     self.logger.info("  SCAMP Output: "+line)
                 else:
                     self.logger.debug("  SCAMP Output: "+line)
+        ## Store Output Catalog Name
+        if os.path.exists(mergedcat_name):
+            self.SCAMP_catalog = mergedcat_name
 
+        ## Populate FITS header with SCAMP derived header values in .head file
+#         HEaderFO = open()
 
     ##-------------------------------------------------------------------------
-    ## Determine Zero Point from SExtractor Catalog
+    ## Determine Zero Point from SExtractor Catalog after SCAMP-refined astrometric solution
     ##-------------------------------------------------------------------------
     def DetermineZeroPoint(self):
         '''
