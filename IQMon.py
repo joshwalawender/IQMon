@@ -854,7 +854,7 @@ class Image(object):
                     line.replace("[1A", "")
                     line.replace("[1M>", "")
                     if not re.match(".*Setting up background map.*", line) and not re.match(".*Line:\s[0-9]*.*", line):
-                        self.logger.debug("  "+line)
+                        self.logger.info("  SExtractor Output: "+line)
                 ## Extract Number of Stars from SExtractor Output
                 pos = SExSTDOUT.find("sextracted ")
                 IsSExCount = re.match("\s*([0-9]+)\s+", SExSTDOUT[pos+11:pos+21])
@@ -965,8 +965,17 @@ class Image(object):
         except:
             self.logger.error("SCAMP process failed: {0} {1} {2}".format(sys.exc_info()[0], sys.exc_info()[1], sys.exc_info()[2]))
         else:
+            StartAstrometricStats = False
+            EndAstrometricStats = False
             for line in SCAMP_STDOUT.split("\n"):
-                self.logger.debug("  "+line)
+                if re.search('Astrometric stats \(external\)', line):
+                    StartAstrometricStats = True
+                if re.search('Generating astrometric plots', line):
+                    EndAstrometricStats = True
+                if StartAstrometricStats and not EndAstrometricStats:
+                    self.logger.info("  SCAMP Output: "+line)
+                else:
+                    self.logger.debug("  SCAMP Output: "+line)
 
 
     ##-------------------------------------------------------------------------
