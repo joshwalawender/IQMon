@@ -799,57 +799,46 @@ class Image(object):
             PhotCatFileObject.write("# This is a dummy file to keep SExtractor happy\n")
             PhotCatFileObject.write("0.0  0.0  0.0  0.0\n")
             PhotCatFileObject.close()
-            
-            ## Make edits To default.sex based on telescope:
-            ## Read in default config file
-            DefaultConfig = subprocess.check_output(["sex", "-dd"], universal_newlines=True).splitlines()
-            NewConfig = open(SExtractorConfigFile, 'w')
-            backgroundFilterSize = max(5.*self.tel.SExtractorSeeing.to(u.arcsec).value / self.tel.pixelScale.value, 5.)
-            self.logger.debug("Using background filter size of 5x seeing = {0:.1f} pixels.".format(backgroundFilterSize))
-            for line in DefaultConfig:
-                newline = line
-                if re.match("CATALOG_NAME\s+", line):
-                    newline = "CATALOG_NAME     "+self.SExtractorCatalog+"\n"
-                if re.match("CATALOG_TYPE\s+", line):
-                    newline = "CATALOG_TYPE     "+"FITS_LDAC"+"\n"
-                if re.match("PARAMETERS_NAME\s+", line):
-                    newline = "PARAMETERS_NAME  "+os.path.join(self.config.pathIQMonExec, "default.param")+"\n"
-                if re.match("DETECT_MINAREA\s+", line) and (2.*self.tel.pixelScale.value > self.tel.SExtractorSeeing.to(u.arcsec).value):
-                    newline = "DETECT_MINAREA   "+"4"+"\n"
-                if re.match("DETECT_THRESH\s+", line):
-                    newline = "DETECT_THRESH    {:.1f}\n".format(threshold)
-                if re.match("ANALYSIS_THRESH\s+", line):
-                    newline = "ANALYSIS_THRESH  {:.1f}\n".format(threshold)
-                if re.match("FILTER\s+", line):
-                    newline = "FILTER           "+"N"+"\n"
-                if re.match("BACK_SIZE\s+", line):
-                    newline = "BACK_SIZE        {0:.1f}\n".format(backgroundFilterSize)
-                if re.match("ASSOC_NAME\s+", line):
-                    newline = "ASSOC_NAME       "+PhotometryCatalogFile_xy+"\n"
-                if re.match("ASSOC_NAME\s+", line):
-                    newline = "ASSOC_NAME       "+PhotometryCatalogFile_xy+"\n"
-                if re.match("ASSOCSELEC_TYPE\s+", line):
-                    newline = "ASSOCSELEC_TYPE  "+"ALL"+"\n"
-                if re.match("CHECKIMAGE_TYPE\s+", line):
-                    newline = "CHECKIMAGE_TYPE  "+CheckImageType+"\n"
-                if re.match("CHECKIMAGE_NAME\s+", line):
-                    newline = "CHECKIMAGE_NAME  "+self.CheckImageFile+"\n"
-                if re.match("PHOT_APERTURES\s+", line):
-                    newline = "PHOT_APERTURES   "+str(self.tel.SExtractorPhotAperture.to(u.pix).value)+"\n"
-                if re.match("GAIN\s+", line):
-                    newline = "GAIN             "+str(self.tel.gain.value)+"\n"
-                if re.match("PIXEL_SCALE\s+", line):
-                    newline = "PIXEL_SCALE      "+str(self.tel.pixelScale.value)+"\n"
-                if self.tel.SExtractorSaturation:
-                    if re.match("SATUR_LEVEL\s+", line):
-                        newline = "SATUR_LEVEL      "+str(self.tel.SExtractorSaturation.to(u.adu).value)+"\n"
-                if re.match("SEEING_FWHM\s+", line):
-                    newline = "SEEING_FWHM      "+str(self.tel.SExtractorSeeing.to(u.arcsec).value)+"\n"
-                NewConfig.write(newline+"\n")
-            NewConfig.close()
 
             ## Run SExtractor
+            backgroundFilterSize = max(5.*self.tel.SExtractorSeeing.to(u.arcsec).value / self.tel.pixelScale.value, 5.)
             SExtractorCommand = ["sex", self.workingFile, "-c", SExtractorConfigFile]
+            SExtractorCommand.append('-CATALOG_NAME')
+            SExtractorCommand.append('{}'.format(self.SExtractorCatalog))
+            SExtractorCommand.append('-CATALOG_TYPE')
+            SExtractorCommand.append('{}'.format('FITS_LDAC'))
+            SExtractorCommand.append('-PARAMETERS_NAME')
+            SExtractorCommand.append('{}'.format(os.path.join(self.config.pathIQMonExec, "default.param")))
+            SExtractorCommand.append('-DETECT_MINAREA')
+            SExtractorCommand.append('{:d}'.format(4))
+            SExtractorCommand.append('-DETECT_THRESH')
+            SExtractorCommand.append('{:.2f}'.format(threshold))
+            SExtractorCommand.append('-ANALYSIS_THRESH')
+            SExtractorCommand.append('{:.2f}'.format(threshold))
+            SExtractorCommand.append('-FILTER')
+            SExtractorCommand.append('{}'.format('N'))
+            SExtractorCommand.append('-BACK_SIZE')
+            SExtractorCommand.append('{:.2}'.format(format(backgroundFilterSize)))
+            SExtractorCommand.append('-ASSOC_NAME')
+            SExtractorCommand.append('{}'.format(PhotometryCatalogFile_xy))
+            SExtractorCommand.append('-ASSOCSELEC_TYPE')
+            SExtractorCommand.append('{}'.format('ALL'))
+            SExtractorCommand.append('-CHECKIMAGE_TYPE')
+            SExtractorCommand.append('{}'.format(CheckImageType))
+            SExtractorCommand.append('-CHECKIMAGE_NAME')
+            SExtractorCommand.append('{}'.format(self.CheckImageFile))
+            SExtractorCommand.append('-PHOT_APERTURES')
+            SExtractorCommand.append('{:.2f}'.format(self.tel.SExtractorPhotAperture.to(u.pix).value))
+            SExtractorCommand.append('-GAIN')
+            SExtractorCommand.append('{:f}'.format(self.tel.gain.value))
+            SExtractorCommand.append('-PIXEL_SCALE')
+            SExtractorCommand.append('{:.3f}'.format(self.tel.pixelScale.value))
+            if self.tel.SExtractorSaturation:
+                SExtractorCommand.append('-SATUR_LEVEL')
+                SExtractorCommand.append('{:.2f}'.format(self.tel.SExtractorSaturation.to(u.adu).value))
+            SExtractorCommand.append('-SEEING_FWHM')
+            SExtractorCommand.append('{:.2f}'.format(self.tel.SExtractorSeeing.to(u.arcsec).value))
+            
             self.logger.info("Invoking SExtractor")
             self.logger.debug("SExtractor command: {}".format(repr(SExtractorCommand)))
             try:
