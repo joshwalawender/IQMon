@@ -18,6 +18,8 @@ import subprocess
 import logging
 import math
 import numpy as np
+import matplotlib.pyplot as pyplot
+
 
 ## Import Astronomy Specific Tools
 import ephem
@@ -332,7 +334,7 @@ class Image(object):
         self.crop_y1 = None
         self.crop_y2 = None
         self.original_nXPix = None
-        self.original_nXPix = None
+        self.original_nYPix = None
         self.SCAMP_catalog = None
 
     ##-------------------------------------------------------------------------
@@ -781,63 +783,56 @@ class Image(object):
         assert type(self.tel.pixelScale) == u.quantity.Quantity
         assert type(self.tel.SExtractorSeeing) == u.quantity.Quantity
         assert type(self.tel.SExtractorPhotAperture) == u.quantity.Quantity
+        
         if self.tel.gain and self.tel.pixelScale and self.tel.SExtractorSeeing and self.tel.SExtractorPhotAperture:
             ## Set up file names
             self.SExtractorCatalog = os.path.join(self.config.pathTemp, self.rawFileBasename+".cat")
             self.tempFiles.append(self.SExtractorCatalog)
-            PhotometryCatalogFile_xy = os.path.join(self.config.pathTemp, self.rawFileBasename+"_PhotCat_xy.txt")
-            self.tempFiles.append(PhotometryCatalogFile_xy)
-            CheckImageType = "-BACKGROUND"
+
+            sextractor_output_param_file = os.path.join(self.config.pathTemp, 'default.param')
+            if os.path.exists(sextractor_output_param_file): os.remove(sextractor_output_param_file)
+            defaultparamsFO = open(sextractor_output_param_file, 'w')
+            params = [
+                'XWIN_IMAGE', 'YWIN_IMAGE', 'ERRXYWIN', 
+                'AWIN_IMAGE', 'BWIN_IMAGE', 'FWHM_IMAGE', 'THETAWIN_IMAGE',
+                'ERRAWIN_IMAGE', 'ERRBWIN_IMAGE', 'ERRTHETAWIN_IMAGE',
+                'ELONGATION', 'ELLIPTICITY',
+                'FLUX_AUTO', 'FLUXERR_AUTO',
+                'MAG_AUTO', 'MAGERR_AUTO'
+                'FLAGS',
+                'FLAGS_WEIGHT',
+                'FLUX_RADIUS']
+            for param in params:
+                defaultparamsFO.write(param+'\n')
+            defaultparamsFO.close()
+
+            SExtractor_params = {}
+            SExtractor_params['CATALOG_NAME'] = '{}'.format(self.SExtractorCatalog)
+            SExtractor_params['CATALOG_TYPE'] = 'FITS_LDAC'
+            SExtractor_params['PARAMETERS_NAME'] = '{}'.format(sextractor_output_param_file)
+            SExtractor_params['FILTER'] = 'N'
+            SExtractor_params['GAIN'] = '{:f}'.format(self.tel.gain.value)
+            SExtractor_params['GAIN_KEY'] = 'GAIN'
+            SExtractor_params['DETECT_THRESH'] = threshold
+            SExtractor_params['ANALYSIS_THRESH'] = threshold
+            SExtractor_params['DETECT_MINAREA'] = 5
+            SExtractor_params['PHOT_APERTURES'] = '{:.2f}'.format(self.tel.SExtractorPhotAperture.to(u.pix).value)
+            SExtractor_params['PIXEL_SCALE'] = '{:.3f}'.format(self.tel.pixelScale.value)
+            if self.tel.SExtractorSaturation:
+                SExtractor_params['SATUR_LEVEL'] = '{:.2f}'.format(self.tel.SExtractorSaturation.to(u.adu).value)
+            backgroundFilterSize = max(5.*self.tel.SExtractorSeeing.to(u.arcsec).value / self.tel.pixelScale.value, 5.)
+            SExtractor_params['BACK_SIZE'] = '{:.2f}'.format(backgroundFilterSize)
+            SExtractor_params['SEEING_FWHM'] = '{:.2f}'.format(self.tel.SExtractorSeeing.to(u.arcsec).value)
             self.CheckImageFile = os.path.join(self.config.pathPlots, self.rawFileBasename+"_bksub.fits")
             self.tempFiles.append(self.CheckImageFile)
-
-            ## Create PhotometryCatalogFile_xy file for SExtractor Association
-            if os.path.exists(PhotometryCatalogFile_xy): os.remove(PhotometryCatalogFile_xy)
-            PhotCatFileObject = open(PhotometryCatalogFile_xy, 'w')
-            PhotCatFileObject.write("# No Existing WCS Found for this image\n")
-            PhotCatFileObject.write("# This is a dummy file to keep SExtractor happy\n")
-            PhotCatFileObject.write("0.0  0.0  0.0  0.0\n")
-            PhotCatFileObject.close()
+            SExtractor_params['CHECKIMAGE_TYPE'] = '{}'.format("-BACKGROUND")
+            SExtractor_params['CHECKIMAGE_NAME'] = '{}'.format(self.CheckImageFile)
 
             ## Run SExtractor
-            backgroundFilterSize = max(5.*self.tel.SExtractorSeeing.to(u.arcsec).value / self.tel.pixelScale.value, 5.)
             SExtractorCommand = ["sex", self.workingFile]
-            SExtractorCommand.append('-CATALOG_NAME')
-            SExtractorCommand.append('{}'.format(self.SExtractorCatalog))
-            SExtractorCommand.append('-CATALOG_TYPE')
-            SExtractorCommand.append('{}'.format('FITS_LDAC'))
-            SExtractorCommand.append('-PARAMETERS_NAME')
-            SExtractorCommand.append('{}'.format(os.path.join(self.config.pathIQMonExec, "default.param")))
-            SExtractorCommand.append('-DETECT_MINAREA')
-            SExtractorCommand.append('{:d}'.format(4))
-            SExtractorCommand.append('-DETECT_THRESH')
-            SExtractorCommand.append('{:.2f}'.format(threshold))
-            SExtractorCommand.append('-ANALYSIS_THRESH')
-            SExtractorCommand.append('{:.2f}'.format(threshold))
-            SExtractorCommand.append('-FILTER')
-            SExtractorCommand.append('{}'.format('N'))
-            SExtractorCommand.append('-BACK_SIZE')
-            SExtractorCommand.append('{:.2f}'.format(backgroundFilterSize))
-            SExtractorCommand.append('-ASSOC_NAME')
-            SExtractorCommand.append('{}'.format(PhotometryCatalogFile_xy))
-            SExtractorCommand.append('-ASSOCSELEC_TYPE')
-            SExtractorCommand.append('{}'.format('ALL'))
-            SExtractorCommand.append('-CHECKIMAGE_TYPE')
-            SExtractorCommand.append('{}'.format(CheckImageType))
-            SExtractorCommand.append('-CHECKIMAGE_NAME')
-            SExtractorCommand.append('{}'.format(self.CheckImageFile))
-            SExtractorCommand.append('-PHOT_APERTURES')
-            SExtractorCommand.append('{:.2f}'.format(self.tel.SExtractorPhotAperture.to(u.pix).value))
-            SExtractorCommand.append('-GAIN')
-            SExtractorCommand.append('{:f}'.format(self.tel.gain.value))
-            SExtractorCommand.append('-PIXEL_SCALE')
-            SExtractorCommand.append('{:.3f}'.format(self.tel.pixelScale.value))
-            if self.tel.SExtractorSaturation:
-                SExtractorCommand.append('-SATUR_LEVEL')
-                SExtractorCommand.append('{:.2f}'.format(self.tel.SExtractorSaturation.to(u.adu).value))
-            SExtractorCommand.append('-SEEING_FWHM')
-            SExtractorCommand.append('{:.2f}'.format(self.tel.SExtractorSeeing.to(u.arcsec).value))
-            
+            for key in SExtractor_params.keys():
+                SExtractorCommand.append('-{}'.format(key))
+                SExtractorCommand.append('{}'.format(SExtractor_params[key]))
             self.logger.info("Invoking SExtractor")
             self.logger.debug("SExtractor command: {}".format(repr(SExtractorCommand)))
             try:
@@ -890,8 +885,8 @@ class Image(object):
                 SExImageRadius = []
                 SExAngleInImage = []
                 for star in self.SExtractorResults:
-                    SExImageRadius.append(math.sqrt((self.nXPix/2-star['X_IMAGE'])**2 + (self.nYPix/2-star['Y_IMAGE'])**2))
-                    SExAngleInImage.append(math.atan((star['X_IMAGE']-self.nXPix/2)/(self.nYPix/2-star['Y_IMAGE']))*180.0/math.pi)
+                    SExImageRadius.append(math.sqrt((self.nXPix/2-star['XWIN_IMAGE'])**2 + (self.nYPix/2-star['YWIN_IMAGE'])**2))
+                    SExAngleInImage.append(math.atan((star['XWIN_IMAGE']-self.nXPix/2)/(self.nYPix/2-star['YWIN_IMAGE']))*180.0/math.pi)
                 self.SExtractorResults.add_column(table.Column(data=SExImageRadius, name='ImageRadius'))
                 self.SExtractorResults.add_column(table.Column(data=SExAngleInImage, name='AngleInImage'))
                 self.nStarsSEx = len(self.SExtractorResults)
@@ -914,17 +909,139 @@ class Image(object):
             IQRadius = DiagonalRadius*IQRadiusFactor
             CentralFWHMs = [star['FWHM_IMAGE'] for star in self.SExtractorResults if star['ImageRadius'] <= IQRadius]
             CentralEllipticities = [star['ELLIPTICITY'] for star in self.SExtractorResults if star['ImageRadius'] <= IQRadius]
+            CentralAs = [star['AWIN_IMAGE'] for star in self.SExtractorResults if star['ImageRadius'] <= IQRadius]
+            CentralBs = [star['BWIN_IMAGE'] for star in self.SExtractorResults if star['ImageRadius'] <= IQRadius]
             if len(CentralFWHMs) > 3:
                 self.FWHM = np.median(CentralFWHMs) * u.pix
                 self.ellipticity = np.median(CentralEllipticities)
+                self.major_axis = np.median(CentralAs) * u.pix
+                self.minor_axis = np.median(CentralBs) * u.pix
             else:
                 self.logger.warning("Not enough stars detected in central region of image to form median FWHM.")
             self.logger.debug("Using {0} stars in central region to determine FWHM and ellipticity.".format(len(CentralFWHMs)))
             self.logger.info("Median FWHM in inner region is {0:.2f} pixels".format(self.FWHM.to(u.pix).value))
+            self.logger.info("Median Minor Axis in inner region is {0:.2f}".format(2.355*self.minor_axis.to(u.pix).value))
+            self.logger.info("Median Major Axis in inner region is {0:.2f}".format(2.355*self.major_axis.to(u.pix).value))
             self.logger.info("Median Ellipticity in inner region is {0:.2f}".format(self.ellipticity))
         else:
             self.FWHM = None
             self.ellipticity = None
+
+
+    ##-------------------------------------------------------------------------
+    ## Make Ellipticity Plot
+    ##-------------------------------------------------------------------------
+    def MakePSFplot(self, plotfilename):
+        '''
+        Plot ellipticity vectors of stars in image.
+        Plot histogram of theta - image_angle values.
+        '''
+        self.logger.info('Calculating histogram of PSF angles.')
+        plotfile = os.path.join(self.config.pathPlots, plotfilename)
+
+        ellip_threshold = 0.15
+        star_angles = [star['THETAWIN_IMAGE'] for star in self.SExtractorResults if star['ELLIPTICITY'] >= ellip_threshold]
+        image_angles = [star['AngleInImage'] for star in self.SExtractorResults if star['ELLIPTICITY'] >= ellip_threshold]
+        star_x = [star['XWIN_IMAGE'] for star in self.SExtractorResults if star['ELLIPTICITY'] >= ellip_threshold]
+        star_y = [star['YWIN_IMAGE'] for star in self.SExtractorResults if star['ELLIPTICITY'] >= ellip_threshold]
+        uncorrected_diffs = [star['THETAWIN_IMAGE']-star['AngleInImage'] for star in self.SExtractorResults if star['ELLIPTICITY'] >= ellip_threshold]
+        
+        nstars = len(star_angles)
+        self.logger.debug('  Found {} stars with ellipticity greater than {:.2f}.'.format(nstars, ellip_threshold))
+        
+        angle_diffs = []
+        for angle in uncorrected_diffs:
+            if angle < -90:
+                angle_diffs.append(angle + 90.)
+            elif angle > 90:
+                angle_diffs.append(angle - 90.)
+            else:
+                angle_diffs.append(angle)
+        angle_binsize = 10
+        diff_hist, diff_bins = np.histogram(angle_diffs, bins=angle_binsize*(np.arange(37)-18))
+        angle_hist, angle_bins = np.histogram(star_angles, bins=angle_binsize*(np.arange(37)-18))
+        angle_centers = (diff_bins[:-1] + diff_bins[1:]) / 2
+
+        ellip_binsize = 0.05
+        ellip_hist, ellip_bins = np.histogram(self.SExtractorResults['ELLIPTICITY'], bins=ellip_binsize*np.arange(21))
+        ellip_centers = (ellip_bins[:-1] + ellip_bins[1:]) / 2
+
+        fwhm_binsize = 0.1
+        fwhm_hist, fwhm_bins = np.histogram(self.SExtractorResults['FWHM_IMAGE'], bins=fwhm_binsize*np.arange(31))
+        fwhm_centers = (fwhm_bins[:-1] + fwhm_bins[1:]) / 2
+
+        star_angle_mean = np.mean(star_angles)
+        star_angle_median = np.median(star_angles)
+        angle_diff_mean = np.mean(angle_diffs)
+        angle_diff_median = np.median(angle_diffs)
+        self.logger.debug('  Mean Stellar PA = {:.0f}'.format(star_angle_mean))
+        self.logger.debug('  Median Stellar PA = {:.0f}'.format(star_angle_median))
+        self.logger.debug('  Mean Difference Angle = {:.0f}'.format(angle_diff_mean))
+        self.logger.debug('  Median Difference Angle = {:.0f}'.format(angle_diff_median))
+
+
+
+        if plotfilename:
+            self.logger.debug('  Generating figure {}'.format(plotfilename))
+
+            pyplot.figure(figsize=(12,11), dpi=100)
+            Left1 = pyplot.axes([0.000, 0.750, 0.465, 0.240])
+            pyplot.title('PSF Statistics for {}'.format(self.rawFileName), size=10)
+            pyplot.bar(ellip_centers, ellip_hist, align='center', width=0.7*ellip_binsize)
+            pyplot.xlabel('Ellipticity', size=10)
+            pyplot.ylabel('N Stars', size=10)
+            pyplot.xlim(0,1)
+            pyplot.xticks(0.1*np.arange(11), size=10)
+            pyplot.yticks(size=10)
+
+            Left2 = pyplot.axes([0.000, 0.460, 0.465, 0.240])
+            pyplot.bar(fwhm_centers, fwhm_hist, align='center', width=0.7*fwhm_binsize)
+            pyplot.xlabel('FWHM (pixels)', size=10)
+            pyplot.ylabel('N Stars', size=10)
+            pyplot.xlim(0,self.FWHM.to(u.pix).value + 3)
+            pyplot.xticks(size=10)
+            pyplot.yticks(size=10)
+
+            Left3 = pyplot.axes([0.000, 0.0, 0.465, 0.400])
+            Left3.set_aspect('equal')
+            pyplot.plot(star_x, star_y, 'k,')
+            pyplot.title('Positions of {:d}/{:d} stars with ellipticity > {:.2f}'.format(nstars, self.nStarsSEx, ellip_threshold), size=10)
+            pyplot.xlabel('X (pixels)', size=10)
+            pyplot.ylabel('Y (pixels)', size=10)
+            pyplot.xlim(0, self.nXPix)
+            pyplot.ylim(0, self.nYPix)
+            pyplot.xticks(size=10)
+            pyplot.yticks(size=10)
+
+            Right1 = pyplot.axes([0.535, 0.750, 0.465, 0.240])
+            pyplot.title('PSF Angles for {:d}/{:d} stars with ellipticity > {:.2f}'.format(nstars, self.nStarsSEx, ellip_threshold), size=10)
+            pyplot.bar(angle_centers, angle_hist, align='center', width=0.7*angle_binsize)
+            pyplot.xlabel('Stellar PSF PA', size=10)
+            pyplot.ylabel('N Stars', size=10)
+            pyplot.xlim(-90,90)
+            pyplot.xticks(30*(np.arange(7)-3), size=10)
+            pyplot.yticks(size=10)
+
+            Right2 = pyplot.axes([0.535, 0.460, 0.465, 0.240])
+            pyplot.bar(angle_centers, diff_hist, align='center', width=0.7*angle_binsize)
+            pyplot.xlabel('Stellar PSF PA - Image PA', size=10)
+            pyplot.ylabel('N Stars', size=10)
+            pyplot.xlim(-90,90)
+            pyplot.xticks(30*(np.arange(7)-3), size=10)
+            pyplot.yticks(size=10)
+            
+            Right3 = pyplot.axes([0.535, 0.0, 0.465, 0.400])
+            Right3.set_aspect('equal')
+            pyplot.plot(star_angles, image_angles, 'k.')
+            pyplot.title('Correlation Between PSF Angle and Position in Image', size=10)
+            pyplot.xlabel('Stellar PSF PA', size=10)
+            pyplot.ylabel('Image PA', size=10)
+            pyplot.xlim(-100,100)
+            pyplot.xticks(30*(np.arange(7)-3), size=10)
+            pyplot.ylim(-100,100)
+            pyplot.yticks(30*(np.arange(7)-3), size=10)
+
+            pyplot.savefig(plotfile, dpi=100, bbox_inches='tight', pad_inches=0.10)
 
 
     ##-------------------------------------------------------------------------
@@ -1020,12 +1137,28 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Determine Zero Point from SExtractor Catalog after SCAMP-refined astrometric solution
     ##-------------------------------------------------------------------------
-    def DetermineZeroPoint(self):
+    def DetermineZeroPoint(self, filter='i', use_local_UCAC=False, local_UCAC_command="/Volumes/Data/UCAC4/access/u4test", local_UCAC_data="/Volumes/Data/UCAC4/u4b"):
         '''
         Determine zero point by comparing measured magnitudes with catalog
         magnitudes.
         '''
-        pass
+        assert self.coordinate_WCS
+
+        if use_local_UCAC:
+            if os.path.exists(local_UCAC_command) and os.path.exists(local_UCAC_data):
+                self.logger.info("## Getting list of stars from UCAC4 catalog.")
+                UCACcommand = [local_UCAC_command,
+                               "{:.4f}".format(target.ra*180./math.pi),
+                               "{:.4f}".format(target.dec*180./math.pi),
+                               "1.2", "1.2", local_UCAC_data, "-h"]
+                if os.path.exists("ucac4.txt"): os.remove("ucac4.txt")
+                result = subprocess.call(UCACcommand)
+            else:
+                if not os.path.exists(local_UCAC_command):
+                    logger.warning('Cannot find local UCAC command: {}'.format(local_UCAC_command))
+                if not os.path.exists(local_UCAC_data):
+                    logger.warning('Cannot find local UCAC data: {}'.format(local_UCAC_data))
+                
 
 
     ##-------------------------------------------------------------------------
@@ -1117,8 +1250,8 @@ class Image(object):
             for star in sortedSExtractorResults:
                 nStarsMarked += 1
                 if nStarsMarked <= nStarsLimit:
-                    MarkXPos = star['X_IMAGE']
-                    MarkYPos = self.nYPix - star['Y_IMAGE']
+                    MarkXPos = star['XWIN_IMAGE']
+                    MarkYPos = self.nYPix - star['YWIN_IMAGE']
                     JPEGcommand.append('-draw')
                     JPEGcommand.append("circle %d,%d %d,%d" % (MarkXPos, MarkYPos, MarkXPos+MarkRadius, MarkYPos))
                 else:
