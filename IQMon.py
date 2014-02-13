@@ -1266,7 +1266,10 @@ class Image(object):
                 HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
         if "MoonSep" in fields:
             if self.moonSep:
-                HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format("black", self.moonSep.to(u.deg).value))
+                if self.moonAlt > 0:
+                    HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format("black", self.moonSep.to(u.deg).value))
+                else:
+                    HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", "down"))
             else:
                 HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
         if "MoonIllum" in fields:
