@@ -466,7 +466,8 @@ class Image(object):
                 ImageDEC = ":".join(ImageDEC.split(" "))
         self.logger.debug("Read pointing info from header: "+ImageRA+" "+ImageDEC)
         try:
-            self.coordinate_header = coords.ICRS(ImageRA+" "+ImageDEC, unit=(u.hour, u.degree))
+            self.coordinate_header = coords.ICRS(ImageRA+" "+ImageDEC,
+                                                 unit=(u.hour, u.degree))
         except:
             self.logger.warning("Failed to read pointing info from header.")
             self.coordinate_header = None
@@ -708,6 +709,10 @@ class Image(object):
                                          AstrometrySTDOUT[pos+40:pos+75])
                 if IsFieldCenter:
                     self.logger.info("Astrometry.net field center is: %s", IsFieldCenter.group(1))
+                else:
+                    self.logger.warning("Could not parse field center from astrometry.net output.")
+                    for line in AstrometrySTDOUT.split("\n"):
+                        self.logger.warning("  %s" % line)
             else:
                 for line in AstrometrySTDOUT.split("\n"):
                     self.logger.warning("  %s" % line)
@@ -759,7 +764,9 @@ class Image(object):
         if self.imageWCS and self.coordinate_header:
             centerWCS = self.imageWCS.wcs_pix2world([[self.nXPix/2, self.nYPix/2]], 1)
             self.logger.debug("Using coordinates of center point: {0} {1}".format(centerWCS[0][0], centerWCS[0][1]))
-            self.coordinate_WCS = coords.ICRS(ra=centerWCS[0][0], dec=centerWCS[0][1], unit=(u.degree, u.degree))
+            self.coordinate_WCS = coords.ICRS(ra=centerWCS[0][0],
+                                                   dec=centerWCS[0][1],
+                                                   unit=(u.degree, u.degree))
             self.pointingError = self.coordinate_WCS.separation(self.coordinate_header)
             self.logger.debug("Target Coordinates are:  %s %s",
                          self.coordinate_header.ra.format(u.hour, sep=":", precision=1),
@@ -1220,9 +1227,9 @@ class Image(object):
             ## Adjust target pixel value for different origin in ImageMagick
             TargetXPos = targetPixel[0]
             if not self.cropped:
-                TargetYPos = self.nXPix - targetPixel[1]
+                TargetYPos = self.nYPix - targetPixel[1]
             else:
-                TargetYPos = self.original_nXPix - targetPixel[1]
+                TargetYPos = self.original_nYPix - targetPixel[1]
             ## Adjust target pixel value for cropping
             if self.cropped:
                 TargetXPos = TargetXPos - self.crop_x1
@@ -1474,7 +1481,10 @@ class Image(object):
                 HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
         if "MoonSep" in fields:
             if self.moonSep:
-                HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format("black", self.moonSep.to(u.deg).value))
+                if self.moonAlt > 0:
+                    HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format("black", self.moonSep.to(u.deg).value))
+                else:
+                    HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", "down"))
             else:
                 HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
         if "MoonIllum" in fields:
