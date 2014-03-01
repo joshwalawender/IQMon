@@ -18,6 +18,8 @@ import subprocess
 import logging
 import math
 import numpy as np
+import matplotlib.pyplot as pyplot
+
 
 ## Import Astronomy Specific Tools
 import ephem
@@ -314,6 +316,7 @@ class Image(object):
         self.SExBackground = None
         self.SExBRMS = None
         self.tempFiles = []
+        self.SExtractorCatalog = None
         self.SExtractorResults = None
         self.nStarsSEx = None
         self.positionAngle = None
@@ -331,7 +334,8 @@ class Image(object):
         self.crop_y1 = None
         self.crop_y2 = None
         self.original_nXPix = None
-        self.original_nXPix = None
+        self.original_nYPix = None
+        self.SCAMP_catalog = None
 
     ##-------------------------------------------------------------------------
     ## Make Logger Object
@@ -562,6 +566,17 @@ class Image(object):
             self.airmass = None
             self.logger.warning("Object position and Moon position not calculated.")
 
+    ##-------------------------------------------------------------------------
+    ## Add To Header
+    ##-------------------------------------------------------------------------
+    def EditHeader(self, keyword, value):
+        '''
+        Get information from the image fits header.
+        '''
+        hdulist = fits.open(self.workingFile, ignore_missing_end=True, mode='update')
+        hdulist[0].header[keyword] = value
+        hdulist.flush()
+
 
     ##-------------------------------------------------------------------------
     ## Read Image
@@ -676,7 +691,7 @@ class Image(object):
         try:
             StartTime = time.time()
             AstrometrySTDOUT = subprocess.check_output(AstrometryCommand, 
-                               stderr=subprocess.STDOUT)
+                               stderr=subprocess.STDOUT, universal_newlines=True)
             EndTime = time.time()
         except subprocess.CalledProcessError as e:
             self.logger.warning("Astrometry.net failed.")
@@ -766,100 +781,81 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Run SExtractor
     ##-------------------------------------------------------------------------
-    def RunSExtractor(self):
+    def RunSExtractor(self, threshold=5.0):
         '''
         Run SExtractor on image.
         '''
+        assert float(threshold)
         assert type(self.tel.gain) == u.quantity.Quantity
         assert type(self.tel.pixelScale) == u.quantity.Quantity
         assert type(self.tel.SExtractorSeeing) == u.quantity.Quantity
         assert type(self.tel.SExtractorPhotAperture) == u.quantity.Quantity
+        
         if self.tel.gain and self.tel.pixelScale and self.tel.SExtractorSeeing and self.tel.SExtractorPhotAperture:
             ## Set up file names
-            SExtractorConfigFile = os.path.join(self.config.pathTemp, self.rawFileBasename+".sex")
-            self.tempFiles.append(SExtractorConfigFile)
-            SExtractorCatalog = os.path.join(self.config.pathTemp, self.rawFileBasename+".cat")
-            self.tempFiles.append(SExtractorCatalog)
-            PhotometryCatalogFile_xy = os.path.join(self.config.pathTemp, self.rawFileBasename+"PhotCat_xy.txt")
-            self.tempFiles.append(PhotometryCatalogFile_xy)
-            CheckImageType = "-BACKGROUND"
+            self.SExtractorCatalog = os.path.join(self.config.pathTemp, self.rawFileBasename+".cat")
+            self.tempFiles.append(self.SExtractorCatalog)
+
+            sextractor_output_param_file = os.path.join(self.config.pathTemp, 'default.param')
+            if os.path.exists(sextractor_output_param_file): os.remove(sextractor_output_param_file)
+            defaultparamsFO = open(sextractor_output_param_file, 'w')
+            params = [
+                'XWIN_IMAGE', 'YWIN_IMAGE', 'ERRXYWIN', 
+                'AWIN_IMAGE', 'BWIN_IMAGE', 'FWHM_IMAGE', 'THETAWIN_IMAGE',
+                'ERRAWIN_IMAGE', 'ERRBWIN_IMAGE', 'ERRTHETAWIN_IMAGE',
+                'ELONGATION', 'ELLIPTICITY',
+                'FLUX_AUTO', 'FLUXERR_AUTO',
+                'MAG_AUTO', 'MAGERR_AUTO'
+                'FLAGS',
+                'FLAGS_WEIGHT',
+                'FLUX_RADIUS']
+            for param in params:
+                defaultparamsFO.write(param+'\n')
+            defaultparamsFO.close()
+
+            SExtractor_params = {}
+            SExtractor_params['CATALOG_NAME'] = '{}'.format(self.SExtractorCatalog)
+            SExtractor_params['CATALOG_TYPE'] = 'FITS_LDAC'
+            SExtractor_params['PARAMETERS_NAME'] = '{}'.format(sextractor_output_param_file)
+            SExtractor_params['FILTER'] = 'N'
+            SExtractor_params['GAIN'] = '{:f}'.format(self.tel.gain.value)
+            SExtractor_params['GAIN_KEY'] = 'GAIN'
+            SExtractor_params['DETECT_THRESH'] = threshold
+            SExtractor_params['ANALYSIS_THRESH'] = threshold
+            SExtractor_params['DETECT_MINAREA'] = 5
+            SExtractor_params['PHOT_APERTURES'] = '{:.2f}'.format(self.tel.SExtractorPhotAperture.to(u.pix).value)
+            SExtractor_params['PIXEL_SCALE'] = '{:.3f}'.format(self.tel.pixelScale.value)
+            if self.tel.SExtractorSaturation:
+                SExtractor_params['SATUR_LEVEL'] = '{:.2f}'.format(self.tel.SExtractorSaturation.to(u.adu).value)
+            backgroundFilterSize = max(5.*self.tel.SExtractorSeeing.to(u.arcsec).value / self.tel.pixelScale.value, 5.)
+            SExtractor_params['BACK_SIZE'] = '{:.2f}'.format(backgroundFilterSize)
+            SExtractor_params['SEEING_FWHM'] = '{:.2f}'.format(self.tel.SExtractorSeeing.to(u.arcsec).value)
             self.CheckImageFile = os.path.join(self.config.pathPlots, self.rawFileBasename+"_bksub.fits")
             self.tempFiles.append(self.CheckImageFile)
-
-            ## Create PhotometryCatalogFile_xy file for SExtractor Association
-            if os.path.exists(PhotometryCatalogFile_xy): os.remove(PhotometryCatalogFile_xy)
-            PhotCatFileObject = open(PhotometryCatalogFile_xy, 'w')
-            PhotCatFileObject.write("# No Existing WCS Found for this image\n")
-            PhotCatFileObject.write("# This is a dummy file to keep SExtractor happy\n")
-            PhotCatFileObject.write("0.0  0.0  0.0  0.0\n")
-            PhotCatFileObject.close()
-            
-            ## Make edits To default.sex based on telescope:
-            ## Read in default config file
-            DefaultConfig = subprocess.check_output(["sex", "-dd"]).split("\n")
-            NewConfig     = open(SExtractorConfigFile, 'w')
-            backgroundFilterSize = max(5.*self.tel.SExtractorSeeing.to(u.arcsec).value / self.tel.pixelScale.value, 5.)
-            self.logger.debug("Using background filter size of 5x seeing = {0:.1f} pixels.".format(backgroundFilterSize))
-            for line in DefaultConfig:
-                newline = line
-                if re.match("CATALOG_NAME\s+", line):
-                    newline = "CATALOG_NAME     "+SExtractorCatalog+"\n"
-                if re.match("CATALOG_TYPE\s+", line):
-                    newline = "CATALOG_TYPE     "+"FITS_LDAC"+"\n"
-                if re.match("PARAMETERS_NAME\s+", line):
-                    newline = "PARAMETERS_NAME  "+os.path.join(self.config.pathIQMonExec, "default.param")+"\n"
-                if re.match("DETECT_MINAREA\s+", line) and (2.*self.tel.pixelScale.value > self.tel.SExtractorSeeing.to(u.arcsec).value):
-                    newline = "DETECT_MINAREA   "+"4"+"\n"
-                if re.match("DETECT_THRESH\s+", line):
-                    newline = "DETECT_THRESH    "+"5.0"+"\n"
-                if re.match("ANALYSIS_THRESH\s+", line):
-                    newline = "ANALYSIS_THRESH  "+"5.0"+"\n"
-                if re.match("FILTER\s+", line):
-                    newline = "FILTER           "+"N"+"\n"
-                if re.match("BACK_SIZE\s+", line):
-                    newline = "BACK_SIZE        {0:.1f}\n".format(backgroundFilterSize)
-                if re.match("ASSOC_NAME\s+", line):
-                    newline = "ASSOC_NAME       "+PhotometryCatalogFile_xy+"\n"
-                if re.match("ASSOC_NAME\s+", line):
-                    newline = "ASSOC_NAME       "+PhotometryCatalogFile_xy+"\n"
-                if re.match("ASSOCSELEC_TYPE\s+", line):
-                    newline = "ASSOCSELEC_TYPE  "+"ALL"+"\n"
-                if re.match("CHECKIMAGE_TYPE\s+", line):
-                    newline = "CHECKIMAGE_TYPE  "+CheckImageType+"\n"
-                if re.match("CHECKIMAGE_NAME\s+", line):
-                    newline = "CHECKIMAGE_NAME  "+self.CheckImageFile+"\n"
-                if re.match("PHOT_APERTURES\s+", line):
-                    newline = "PHOT_APERTURES   "+str(self.tel.SExtractorPhotAperture.to(u.pix).value)+"\n"
-                if re.match("GAIN\s+", line):
-                    newline = "GAIN             "+str(self.tel.gain.value)+"\n"
-                if re.match("PIXEL_SCALE\s+", line):
-                    newline = "PIXEL_SCALE      "+str(self.tel.pixelScale.value)+"\n"
-                if self.tel.SExtractorSaturation:
-                    if re.match("SATUR_LEVEL\s+", line):
-                        newline = "SATUR_LEVEL      "+str(self.tel.SExtractorSaturation.to(u.adu).value)+"\n"
-                if re.match("SEEING_FWHM\s+", line):
-                    newline = "SEEING_FWHM      "+str(self.tel.SExtractorSeeing.to(u.arcsec).value)+"\n"
-                NewConfig.write(newline+"\n")
-            NewConfig.close()
+            SExtractor_params['CHECKIMAGE_TYPE'] = '{}'.format("-BACKGROUND")
+            SExtractor_params['CHECKIMAGE_NAME'] = '{}'.format(self.CheckImageFile)
 
             ## Run SExtractor
-            SExtractorCommand = ["sex", self.workingFile, "-c", SExtractorConfigFile]
+            SExtractorCommand = ["sex", self.workingFile]
+            for key in SExtractor_params.keys():
+                SExtractorCommand.append('-{}'.format(key))
+                SExtractorCommand.append('{}'.format(SExtractor_params[key]))
             self.logger.info("Invoking SExtractor")
             self.logger.debug("SExtractor command: {}".format(repr(SExtractorCommand)))
             try:
-                SExSTDOUT = subprocess.check_output(SExtractorCommand, stderr=subprocess.STDOUT)
+                SExSTDOUT = subprocess.check_output(SExtractorCommand, stderr=subprocess.STDOUT, universal_newlines=True)
             except subprocess.CalledProcessError as e:
-                self.logger.error("SExtractor failed.")
-                for line in e.output.split("\n"):
-                    self.logger.error(line)
+                self.logger.error("SExtractor failed.  Command: {}".format(e.cmd))
+                self.logger.error("SExtractor failed.  Returncode: {}".format(e.returncode))
+                self.logger.error("SExtractor failed.  Output: {}".format(e.output))
             except:
                 self.logger.error("SExtractor process failed: {0} {1} {2}".format(sys.exc_info()[0], sys.exc_info()[1], sys.exc_info()[2]))
             else:
-                for line in SExSTDOUT.split("\n"):
+                for line in SExSTDOUT.splitlines():
                     line.replace("[1A", "")
                     line.replace("[1M>", "")
                     if not re.match(".*Setting up background map.*", line) and not re.match(".*Line:\s[0-9]*.*", line):
-                        self.logger.debug("  "+line)
+                        self.logger.info("  SExtractor Output: {}".format(line))
                 ## Extract Number of Stars from SExtractor Output
                 pos = SExSTDOUT.find("sextracted ")
                 IsSExCount = re.match("\s*([0-9]+)\s+", SExSTDOUT[pos+11:pos+21])
@@ -885,22 +881,19 @@ class Image(object):
                     self.SExBRMS = None
 
                 ## If No Output Catalog Created ...
-                if not os.path.exists(SExtractorCatalog):
+                if not os.path.exists(self.SExtractorCatalog):
                     self.logger.warning("SExtractor failed to create catalog.")
                     self.SExtractorCatalog = None
-                else:
-                    self.SExtractorCatalog = SExtractorCatalog
 
                 ## Read FITS_LDAC SExtractor Catalog
                 self.logger.debug("Reading SExtractor output catalog.")
                 hdu = fits.open(self.SExtractorCatalog)
                 self.SExtractorResults = table.Table(hdu[2].data)
-#                 self.SExtractorResults = ascii.read(self.SExtractorCatalog, Reader=ascii.sextractor.SExtractor)
                 SExImageRadius = []
                 SExAngleInImage = []
                 for star in self.SExtractorResults:
-                    SExImageRadius.append(math.sqrt((self.nXPix/2-star['X_IMAGE'])**2 + (self.nYPix/2-star['Y_IMAGE'])**2))
-                    SExAngleInImage.append(math.atan((star['X_IMAGE']-self.nXPix/2)/(self.nYPix/2-star['Y_IMAGE']))*180.0/math.pi)
+                    SExImageRadius.append(math.sqrt((self.nXPix/2-star['XWIN_IMAGE'])**2 + (self.nYPix/2-star['YWIN_IMAGE'])**2))
+                    SExAngleInImage.append(math.atan((star['XWIN_IMAGE']-self.nXPix/2)/(self.nYPix/2-star['YWIN_IMAGE']))*180.0/math.pi)
                 self.SExtractorResults.add_column(table.Column(data=SExImageRadius, name='ImageRadius'))
                 self.SExtractorResults.add_column(table.Column(data=SExAngleInImage, name='AngleInImage'))
                 self.nStarsSEx = len(self.SExtractorResults)
@@ -923,19 +916,19 @@ class Image(object):
             IQRadius = DiagonalRadius*IQRadiusFactor
             CentralFWHMs = [star['FWHM_IMAGE'] for star in self.SExtractorResults if star['ImageRadius'] <= IQRadius]
             CentralEllipticities = [star['ELLIPTICITY'] for star in self.SExtractorResults if star['ImageRadius'] <= IQRadius]
-#             CentralFWHMs = []
-#             CentralEllipticities = []
-#             for star in self.SExtractorResults:
-#                 if star['ImageRadius'] <= IQRadius:
-#                     CentralFWHMs.append(star['FWHM_IMAGE'])
-#                     CentralEllipticities.append(star['ELLIPTICITY'])   
+            CentralAs = [star['AWIN_IMAGE'] for star in self.SExtractorResults if star['ImageRadius'] <= IQRadius]
+            CentralBs = [star['BWIN_IMAGE'] for star in self.SExtractorResults if star['ImageRadius'] <= IQRadius]
             if len(CentralFWHMs) > 3:
                 self.FWHM = np.median(CentralFWHMs) * u.pix
                 self.ellipticity = np.median(CentralEllipticities)
+                self.major_axis = np.median(CentralAs) * u.pix
+                self.minor_axis = np.median(CentralBs) * u.pix
             else:
                 self.logger.warning("Not enough stars detected in central region of image to form median FWHM.")
             self.logger.debug("Using {0} stars in central region to determine FWHM and ellipticity.".format(len(CentralFWHMs)))
             self.logger.info("Median FWHM in inner region is {0:.2f} pixels".format(self.FWHM.to(u.pix).value))
+            self.logger.info("Median Minor Axis in inner region is {0:.2f}".format(2.355*self.minor_axis.to(u.pix).value))
+            self.logger.info("Median Major Axis in inner region is {0:.2f}".format(2.355*self.major_axis.to(u.pix).value))
             self.logger.info("Median Ellipticity in inner region is {0:.2f}".format(self.ellipticity))
         else:
             self.FWHM = None
@@ -943,14 +936,236 @@ class Image(object):
 
 
     ##-------------------------------------------------------------------------
-    ## Determine Zero Point from SExtractor Catalog
+    ## Make Ellipticity Plot
     ##-------------------------------------------------------------------------
-    def DetermineZeroPoint(self):
+    def MakePSFplot(self, plotfilename):
+        '''
+        Plot ellipticity vectors of stars in image.
+        Plot histogram of theta - image_angle values.
+        '''
+        self.logger.info('Calculating histogram of PSF angles.')
+        plotfile = os.path.join(self.config.pathPlots, plotfilename)
+
+        ellip_threshold = 0.15
+        star_angles = [star['THETAWIN_IMAGE'] for star in self.SExtractorResults if star['ELLIPTICITY'] >= ellip_threshold]
+        image_angles = [star['AngleInImage'] for star in self.SExtractorResults if star['ELLIPTICITY'] >= ellip_threshold]
+        star_x = [star['XWIN_IMAGE'] for star in self.SExtractorResults if star['ELLIPTICITY'] >= ellip_threshold]
+        star_y = [star['YWIN_IMAGE'] for star in self.SExtractorResults if star['ELLIPTICITY'] >= ellip_threshold]
+        uncorrected_diffs = [star['THETAWIN_IMAGE']-star['AngleInImage'] for star in self.SExtractorResults if star['ELLIPTICITY'] >= ellip_threshold]
+        
+        nstars = len(star_angles)
+        self.logger.debug('  Found {} stars with ellipticity greater than {:.2f}.'.format(nstars, ellip_threshold))
+        
+        angle_diffs = []
+        for angle in uncorrected_diffs:
+            if angle < -90:
+                angle_diffs.append(angle + 90.)
+            elif angle > 90:
+                angle_diffs.append(angle - 90.)
+            else:
+                angle_diffs.append(angle)
+        angle_binsize = 10
+        diff_hist, diff_bins = np.histogram(angle_diffs, bins=angle_binsize*(np.arange(37)-18))
+        angle_hist, angle_bins = np.histogram(star_angles, bins=angle_binsize*(np.arange(37)-18))
+        angle_centers = (diff_bins[:-1] + diff_bins[1:]) / 2
+
+        ellip_binsize = 0.05
+        ellip_hist, ellip_bins = np.histogram(self.SExtractorResults['ELLIPTICITY'], bins=ellip_binsize*np.arange(21))
+        ellip_centers = (ellip_bins[:-1] + ellip_bins[1:]) / 2
+
+        fwhm_binsize = 0.1
+        fwhm_hist, fwhm_bins = np.histogram(self.SExtractorResults['FWHM_IMAGE'], bins=fwhm_binsize*np.arange(31))
+        fwhm_centers = (fwhm_bins[:-1] + fwhm_bins[1:]) / 2
+
+        star_angle_mean = np.mean(star_angles)
+        star_angle_median = np.median(star_angles)
+        angle_diff_mean = np.mean(angle_diffs)
+        angle_diff_median = np.median(angle_diffs)
+        self.logger.debug('  Mean Stellar PA = {:.0f}'.format(star_angle_mean))
+        self.logger.debug('  Median Stellar PA = {:.0f}'.format(star_angle_median))
+        self.logger.debug('  Mean Difference Angle = {:.0f}'.format(angle_diff_mean))
+        self.logger.debug('  Median Difference Angle = {:.0f}'.format(angle_diff_median))
+
+
+
+        if plotfilename:
+            self.logger.debug('  Generating figure {}'.format(plotfilename))
+
+            pyplot.figure(figsize=(12,11), dpi=100)
+            Left1 = pyplot.axes([0.000, 0.750, 0.465, 0.240])
+            pyplot.title('PSF Statistics for {}'.format(self.rawFileName), size=10)
+            pyplot.bar(ellip_centers, ellip_hist, align='center', width=0.7*ellip_binsize)
+            pyplot.xlabel('Ellipticity', size=10)
+            pyplot.ylabel('N Stars', size=10)
+            pyplot.xlim(0,1)
+            pyplot.xticks(0.1*np.arange(11), size=10)
+            pyplot.yticks(size=10)
+
+            Left2 = pyplot.axes([0.000, 0.460, 0.465, 0.240])
+            pyplot.bar(fwhm_centers, fwhm_hist, align='center', width=0.7*fwhm_binsize)
+            pyplot.xlabel('FWHM (pixels)', size=10)
+            pyplot.ylabel('N Stars', size=10)
+            pyplot.xlim(0,self.FWHM.to(u.pix).value + 3)
+            pyplot.xticks(size=10)
+            pyplot.yticks(size=10)
+
+            Left3 = pyplot.axes([0.000, 0.0, 0.465, 0.400])
+            Left3.set_aspect('equal')
+            pyplot.plot(star_x, star_y, 'k,')
+            pyplot.title('Positions of {:d}/{:d} stars with ellipticity > {:.2f}'.format(nstars, self.nStarsSEx, ellip_threshold), size=10)
+            pyplot.xlabel('X (pixels)', size=10)
+            pyplot.ylabel('Y (pixels)', size=10)
+            pyplot.xlim(0, self.nXPix)
+            pyplot.ylim(0, self.nYPix)
+            pyplot.xticks(size=10)
+            pyplot.yticks(size=10)
+
+            Right1 = pyplot.axes([0.535, 0.750, 0.465, 0.240])
+            pyplot.title('PSF Angles for {:d}/{:d} stars with ellipticity > {:.2f}'.format(nstars, self.nStarsSEx, ellip_threshold), size=10)
+            pyplot.bar(angle_centers, angle_hist, align='center', width=0.7*angle_binsize)
+            pyplot.xlabel('Stellar PSF PA', size=10)
+            pyplot.ylabel('N Stars', size=10)
+            pyplot.xlim(-90,90)
+            pyplot.xticks(30*(np.arange(7)-3), size=10)
+            pyplot.yticks(size=10)
+
+            Right2 = pyplot.axes([0.535, 0.460, 0.465, 0.240])
+            pyplot.bar(angle_centers, diff_hist, align='center', width=0.7*angle_binsize)
+            pyplot.xlabel('Stellar PSF PA - Image PA', size=10)
+            pyplot.ylabel('N Stars', size=10)
+            pyplot.xlim(-90,90)
+            pyplot.xticks(30*(np.arange(7)-3), size=10)
+            pyplot.yticks(size=10)
+            
+            Right3 = pyplot.axes([0.535, 0.0, 0.465, 0.400])
+            Right3.set_aspect('equal')
+            pyplot.plot(star_angles, image_angles, 'k.')
+            pyplot.title('Correlation Between PSF Angle and Position in Image', size=10)
+            pyplot.xlabel('Stellar PSF PA', size=10)
+            pyplot.ylabel('Image PA', size=10)
+            pyplot.xlim(-100,100)
+            pyplot.xticks(30*(np.arange(7)-3), size=10)
+            pyplot.ylim(-100,100)
+            pyplot.yticks(30*(np.arange(7)-3), size=10)
+
+            pyplot.savefig(plotfile, dpi=100, bbox_inches='tight', pad_inches=0.10)
+
+
+    ##-------------------------------------------------------------------------
+    ## Run SCAMP
+    ##-------------------------------------------------------------------------
+    def RunSCAMP(self, catalog='USNO-B1', distortion_order=3, mergedcat_name='scamp.cat', mergedcat_type='NONE'):
+        '''
+        Run SCAMP on SExtractor output catalog.
+        '''
+        ## Set up SCAMP configuration file
+        checkplot_resx = 1200
+        checkplot_resy = 1200
+
+        SCAMPCommand = ["scamp", self.SExtractorCatalog]
+        SCAMPCommand.append('-DISTORT_DEGREES')
+        SCAMPCommand.append('{:d}'.format(distortion_order))
+        SCAMPCommand.append('-ASTREF_CATALOG')
+        SCAMPCommand.append('{}'.format(catalog))
+        SCAMPCommand.append('-SAVE_REFCATALOG')
+        SCAMPCommand.append('{}'.format('Y'))
+        SCAMPCommand.append('-REFOUT_CATPATH')
+        SCAMPCommand.append('{}'.format(self.config.pathTemp))
+        SCAMPCommand.append('-MERGEDOUTCAT_NAME')
+        SCAMPCommand.append('{}'.format(mergedcat_name))
+        SCAMPCommand.append('-MERGEDOUTCAT_TYPE')
+        SCAMPCommand.append('{}'.format(mergedcat_type))
+        SCAMPCommand.append('-CHECKPLOT_RES')
+        SCAMPCommand.append('{:d},{:d}'.format(checkplot_resx, checkplot_resy))
+        SCAMPCommand.append('-CHECKPLOT_TYPE')
+        SCAMPCommand.append('{}'.format('FGROUPS,DISTORTION,ASTR_REFERROR2D,ASTR_REFERROR1D,PHOT_ZPCORR'))
+        SCAMPCommand.append('-CHECKPLOT_NAME')
+        SCAMPCommand.append('{}'.format('fgroups,distortion,astr_referror2d,astr_referror1d,phot_zpcorr'))
+        SCAMPCommand.append('-WRITE_XML')
+        SCAMPCommand.append('{}'.format('N'))
+        self.logger.info("Invoking SCAMP using {} catalog with distortion polynomial of order {}.".format(catalog, distortion_order))
+        self.logger.debug("SCAMP command: {}".format(repr(SCAMPCommand)))
+        try:
+            SCAMP_STDOUT = subprocess.check_output(SCAMPCommand, stderr=subprocess.STDOUT, universal_newlines=True)
+        except subprocess.CalledProcessError as e:
+            self.logger.error("SCAMP failed.  Command: {}".format(e.cmd))
+            self.logger.error("SCAMP failed.  Returncode: {}".format(e.returncode))
+            self.logger.error("SCAMP failed.  Output: {}".format(e.output))
+        except:
+            self.logger.error("SCAMP process failed: {0} {1} {2}".format(sys.exc_info()[0], sys.exc_info()[1], sys.exc_info()[2]))
+        else:
+            StartAstrometricStats = False
+            EndAstrometricStats = False
+            for line in SCAMP_STDOUT.splitlines():
+                if re.search('Astrometric stats \(external\)', line):
+                    StartAstrometricStats = True
+                if re.search('Generating astrometric plots', line):
+                    EndAstrometricStats = True
+                if StartAstrometricStats and not EndAstrometricStats:
+                    self.logger.info("  SCAMP Output: "+line)
+                else:
+                    self.logger.debug("  SCAMP Output: "+line)
+        ## Store Output Catalog Name
+        if os.path.exists(mergedcat_name):
+            self.SCAMP_catalog = mergedcat_name
+
+        ## Populate FITS header with SCAMP derived header values in .head file
+        HeaderFO = open(os.path.join(self.config.pathTemp, self.rawFileBasename+'.head'), 'r')
+        SCAMP_header = HeaderFO.readlines()
+        HeaderFO.close()
+
+        self.logger.info('Adding SCAMP header output to fits header.')
+        hdulist = fits.open(self.workingFile, ignore_missing_end=True, mode='update')
+        for line in SCAMP_header:
+            line.strip('\n')
+            line.strip('\r')
+            IsHeaderLine = re.match('([\w\d\s]{1,8})=\s(.{20})\s/\s(.+)', line)
+            IsCommentLine = re.match('COMMENT\s\s\s(.+)', line)
+            IsHistoryLine = re.match('HISTORY\s\s\s(.+)', line)
+            if IsHeaderLine:
+                self.logger.debug('  {} = {} / {}'.format(
+                                  IsHeaderLine.group(1), IsHeaderLine.group(2), IsHeaderLine.group(3)))
+                hdulist[0].header[IsHeaderLine.group(1)] = (IsHeaderLine.group(2), IsHeaderLine.group(3))
+            elif IsCommentLine:
+                self.logger.debug('  COMMENT   {}'.format(IsCommentLine.group(1)))
+                hdulist[0].header['COMMENT'] = IsCommentLine.group(1)
+            elif IsHistoryLine:
+                self.logger.debug('  HISTORY   {}'.format(IsHistoryLine.group(1)))
+                hdulist[0].header['HISTORY'] = IsHistoryLine.group(1)
+            elif re.search('END', line):
+                pass
+            elif re.match('COMMENT\s\s\s', line):
+                pass
+            else:
+                self.logger.debug('  Could not parse SCAMP header line: {}'.format(line))
+        hdulist.flush()
+
+
+    ##-------------------------------------------------------------------------
+    ## Determine Zero Point from SExtractor Catalog after SCAMP-refined astrometric solution
+    ##-------------------------------------------------------------------------
+    def DetermineZeroPoint(self, filter='i', use_local_UCAC=False, local_UCAC_command="/Volumes/Data/UCAC4/access/u4test", local_UCAC_data="/Volumes/Data/UCAC4/u4b"):
         '''
         Determine zero point by comparing measured magnitudes with catalog
         magnitudes.
         '''
-        pass
+        assert self.coordinate_WCS
+
+        if use_local_UCAC:
+            if os.path.exists(local_UCAC_command) and os.path.exists(local_UCAC_data):
+                self.logger.info("## Getting list of stars from UCAC4 catalog.")
+                UCACcommand = [local_UCAC_command,
+                               "{:.4f}".format(target.ra*180./math.pi),
+                               "{:.4f}".format(target.dec*180./math.pi),
+                               "1.2", "1.2", local_UCAC_data, "-h"]
+                if os.path.exists("ucac4.txt"): os.remove("ucac4.txt")
+                result = subprocess.call(UCACcommand)
+            else:
+                if not os.path.exists(local_UCAC_command):
+                    logger.warning('Cannot find local UCAC command: {}'.format(local_UCAC_command))
+                if not os.path.exists(local_UCAC_data):
+                    logger.warning('Cannot find local UCAC data: {}'.format(local_UCAC_data))
+                
 
 
     ##-------------------------------------------------------------------------
@@ -1042,8 +1257,8 @@ class Image(object):
             for star in sortedSExtractorResults:
                 nStarsMarked += 1
                 if nStarsMarked <= nStarsLimit:
-                    MarkXPos = star['X_IMAGE']
-                    MarkYPos = self.nYPix - star['Y_IMAGE']
+                    MarkXPos = star['XWIN_IMAGE']
+                    MarkYPos = self.nYPix - star['YWIN_IMAGE']
                     JPEGcommand.append('-draw')
                     JPEGcommand.append("circle %d,%d %d,%d" % (MarkXPos, MarkYPos, MarkXPos+MarkRadius, MarkYPos))
                 else:
@@ -1098,7 +1313,7 @@ class Image(object):
         self.logger.debug("Issuing convert command to create jpeg.")
 #         self.logger.debug("Command: {}".format(repr(JPEGcommand)))
         try:
-            ConvertSTDOUT = subprocess.check_output(JPEGcommand, stderr=subprocess.STDOUT)
+            ConvertSTDOUT = subprocess.check_output(JPEGcommand, stderr=subprocess.STDOUT, universal_newlines=True)
         except subprocess.CalledProcessError as e:
             self.logger.error("Failed to create jpeg.")
             for line in e.output.split("\n"):
