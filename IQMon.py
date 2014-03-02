@@ -596,6 +596,21 @@ class Image(object):
         self.tempFiles.append(self.workingFile)
 
     ##-------------------------------------------------------------------------
+    ## Remove Hot Columns
+    ##-------------------------------------------------------------------------
+    def ColumnFix(self):
+        self.logger.info('Subtracting median value from each column in image.')
+        hdulist = fits.open(self.workingFile, mode="update")
+        data = hdulist[0].data
+        background = np.median(data)
+        for i in range(0, data.shape[1]-1):
+            data[:,i] = data[:,i] - (np.median(data[:,i]) - background)
+        hdulist[0].data = data
+        hdulist.flush()
+        hdulist.close()
+
+
+    ##-------------------------------------------------------------------------
     ## Dark Subtract Image
     ##-------------------------------------------------------------------------
     def DarkSubtract(self, Darks):
@@ -781,7 +796,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Run SExtractor
     ##-------------------------------------------------------------------------
-    def RunSExtractor(self, threshold=5.0):
+    def RunSExtractor(self, threshold=4.0):
         '''
         Run SExtractor on image.
         '''
@@ -800,12 +815,12 @@ class Image(object):
             if os.path.exists(sextractor_output_param_file): os.remove(sextractor_output_param_file)
             defaultparamsFO = open(sextractor_output_param_file, 'w')
             params = [
-                'XWIN_IMAGE', 'YWIN_IMAGE', 'ERRXYWIN', 
+                'XWIN_IMAGE', 'YWIN_IMAGE', 
                 'AWIN_IMAGE', 'BWIN_IMAGE', 'FWHM_IMAGE', 'THETAWIN_IMAGE',
                 'ERRAWIN_IMAGE', 'ERRBWIN_IMAGE', 'ERRTHETAWIN_IMAGE',
                 'ELONGATION', 'ELLIPTICITY',
                 'FLUX_AUTO', 'FLUXERR_AUTO',
-                'MAG_AUTO', 'MAGERR_AUTO'
+                'MAG_AUTO', 'MAGERR_AUTO',
                 'FLAGS',
                 'FLAGS_WEIGHT',
                 'FLUX_RADIUS']
@@ -888,7 +903,15 @@ class Image(object):
                 ## Read FITS_LDAC SExtractor Catalog
                 self.logger.debug("Reading SExtractor output catalog.")
                 hdu = fits.open(self.SExtractorCatalog)
-                self.SExtractorResults = table.Table(hdu[2].data)
+                results = table.Table(hdu[2].data)
+                ## Filter out detections with dimensions smaller than 1 pixel
+#                 rows_to_remove = []
+#                 for i in range(0, len(results)-1):
+#                     if (results[i]['AWIN_IMAGE'] < 1) or (results[i]['BWIN_IMAGE'] < 1) or (results[i]['FWHM_IMAGE'] < 1):
+#                         rows_to_remove.append(i)
+#                 self.logger.debug('  Removing {} of {} rows from results table.'.format(len(rows_to_remove), len(results)))
+#                 results.remove_rows(rows_to_remove)
+                self.SExtractorResults = results
                 SExImageRadius = []
                 SExAngleInImage = []
                 for star in self.SExtractorResults:
@@ -1242,7 +1265,7 @@ class Image(object):
             JPEGcommand.append("circle %d,%d %d,%d" % (TargetXPos, TargetYPos,
                                TargetXPos+markSize/2, TargetYPos))
         if markStars and self.SExtractorResults:
-            self.logger.debug("Marking stars found by SExtractor in jpeg.")
+            self.logger.debug("Marking {} stars found by SExtractor in jpeg.".format(len(self.SExtractorResults)))
             JPEGcommand.append("-stroke")
             JPEGcommand.append("red")
             JPEGcommand.append("-strokewidth")
