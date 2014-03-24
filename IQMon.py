@@ -761,7 +761,7 @@ class Image(object):
         solved WCS).
         '''
         self.logger.info("Detemining pointing error based on WCS solution")
-        if self.imageWCS and self.coordinate_header:
+        if self.imageWCS:
             centerWCS = self.imageWCS.wcs_pix2world([[self.nXPix/2, self.nYPix/2]], 1)
             self.logger.debug("Using coordinates of center point: {0} {1}".format(centerWCS[0][0], centerWCS[0][1]))
             self.coordinate_WCS = coords.ICRS(ra=centerWCS[0][0],
@@ -1058,33 +1058,28 @@ class Image(object):
         '''
         Run SCAMP on SExtractor output catalog.
         '''
-        ## Set up SCAMP configuration file
-        checkplot_resx = 1200
-        checkplot_resy = 1200
-
+        ## Parameters for SCAMP
+        SCAMP_params = {
+                        'DISTORT_DEGREES': distortion_order,
+                        'ASTREF_CATALOG': catalog,
+                        'SAVE_REFCATALOG': 'Y',
+                        'REFOUT_CATPATH': self.config.pathTemp,
+                        'MERGEDOUTCAT_NAME': mergedcat_name,
+                        'MERGEDOUTCAT_TYPE': mergedcat_type,
+#                         'CHECKPLOT_RES': '1200,1200',
+#                         'CHECKPLOT_TYPE': 'FGROUPS,DISTORTION,ASTR_REFERROR2D,ASTR_REFERROR1D,PHOT_ZPCORR',
+#                         'CHECKPLOT_NAME': 'fgroups,distortion,astr_referror2d,astr_referror1d,phot_zpcorr',
+                        'WRITE_XML': 'N',
+                        'SOLVE_PHOTOM': 'Y',
+                        'ASTRINSTRU_KEY': 'QRUNID',
+                        }
         SCAMPCommand = ["scamp", self.SExtractorCatalog]
-        SCAMPCommand.append('-DISTORT_DEGREES')
-        SCAMPCommand.append('{:d}'.format(distortion_order))
-        SCAMPCommand.append('-ASTREF_CATALOG')
-        SCAMPCommand.append('{}'.format(catalog))
-        SCAMPCommand.append('-SAVE_REFCATALOG')
-        SCAMPCommand.append('{}'.format('Y'))
-        SCAMPCommand.append('-REFOUT_CATPATH')
-        SCAMPCommand.append('{}'.format(self.config.pathTemp))
-        SCAMPCommand.append('-MERGEDOUTCAT_NAME')
-        SCAMPCommand.append('{}'.format(mergedcat_name))
-        SCAMPCommand.append('-MERGEDOUTCAT_TYPE')
-        SCAMPCommand.append('{}'.format(mergedcat_type))
-        SCAMPCommand.append('-CHECKPLOT_RES')
-        SCAMPCommand.append('{:d},{:d}'.format(checkplot_resx, checkplot_resy))
-        SCAMPCommand.append('-CHECKPLOT_TYPE')
-        SCAMPCommand.append('{}'.format('FGROUPS,DISTORTION,ASTR_REFERROR2D,ASTR_REFERROR1D,PHOT_ZPCORR'))
-        SCAMPCommand.append('-CHECKPLOT_NAME')
-        SCAMPCommand.append('{}'.format('fgroups,distortion,astr_referror2d,astr_referror1d,phot_zpcorr'))
-        SCAMPCommand.append('-WRITE_XML')
-        SCAMPCommand.append('{}'.format('N'))
+        for key in SCAMP_params.keys():
+            SCAMPCommand.append('-{}'.format(key))
+            SCAMPCommand.append('{}'.format(SCAMP_params[key]))
+        SCAMPCommand = ' '.join(SCAMPCommand)
         self.logger.info("Invoking SCAMP using {} catalog with distortion polynomial of order {}.".format(catalog, distortion_order))
-        self.logger.debug("SCAMP command: {}".format(repr(SCAMPCommand)))
+        self.logger.debug("SCAMP command: {}".format(SCAMPCommand))
         try:
             SCAMP_STDOUT = subprocess.check_output(SCAMPCommand, stderr=subprocess.STDOUT, universal_newlines=True)
         except subprocess.CalledProcessError as e:
@@ -1110,35 +1105,27 @@ class Image(object):
             self.SCAMP_catalog = mergedcat_name
 
         ## Populate FITS header with SCAMP derived header values in .head file
-        HeaderFO = open(os.path.join(self.config.pathTemp, self.rawFileBasename+'.head'), 'r')
-        SCAMP_header = HeaderFO.readlines()
-        HeaderFO.close()
+        self.logger.info('Writing SCAMP .head file back in to fits header on {}'.format(self.workingFile))
+        missfits_cmd = 'missfits -SAVE_TYPE REPLACE -WRITE_XML N {}'.format(self.workingFile)
+        self.logger.debug('    Running: {}'.format(missfits_cmd))
+        output = subprocess.check_output(missfits_cmd, shell=True, stderr=subprocess.STDOUT, universal_newlines=True)
+        output = str(output)
+        for line in output.splitlines():
+            self.logger.debug(line)
 
-        self.logger.info('Adding SCAMP header output to fits header.')
-        hdulist = fits.open(self.workingFile, ignore_missing_end=True, mode='update')
-        for line in SCAMP_header:
-            line.strip('\n')
-            line.strip('\r')
-            IsHeaderLine = re.match('([\w\d\s]{1,8})=\s(.{20})\s/\s(.+)', line)
-            IsCommentLine = re.match('COMMENT\s\s\s(.+)', line)
-            IsHistoryLine = re.match('HISTORY\s\s\s(.+)', line)
-            if IsHeaderLine:
-                self.logger.debug('  {} = {} / {}'.format(
-                                  IsHeaderLine.group(1), IsHeaderLine.group(2), IsHeaderLine.group(3)))
-                hdulist[0].header[IsHeaderLine.group(1)] = (IsHeaderLine.group(2), IsHeaderLine.group(3))
-            elif IsCommentLine:
-                self.logger.debug('  COMMENT   {}'.format(IsCommentLine.group(1)))
-                hdulist[0].header['COMMENT'] = IsCommentLine.group(1)
-            elif IsHistoryLine:
-                self.logger.debug('  HISTORY   {}'.format(IsHistoryLine.group(1)))
-                hdulist[0].header['HISTORY'] = IsHistoryLine.group(1)
-            elif re.search('END', line):
-                pass
-            elif re.match('COMMENT\s\s\s', line):
-                pass
-            else:
-                self.logger.debug('  Could not parse SCAMP header line: {}'.format(line))
-        hdulist.flush()
+
+    ##-------------------------------------------------------------------------
+    ## Overplot Stellar Catalog on Image
+    ##-------------------------------------------------------------------------
+    def OverplotStellarCatalog():
+        '''
+        Overplot the caluclated positions (via using the image WCS) on the image so one can visually
+        check the accuracy of the WCS.
+        
+        Supports two methods of overplotting.  First on an image jpeg and second, by outputting a
+        ds9 regions file (.reg).  May also consider a ginga implementation as well.
+        '''
+        pass
 
 
     ##-------------------------------------------------------------------------
@@ -1149,7 +1136,8 @@ class Image(object):
         Determine zero point by comparing measured magnitudes with catalog
         magnitudes.
         '''
-        assert self.coordinate_WCS
+        print(type(self.coordinate_WCS))
+        assert type(self.coordinate_WCS) == coords.builtin_systems.ICRS
 
         if use_local_UCAC:
             if os.path.exists(local_UCAC_command) and os.path.exists(local_UCAC_data):
@@ -1165,7 +1153,6 @@ class Image(object):
                     logger.warning('Cannot find local UCAC command: {}'.format(local_UCAC_command))
                 if not os.path.exists(local_UCAC_data):
                     logger.warning('Cannot find local UCAC data: {}'.format(local_UCAC_data))
-                
 
 
     ##-------------------------------------------------------------------------
