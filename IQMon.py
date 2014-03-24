@@ -776,7 +776,7 @@ class Image(object):
         solved WCS).
         '''
         self.logger.info("Detemining pointing error based on WCS solution")
-        if self.imageWCS and self.coordinate_header:
+        if self.imageWCS:
             centerWCS = self.imageWCS.wcs_pix2world([[self.nXPix/2, self.nYPix/2]], 1)
             self.logger.debug("Using coordinates of center point: {0} {1}".format(centerWCS[0][0], centerWCS[0][1]))
             self.coordinate_WCS = coords.ICRS(ra=centerWCS[0][0],
@@ -1205,7 +1205,7 @@ class Image(object):
         if os.path.exists(jpegFile): os.remove(jpegFile)
         binningString = str(1./binning*100)+"%"
         JPEGcommand = ["convert", "-contrast-stretch", "0.9%,1%", "-compress", "JPEG", "-quality", "70", "-resize", binningString]
-        if markPointing and self.imageWCS and self.coordinate_header:
+        if markPointing and self.imageWCS:
             self.logger.debug("Marking target pointing in jpeg.")
             ## Make markSize 180 arcseconds (3 arcmin)
 #             markSize = (180*u.arcsec/self.tel.pixelScale).value/binning
@@ -1296,7 +1296,7 @@ class Image(object):
                     JPEGcommand.append("-flop")
             else:
                 self.logger.warning("No position angle value found.  Not rotating JPEG.")
-        if markPointing and self.imageWCS and self.coordinate_header:
+        if markPointing and self.imageWCS:
             JPEGcommand.append("-stroke")
             JPEGcommand.append("none")
             JPEGcommand.append("-fill")
