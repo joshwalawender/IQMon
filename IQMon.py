@@ -49,6 +49,8 @@ class Config(object):
                      (i.e. ~/IQMon/Plots/)
     - pathTemp:      path where temporary files should be written
                      (i.e. ~/IQMon/tmp/)
+    - pathConfig:    path for config files.  Typically the base path for the
+                     above paths
     '''
     _singletons = dict()
 
@@ -89,9 +91,9 @@ class Config(object):
             IstmpPath = re.match("IQMONTMP\s=\s([\w/\-\.]+)", line)
             if IstmpPath:
                 self.pathTemp = os.path.abspath(IstmpPath.group(1))
-#             IsCatalogPath = re.match("CATALOGPATH\s=\s([\w/\-\.]+)", line)
-#             if IsCatalogPath:
-#                 self.pathCatalog = os.path.abspath(IsCatalogPath.group(1))
+            IsConfigPath = re.match("CONFIGPATH\s=\s([\w/\-\.]+)", line)
+            if IsConfigPath:
+                self.pathConfig = os.path.abspath(IsConfigPath.group(1))
 
         ## Create Log Path if it doesn't exist
         SplitPath = [self.pathLog]
@@ -179,9 +181,10 @@ class Telescope(object):
         self.thresholdEllipticity = None
         self.pixelScale = None
         self.fRatio = None
-        self.SExtractorPhotAperture = None
-        self.SExtractorSeeing = None
-        self.SExtractorSaturation = None
+        self.SExtractorParams = None
+#         self.SExtractorPhotAperture = None
+#         self.SExtractorSeeing = None
+#         self.SExtractorSaturation = None
         self.site = None
         self.pointingMarkerSize = 1*u.arcmin
         
@@ -216,11 +219,6 @@ class Telescope(object):
             assert self.gain.to(1/u.adu)
         else:
             self.gain *= 1./u.adu
-        ## Default SExtractorSaturation to units of ADU
-        if type(self.SExtractorSaturation) == u.quantity.Quantity:
-            assert self.SExtractorSaturation.to(u.adu)
-        else:
-            self.SExtractorSaturation *= u.adu
         ## Default unitsForFWHM to units of arcsec
         if type(self.unitsForFWHM) == u.quantity.Quantity:
             assert self.unitsForFWHM.unit in [u.arcsec, u.pix]
@@ -310,7 +308,7 @@ class Image(object):
         self.focusPos = None
         self.objectName = None
         self.astrometrySolved = None
-        self.coordinate_WCS = None
+        self.center_coordinate = None
         self.coordinate_header = None
         self.nSExtracted = None
         self.SExBackground = None
@@ -555,7 +553,10 @@ class Image(object):
             self.moonPhase = TheMoon.phase
             self.moonSep = ephem.separation(TargetObject, TheMoon) * 180./ephem.pi * u.deg
             self.moonAlt = TheMoon.alt * 180./ephem.pi * u.deg
-            self.logger.debug("A {0:.0f} percent illuminated Moon is {1:.0f} deg from target.".format(self.moonPhase, self.moonSep.to(u.deg).value))
+            if self.moonAlt > 0:
+                self.logger.debug("A {0:.0f} percent illuminated Moon is {1:.0f} deg from target.".format(self.moonPhase, self.moonSep.to(u.deg).value))
+            else:
+                self.logger.debug("A {0:.0f} percent illuminated Moon is down.".format(self.moonPhase))
         else:
             self.targetAlt = None
             self.targetAz = None
@@ -565,6 +566,7 @@ class Image(object):
             self.zenithAngle = None
             self.airmass = None
             self.logger.warning("Object position and Moon position not calculated.")
+
 
     ##-------------------------------------------------------------------------
     ## Add To Header
@@ -591,9 +593,15 @@ class Image(object):
         - Later implement file format conversion from CRW, CR2, DNG, etc to
           fits using dcraw.
         '''
-        self.workingFile = os.path.join(self.config.pathTemp, self.rawFileName)
+        if self.fileExt == '.fts':
+            self.workingFile = os.path.join(self.config.pathTemp, self.rawFileBasename+'.fits')
+        else:
+            self.workingFile = os.path.join(self.config.pathTemp, self.rawFileName)
+        if os.path.exists(self.workingFile): os.remove(self.workingFile)
         shutil.copy2(self.rawFile, self.workingFile)
+        os.chmod(self.workingFile, 0666)
         self.tempFiles.append(self.workingFile)
+
 
     ##-------------------------------------------------------------------------
     ## Dark Subtract Image
@@ -743,14 +751,6 @@ class Image(object):
             self.tempFiles.append(os.path.join(self.config.pathTemp, self.rawFileBasename+".new.fits"))
             self.tempFiles.append(os.path.join(self.config.pathTemp, self.rawFileBasename+"-indx.xyls"))
 
-    ##-------------------------------------------------------------------------
-    ## Refine WCS
-    ##-------------------------------------------------------------------------
-    def RefineWCS(self):
-        '''
-        Refine the WCS of the image to have accurate distortions.
-        '''
-        pass
 
     ##-------------------------------------------------------------------------
     ## Determine Pointing Error
@@ -764,16 +764,12 @@ class Image(object):
         if self.imageWCS:
             centerWCS = self.imageWCS.wcs_pix2world([[self.nXPix/2, self.nYPix/2]], 1)
             self.logger.debug("Using coordinates of center point: {0} {1}".format(centerWCS[0][0], centerWCS[0][1]))
-            self.coordinate_WCS = coords.ICRS(ra=centerWCS[0][0],
-                                                   dec=centerWCS[0][1],
-                                                   unit=(u.degree, u.degree))
-            self.pointingError = self.coordinate_WCS.separation(self.coordinate_header)
-            self.logger.debug("Target Coordinates are:  %s %s",
-                         self.coordinate_header.ra.format(u.hour, sep=":", precision=1),
-                         self.coordinate_header.dec.format(u.degree, sep=":", precision=1, alwayssign=True))
-            self.logger.debug("WCS of Central Pixel is: %s %s",
-                         self.coordinate_WCS.ra.format(u.hour, sep=":", precision=1),
-                         self.coordinate_WCS.dec.format(u.degree, sep=":", precision=1, alwayssign=True))
+            self.center_coordinate = coords.ICRS(ra=centerWCS[0][0], dec=centerWCS[0][1], unit=(u.degree, u.degree))
+            self.pointingError = self.center_coordinate.separation(self.coordinate_header)
+            self.logger.debug("Target Coordinates are:  {}".format(
+                              self.coordinate_header.to_string(sep=":", precision=1, alwayssign=True))),
+            self.logger.debug("WCS of Central Pixel is: {}".format(
+                              self.center_coordinate.to_string(sep=":", precision=1, alwayssign=True)))
             self.logger.info("Pointing Error is %.2f arcmin", self.pointingError.arcminute)
         else:
             self.logger.warning("Pointing error not calculated.")
@@ -781,126 +777,118 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Run SExtractor
     ##-------------------------------------------------------------------------
-    def RunSExtractor(self, threshold=5.0):
+    def RunSExtractor(self):
         '''
         Run SExtractor on image.
         '''
-        assert float(threshold)
         assert type(self.tel.gain) == u.quantity.Quantity
         assert type(self.tel.pixelScale) == u.quantity.Quantity
-        assert type(self.tel.SExtractorSeeing) == u.quantity.Quantity
-        assert type(self.tel.SExtractorPhotAperture) == u.quantity.Quantity
         
-        if self.tel.gain and self.tel.pixelScale and self.tel.SExtractorSeeing and self.tel.SExtractorPhotAperture:
-            ## Set up file names
-            self.SExtractorCatalog = os.path.join(self.config.pathTemp, self.rawFileBasename+".cat")
-            self.tempFiles.append(self.SExtractorCatalog)
+        ## Set up file names
+        self.SExtractorCatalog = os.path.join(self.config.pathTemp, self.rawFileBasename+".cat")
+        self.tempFiles.append(self.SExtractorCatalog)
 
-            sextractor_output_param_file = os.path.join(self.config.pathTemp, 'default.param')
-            if os.path.exists(sextractor_output_param_file): os.remove(sextractor_output_param_file)
-            defaultparamsFO = open(sextractor_output_param_file, 'w')
-            params = [
-                'XWIN_IMAGE', 'YWIN_IMAGE', 'ERRXYWIN', 
-                'AWIN_IMAGE', 'BWIN_IMAGE', 'FWHM_IMAGE', 'THETAWIN_IMAGE',
-                'ERRAWIN_IMAGE', 'ERRBWIN_IMAGE', 'ERRTHETAWIN_IMAGE',
-                'ELONGATION', 'ELLIPTICITY',
-                'FLUX_AUTO', 'FLUXERR_AUTO',
-                'MAG_AUTO', 'MAGERR_AUTO'
-                'FLAGS',
-                'FLAGS_WEIGHT',
-                'FLUX_RADIUS']
-            for param in params:
-                defaultparamsFO.write(param+'\n')
-            defaultparamsFO.close()
+        sextractor_output_param_file = os.path.join(self.config.pathTemp, 'default.param')
+        if os.path.exists(sextractor_output_param_file): os.remove(sextractor_output_param_file)
+        defaultparamsFO = open(sextractor_output_param_file, 'w')
+        params = [
+                  'XWIN_IMAGE', 'YWIN_IMAGE', 
+                  'AWIN_IMAGE', 'BWIN_IMAGE', 'FWHM_IMAGE', 'THETAWIN_IMAGE',
+                  'ERRAWIN_IMAGE', 'ERRBWIN_IMAGE', 'ERRTHETAWIN_IMAGE',
+                  'ELONGATION', 'ELLIPTICITY',
+                  'FLUX_AUTO', 'FLUXERR_AUTO', 'MAG_AUTO', 'MAGERR_AUTO',
+                  'FLAGS', 'FLAGS_WEIGHT', 'FLUX_RADIUS'
+                 ]
+        for param in params:
+            defaultparamsFO.write(param+'\n')
+        defaultparamsFO.close()
 
-            SExtractor_params = {}
-            SExtractor_params['CATALOG_NAME'] = '{}'.format(self.SExtractorCatalog)
-            SExtractor_params['CATALOG_TYPE'] = 'FITS_LDAC'
-            SExtractor_params['PARAMETERS_NAME'] = '{}'.format(sextractor_output_param_file)
-            SExtractor_params['FILTER'] = 'N'
-            SExtractor_params['GAIN'] = '{:f}'.format(self.tel.gain.value)
-            SExtractor_params['GAIN_KEY'] = 'GAIN'
-            SExtractor_params['DETECT_THRESH'] = threshold
-            SExtractor_params['ANALYSIS_THRESH'] = threshold
-            SExtractor_params['DETECT_MINAREA'] = 5
-            SExtractor_params['PHOT_APERTURES'] = '{:.2f}'.format(self.tel.SExtractorPhotAperture.to(u.pix).value)
-            SExtractor_params['PIXEL_SCALE'] = '{:.3f}'.format(self.tel.pixelScale.value)
-            if self.tel.SExtractorSaturation:
-                SExtractor_params['SATUR_LEVEL'] = '{:.2f}'.format(self.tel.SExtractorSaturation.to(u.adu).value)
-            backgroundFilterSize = max(5.*self.tel.SExtractorSeeing.to(u.arcsec).value / self.tel.pixelScale.value, 5.)
-            SExtractor_params['BACK_SIZE'] = '{:.2f}'.format(backgroundFilterSize)
-            SExtractor_params['SEEING_FWHM'] = '{:.2f}'.format(self.tel.SExtractorSeeing.to(u.arcsec).value)
-            self.CheckImageFile = os.path.join(self.config.pathPlots, self.rawFileBasename+"_bksub.fits")
-            self.tempFiles.append(self.CheckImageFile)
-            SExtractor_params['CHECKIMAGE_TYPE'] = '{}'.format("-BACKGROUND")
-            SExtractor_params['CHECKIMAGE_NAME'] = '{}'.format(self.CheckImageFile)
+        self.CheckImageFile = os.path.join(self.config.pathPlots, self.rawFileBasename+"_bksub.fits")
+        self.tempFiles.append(self.CheckImageFile)
+        ## Compare input parameters dict to default
+        SExtractor_default = {
+                             'CATALOG_NAME': self.SExtractorCatalog,
+                             'CATALOG_TYPE': 'FITS_LDAC',
+                             'PARAMETERS_NAME': sextractor_output_param_file,
+                             'GAIN': self.tel.gain.value,
+                             'GAIN_KEY': 'GAIN',
+                             'PIXEL_SCALE': '{:.3f}'.format(self.tel.pixelScale.value),
+                             'CHECKIMAGE_TYPE': '-BACKGROUND',
+                             'CHECKIMAGE_NAME': self.CheckImageFile,
+                            }
 
-            ## Run SExtractor
-            SExtractorCommand = ["sex", self.workingFile]
-            for key in SExtractor_params.keys():
-                SExtractorCommand.append('-{}'.format(key))
-                SExtractorCommand.append('{}'.format(SExtractor_params[key]))
-            self.logger.info("Invoking SExtractor")
-            self.logger.debug("SExtractor command: {}".format(repr(SExtractorCommand)))
-            try:
-                SExSTDOUT = subprocess.check_output(SExtractorCommand, stderr=subprocess.STDOUT, universal_newlines=True)
-            except subprocess.CalledProcessError as e:
-                self.logger.error("SExtractor failed.  Command: {}".format(e.cmd))
-                self.logger.error("SExtractor failed.  Returncode: {}".format(e.returncode))
-                self.logger.error("SExtractor failed.  Output: {}".format(e.output))
-            except:
-                self.logger.error("SExtractor process failed: {0} {1} {2}".format(sys.exc_info()[0], sys.exc_info()[1], sys.exc_info()[2]))
-            else:
-                for line in SExSTDOUT.splitlines():
-                    line.replace("[1A", "")
-                    line.replace("[1M>", "")
-                    if not re.match(".*Setting up background map.*", line) and not re.match(".*Line:\s[0-9]*.*", line):
-                        self.logger.info("  SExtractor Output: {}".format(line))
-                ## Extract Number of Stars from SExtractor Output
-                pos = SExSTDOUT.find("sextracted ")
-                IsSExCount = re.match("\s*([0-9]+)\s+", SExSTDOUT[pos+11:pos+21])
-                if IsSExCount:
-                    self.nSExtracted = int(IsSExCount.group(1))
-                    self.logger.info("SExtractor found {0} sources.".format(self.nSExtracted))
-                else:
-                    self.nSExtracted = None
-                ## Extract Background Level from SExtractor Output
-                pos = SExSTDOUT.find("Background: ")
-                IsSExBkgnd = re.match("\s*([0-9\.]+)\s*", SExSTDOUT[pos+11:pos+21])
-                if IsSExBkgnd:
-                    self.SExBackground = float(IsSExBkgnd.group(1))
-                    self.logger.info("SExtractor background is {0:.1f}".format(self.SExBackground))
-                else:
-                    self.SExBackground = None
-                ## Extract Background RMS from SExtractor Output
-                IsSExBRMS = re.match("\s*RMS:\s([0-9\.]+)\s*", SExSTDOUT[pos+21:pos+37])
-                if IsSExBRMS:
-                    self.SExBRMS = float(IsSExBRMS.group(1))
-                    self.logger.info("SExtractor background RMS is {0:.1f}".format(self.SExBRMS))
-                else:
-                    self.SExBRMS = None
-
-                ## If No Output Catalog Created ...
-                if not os.path.exists(self.SExtractorCatalog):
-                    self.logger.warning("SExtractor failed to create catalog.")
-                    self.SExtractorCatalog = None
-
-                ## Read FITS_LDAC SExtractor Catalog
-                self.logger.debug("Reading SExtractor output catalog.")
-                hdu = fits.open(self.SExtractorCatalog)
-                self.SExtractorResults = table.Table(hdu[2].data)
-                SExImageRadius = []
-                SExAngleInImage = []
-                for star in self.SExtractorResults:
-                    SExImageRadius.append(math.sqrt((self.nXPix/2-star['XWIN_IMAGE'])**2 + (self.nYPix/2-star['YWIN_IMAGE'])**2))
-                    SExAngleInImage.append(math.atan((star['XWIN_IMAGE']-self.nXPix/2)/(self.nYPix/2-star['YWIN_IMAGE']))*180.0/math.pi)
-                self.SExtractorResults.add_column(table.Column(data=SExImageRadius, name='ImageRadius'))
-                self.SExtractorResults.add_column(table.Column(data=SExAngleInImage, name='AngleInImage'))
-                self.nStarsSEx = len(self.SExtractorResults)
-                self.logger.info("Read in {0} stars from SExtractor catalog.".format(self.nStarsSEx))
-
+        ## Use command line sextractor params
+        if not self.tel.SExtractorParams:
+            SExtractor_params = SExtractor_default
         else:
-            self.logger.warning("Telescope proerties not set.")
+            SExtractor_params = self.tel.SExtractorParams
+            for key in SExtractor_default.keys():
+                if not key in self.tel.SExtractorParams.keys():
+                    SExtractor_params[key] = SExtractor_default[key]
+
+        ## Run SExtractor
+        SExtractorCommand = ["sex", self.workingFile]
+        for key in SExtractor_params.keys():
+            SExtractorCommand.append('-{}'.format(key))
+            SExtractorCommand.append('{}'.format(SExtractor_params[key]))
+        self.logger.info("Invoking SExtractor")
+        self.logger.debug("SExtractor command: {}".format(repr(SExtractorCommand)))
+        try:
+            SExSTDOUT = subprocess.check_output(SExtractorCommand, stderr=subprocess.STDOUT, universal_newlines=True)
+        except subprocess.CalledProcessError as e:
+            self.logger.error("SExtractor failed.  Command: {}".format(e.cmd))
+            self.logger.error("SExtractor failed.  Returncode: {}".format(e.returncode))
+            self.logger.error("SExtractor failed.  Output: {}".format(e.output))
+        except:
+            self.logger.error("SExtractor process failed: {0} {1} {2}".format(sys.exc_info()[0], sys.exc_info()[1], sys.exc_info()[2]))
+        else:
+            for line in SExSTDOUT.splitlines():
+                line.replace("[1A", "")
+                line.replace("[1M>", "")
+                if not re.match(".*Setting up background map.*", line) and not re.match(".*Line:\s[0-9]*.*", line):
+                    self.logger.info("  SExtractor Output: {}".format(line))
+            ## Extract Number of Stars from SExtractor Output
+            pos = SExSTDOUT.find("sextracted ")
+            IsSExCount = re.match("\s*([0-9]+)\s+", SExSTDOUT[pos+11:pos+21])
+            if IsSExCount:
+                self.nSExtracted = int(IsSExCount.group(1))
+                self.logger.info("SExtractor found {0} sources.".format(self.nSExtracted))
+            else:
+                self.nSExtracted = None
+            ## Extract Background Level from SExtractor Output
+            pos = SExSTDOUT.find("Background: ")
+            IsSExBkgnd = re.match("\s*([0-9\.]+)\s*", SExSTDOUT[pos+11:pos+21])
+            if IsSExBkgnd:
+                self.SExBackground = float(IsSExBkgnd.group(1))
+                self.logger.info("SExtractor background is {0:.1f}".format(self.SExBackground))
+            else:
+                self.SExBackground = None
+            ## Extract Background RMS from SExtractor Output
+            IsSExBRMS = re.match("\s*RMS:\s([0-9\.]+)\s*", SExSTDOUT[pos+21:pos+37])
+            if IsSExBRMS:
+                self.SExBRMS = float(IsSExBRMS.group(1))
+                self.logger.info("SExtractor background RMS is {0:.1f}".format(self.SExBRMS))
+            else:
+                self.SExBRMS = None
+
+            ## If No Output Catalog Created ...
+            if not os.path.exists(self.SExtractorCatalog):
+                self.logger.warning("SExtractor failed to create catalog.")
+                self.SExtractorCatalog = None
+
+            ## Read FITS_LDAC SExtractor Catalog
+            self.logger.debug("Reading SExtractor output catalog.")
+            hdu = fits.open(self.SExtractorCatalog)
+            self.SExtractorResults = table.Table(hdu[2].data)
+            SExImageRadius = []
+            SExAngleInImage = []
+            for star in self.SExtractorResults:
+                SExImageRadius.append(math.sqrt((self.nXPix/2-star['XWIN_IMAGE'])**2 + (self.nYPix/2-star['YWIN_IMAGE'])**2))
+                SExAngleInImage.append(math.atan((star['XWIN_IMAGE']-self.nXPix/2)/(self.nYPix/2-star['YWIN_IMAGE']))*180.0/math.pi)
+            self.SExtractorResults.add_column(table.Column(data=SExImageRadius, name='ImageRadius'))
+            self.SExtractorResults.add_column(table.Column(data=SExAngleInImage, name='AngleInImage'))
+            self.nStarsSEx = len(self.SExtractorResults)
+            self.logger.info("Read in {0} stars from SExtractor catalog.".format(self.nStarsSEx))
 
 
     ##-------------------------------------------------------------------------
@@ -1054,22 +1042,24 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Run SCAMP
     ##-------------------------------------------------------------------------
-    def RunSCAMP(self, catalog='USNO-B1', distortion_order=3, mergedcat_name='scamp.cat', mergedcat_type='NONE'):
+    def RunSCAMP(self, catalog='USNO-B1', distortion_order=3, mergedcat_name='scamp.cat', mergedcat_type='ASCII_HEAD', aheader='scamp.ahead'):
         '''
         Run SCAMP on SExtractor output catalog.
         '''
         ## Parameters for SCAMP
         SCAMP_params = {
                         'DISTORT_DEGREES': distortion_order,
+                        'AHEADER_GLOBAL': aheader,
                         'ASTREF_CATALOG': catalog,
                         'SAVE_REFCATALOG': 'Y',
                         'REFOUT_CATPATH': self.config.pathTemp,
                         'MERGEDOUTCAT_NAME': mergedcat_name,
                         'MERGEDOUTCAT_TYPE': mergedcat_type,
-#                         'CHECKPLOT_RES': '1200,1200',
-#                         'CHECKPLOT_TYPE': 'FGROUPS,DISTORTION,ASTR_REFERROR2D,ASTR_REFERROR1D,PHOT_ZPCORR',
-#                         'CHECKPLOT_NAME': 'fgroups,distortion,astr_referror2d,astr_referror1d,phot_zpcorr',
+                        'CHECKPLOT_RES': '1200,1200',
+                        'CHECKPLOT_TYPE': 'FGROUPS,DISTORTION,ASTR_REFERROR2D,ASTR_REFERROR1D,PHOT_ZPCORR,ASTR_REFSYSMAP',
+                        'CHECKPLOT_NAME': 'fgroups,distortion,astr_referror2d,astr_referror1d,phot_zpcorr,astr_refsysmap',
                         'WRITE_XML': 'N',
+                        'CROSSID_RADIUS': 6.0,
                         'SOLVE_PHOTOM': 'Y',
                         'ASTRINSTRU_KEY': 'QRUNID',
                         }
@@ -1077,8 +1067,9 @@ class Image(object):
         for key in SCAMP_params.keys():
             SCAMPCommand.append('-{}'.format(key))
             SCAMPCommand.append('{}'.format(SCAMP_params[key]))
-        SCAMPCommand = ' '.join(SCAMPCommand)
         self.logger.info("Invoking SCAMP using {} catalog with distortion polynomial of order {}.".format(catalog, distortion_order))
+        if aheader:
+            self.logger.info("  Using aheader file: {}".format(aheader))
         self.logger.debug("SCAMP command: {}".format(SCAMPCommand))
         try:
             SCAMP_STDOUT = subprocess.check_output(SCAMPCommand, stderr=subprocess.STDOUT, universal_newlines=True)
@@ -1087,7 +1078,9 @@ class Image(object):
             self.logger.error("SCAMP failed.  Returncode: {}".format(e.returncode))
             self.logger.error("SCAMP failed.  Output: {}".format(e.output))
         except:
-            self.logger.error("SCAMP process failed: {0} {1} {2}".format(sys.exc_info()[0], sys.exc_info()[1], sys.exc_info()[2]))
+            self.logger.error("SCAMP process failed: {0}".format(sys.exc_info()[0]))
+            self.logger.error("SCAMP process failed: {0}".format(sys.exc_info()[1]))
+            self.logger.error("SCAMP process failed: {0}".format(sys.exc_info()[2]))
         else:
             StartAstrometricStats = False
             EndAstrometricStats = False
@@ -1105,60 +1098,107 @@ class Image(object):
             self.SCAMP_catalog = mergedcat_name
 
         ## Populate FITS header with SCAMP derived header values in .head file
-        self.logger.info('Writing SCAMP .head file back in to fits header on {}'.format(self.workingFile))
-        missfits_cmd = 'missfits -SAVE_TYPE REPLACE -WRITE_XML N {}'.format(self.workingFile)
-        self.logger.debug('    Running: {}'.format(missfits_cmd))
-        output = subprocess.check_output(missfits_cmd, shell=True, stderr=subprocess.STDOUT, universal_newlines=True)
-        output = str(output)
-        for line in output.splitlines():
-            self.logger.debug(line)
+        head_file = os.path.splitext(self.workingFile)[0]+'.head'
+        if os.path.exists(head_file):
+            self.logger.info('Writing SCAMP .head file back in to fits header on {}'.format(self.workingFile))
+            missfits_cmd = 'missfits -SAVE_TYPE REPLACE -WRITE_XML N {}'.format(self.workingFile)
+            self.logger.debug('    Running: {}'.format(missfits_cmd))
+            output = subprocess.check_output(missfits_cmd, shell=True, stderr=subprocess.STDOUT, universal_newlines=True)
+            output = str(output)
+            for line in output.splitlines():
+                self.logger.debug(line)
+        else:
+            self.logger.critical('No .head file found from SCAMP.')
+            sys.exit(1)
 
 
     ##-------------------------------------------------------------------------
-    ## Overplot Stellar Catalog on Image
+    ## Run SWarp
     ##-------------------------------------------------------------------------
-    def OverplotStellarCatalog():
-        '''
-        Overplot the caluclated positions (via using the image WCS) on the image so one can visually
-        check the accuracy of the WCS.
-        
-        Supports two methods of overplotting.  First on an image jpeg and second, by outputting a
-        ds9 regions file (.reg).  May also consider a ginga implementation as well.
-        '''
-        pass
+    '''
+    Run SWarp on the image (after SCAMP distortion solution) to de-distort it.
+    '''
+    def RunSWarp(self):
+        ## Parameters for SWarp
+        swarp_file = os.path.join(self.config.pathTemp, 'swarpped.fits')
+        if os.path.exists(swarp_file): os.remove(swarp_file)
+        SWarp_params = {'IMAGEOUT_NAME': swarp_file}
+        SWarpCommand = ["swarp", self.workingFile]
+        for key in SWarp_params.keys():
+            SWarpCommand.append('-{}'.format(key))
+            SWarpCommand.append('{}'.format(SWarp_params[key]))
+        self.logger.info("Invoking SWarp.")
+        self.logger.debug("SWarp command: {}".format(SWarpCommand))
+        try:
+            SWarp_STDOUT = subprocess.check_output(SWarpCommand, stderr=subprocess.STDOUT, universal_newlines=True)
+        except subprocess.CalledProcessError as e:
+            self.logger.error("SWarp failed.  Command: {}".format(e.cmd))
+            self.logger.error("SWarp failed.  Returncode: {}".format(e.returncode))
+            self.logger.error("SWarp failed.  Output: {}".format(e.output))
+        except:
+            self.logger.error("SWarp process failed: {0}".format(sys.exc_info()[0]))
+            self.logger.error("SWarp process failed: {0}".format(sys.exc_info()[1]))
+            self.logger.error("SWarp process failed: {0}".format(sys.exc_info()[2]))
+        else:
+            for line in SWarp_STDOUT.splitlines():
+                self.logger.debug("  SWarp Output: "+line)
+        ## Replace workingFile with SWarp output file
+        if os.path.exists(swarp_file):
+            self.logger.debug('  SWarp process succeeded.')
+            self.logger.debug('  Moving SWapped file to working file.')
+            if os.path.exists(self.workingFile): os.remove(self.workingFile)
+            os.rename(swarp_file, self.workingFile)
+            assert os.path.exists(self.workingFile)
 
 
     ##-------------------------------------------------------------------------
-    ## Determine Zero Point from SExtractor Catalog after SCAMP-refined astrometric solution
+    ## Get UCAC4 Catalog for Image from Local File
     ##-------------------------------------------------------------------------
-    def DetermineZeroPoint(self, filter='i', use_local_UCAC=False, local_UCAC_command="/Volumes/Data/UCAC4/access/u4test", local_UCAC_data="/Volumes/Data/UCAC4/u4b"):
+    def GetLocalUCAC4(self, filter='i', local_UCAC_command="/Volumes/Data/UCAC4/access/u4test", local_UCAC_data="/Volumes/Data/UCAC4/u4b"):
         '''
         Determine zero point by comparing measured magnitudes with catalog
         magnitudes.
         '''
-        print(type(self.coordinate_WCS))
-        assert type(self.coordinate_WCS) == coords.builtin_systems.ICRS
+        assert type(self.center_coordinate) == coords.builtin_systems.ICRS
 
-        if use_local_UCAC:
-            if os.path.exists(local_UCAC_command) and os.path.exists(local_UCAC_data):
-                self.logger.info("## Getting list of stars from UCAC4 catalog.")
-                UCACcommand = [local_UCAC_command,
-                               "{:.4f}".format(target.ra*180./math.pi),
-                               "{:.4f}".format(target.dec*180./math.pi),
-                               "1.2", "1.2", local_UCAC_data, "-h"]
-                if os.path.exists("ucac4.txt"): os.remove("ucac4.txt")
-                result = subprocess.call(UCACcommand)
-            else:
-                if not os.path.exists(local_UCAC_command):
-                    logger.warning('Cannot find local UCAC command: {}'.format(local_UCAC_command))
-                if not os.path.exists(local_UCAC_data):
-                    logger.warning('Cannot find local UCAC data: {}'.format(local_UCAC_data))
+        if not os.path.exists(local_UCAC_command):
+            logger.warning('Cannot find local UCAC command: {}'.format(local_UCAC_command))
+        elif not os.path.exists(local_UCAC_data):
+            logger.warning('Cannot find local UCAC data: {}'.format(local_UCAC_data))
+        else:
+            corners = self.imageWCS.wcs_pix2world([[0, 0], [self.nXPix, 0], [0, self.nYPix], [self.nXPix, self.nYPix]], 1)
+            field_size_RA = max(corners[:,0]) - min(corners[:,0])
+            field_size_DEC = max(corners[:,1]) - min(corners[:,1])
+            self.logger.info("Getting stars from local UCAC4 catalog.")
+            UCACcommand = [local_UCAC_command,
+                           "{:.4f}".format(self.center_coordinate.ra.degree),
+                           "{:.4f}".format(self.center_coordinate.dec.degree),
+                           "{:.2f}".format(field_size_RA),
+                           "{:.2f}".format(field_size_DEC),
+                           local_UCAC_data]
+            self.logger.debug("  Using command: {}".format(UCACcommand))
+            if os.path.exists("ucac4.txt"): os.remove("ucac4.txt")
+            result = subprocess.call(UCACcommand)
+            if os.path.exists('ucac4.txt'):
+                ucac_file_path = os.path.join(self.config.pathTemp, 'ucac4.txt')
+                shutil.move('ucac4.txt', ucac_file_path)
+                self.tempFiles.append(ucac_file_path)
+
+        ## Read in UCAC catalog
+        self.UCACtable = ascii.read(ucac_file_path, Reader=ascii.FixedWidthNoHeader,
+                                    data_start=1, guess=False,
+                                    names=('id', 'RA', 'Dec', 'mag1', 'mag2', 'smag', 'ot', 'dsf', 'RAepoch', 'Decepoch', 'dRA', 'dde', 'nt', 'nu', 'nc', 'pmRA', 'pmDec', 'sRA', 'sDec', '2mass', 'j', 'h', 'k', 'e2mphos', 'icq_flag', 'B', 'V', 'g', 'r', 'i'),
+                                    col_starts=(0, 10, 24, 36, 43, 50, 54, 57, 60, 68, 76, 80, 84, 87, 90, 93, 100, 107, 111, 115, 126, 133, 140, 147, 159, 168, 175, 182, 189, 196),
+                                    col_ends=(  9, 22, 35, 42, 49, 53, 56, 59, 67, 75, 79, 83, 86, 89, 92, 99, 106, 110, 114, 125, 132, 139, 146, 158, 167, 174, 181, 188, 195, 202),
+                                   )
+        nUCACStars = len(self.UCACtable)
+        self.logger.info("  Retrieved {} lines from UCAC catalog.".format(nUCACStars))
 
 
     ##-------------------------------------------------------------------------
     ## Make JPEG of Image
     ##-------------------------------------------------------------------------
-    def MakeJPEG(self, jpegFileName, markStars=False, markPointing=False, rotate=False, binning=1, backgroundSubtracted=False):
+    def MakeJPEG(self, jpegFileName, markDetectedStars=False, markPointing=False, binning=1, backgroundSubtracted=False):
         '''
         Make jpegs of image.
         '''
@@ -1169,10 +1209,9 @@ class Image(object):
         if os.path.exists(jpegFile): os.remove(jpegFile)
         binningString = str(1./binning*100)+"%"
         JPEGcommand = ["convert", "-contrast-stretch", "0.9%,1%", "-compress", "JPEG", "-quality", "70", "-resize", binningString]
+        ## Mark Target Coordinates as read from header
         if markPointing and self.imageWCS and self.coordinate_header:
             self.logger.debug("Marking target pointing in jpeg.")
-            ## Make markSize 180 arcseconds (3 arcmin)
-#             markSize = (180*u.arcsec/self.tel.pixelScale).value/binning
             markSize = (self.tel.pointingMarkerSize.to(u.arcsec)/self.tel.pixelScale).value/binning
             ## Mark Central Pixel with a White Cross
             JPEGcommand.append("-stroke")
@@ -1183,9 +1222,6 @@ class Image(object):
             JPEGcommand.append("none")
             pixelCenter = [self.nXPix/2/binning, self.nYPix/2/binning]
             self.logger.debug("Marking central pixel of JPEG: {:.1f},{:.1f}".format(pixelCenter[0], pixelCenter[1]))
-#             JPEGcommand.append('-draw')
-#             JPEGcommand.append("circle %d,%d %d,%d" % (pixelCenter[0], pixelCenter[1],
-#                                pixelCenter[0]+markSize, pixelCenter[1]))
             JPEGcommand.append('-draw')
             JPEGcommand.append("line %d,%d %d,%d" % (pixelCenter[0], pixelCenter[1]+markSize,
                                pixelCenter[0], pixelCenter[1]+markSize*0.3))
@@ -1198,7 +1234,7 @@ class Image(object):
             JPEGcommand.append('-draw')
             JPEGcommand.append("line %d,%d %d,%d" % (pixelCenter[0]-markSize, pixelCenter[1],
                                pixelCenter[0]-markSize*0.3, pixelCenter[1]))
-            ## Mark WCS of Target with a blue Circle
+            ## Mark Coordinates of Target with a blue Circle
             JPEGcommand.append("-stroke")
             JPEGcommand.append("blue")
             JPEGcommand.append("-strokewidth")
@@ -1228,7 +1264,8 @@ class Image(object):
             JPEGcommand.append('-draw')
             JPEGcommand.append("circle %d,%d %d,%d" % (TargetXPos, TargetYPos,
                                TargetXPos+markSize/2, TargetYPos))
-        if markStars and self.SExtractorResults:
+        ## Mark Stars Detected by SExtractor
+        if markDetectedStars and self.SExtractorResults:
             self.logger.debug("Marking stars found by SExtractor in jpeg.")
             JPEGcommand.append("-stroke")
             JPEGcommand.append("red")
@@ -1251,15 +1288,7 @@ class Image(object):
                 else:
                     self.logger.warning("Only marked brightest {} stars found in image.".format(nStarsLimit))
                     break
-        if rotate and self.positionAngle:
-            self.logger.debug("Rotating jpeg by {0:.1f} deg".format(self.positionAngle.to(u.deg).value))
-            if self.positionAngle:
-                JPEGcommand.append("-rotate")
-                JPEGcommand.append(str(self.positionAngle.to(u.deg).value))
-                if self.imageFlipped:
-                    JPEGcommand.append("-flop")
-            else:
-                self.logger.warning("No position angle value found.  Not rotating JPEG.")
+        ## Write label describing marking of pointing
         if markPointing and self.imageWCS and self.coordinate_header:
             JPEGcommand.append("-stroke")
             JPEGcommand.append("none")
@@ -1271,6 +1300,7 @@ class Image(object):
             JPEGcommand.append('fixed')
             JPEGcommand.append('-draw')
             JPEGcommand.append("text 200,40 'Blue circle centered on target is {:.1f} arcmin diameter.'".format(self.tel.pointingMarkerSize.to(u.arcmin).value))
+        ## Use background subtracted image generated by SExtractor
         if not backgroundSubtracted:
             JPEGcommand.append(self.workingFile)
         else:
@@ -1285,7 +1315,7 @@ class Image(object):
             JPEGcommand.append('-draw')
             JPEGcommand.append("text 200,120 'Background Subtracted Image'")
             JPEGcommand.append(self.CheckImageFile)
-        if markStars and nStarsMarked > nStarsLimit:
+        if markDetectedStars and nStarsMarked > nStarsLimit:
             JPEGcommand.append("-stroke")
             JPEGcommand.append("none")
             JPEGcommand.append("-fill")
@@ -1298,7 +1328,168 @@ class Image(object):
             JPEGcommand.append("text 200,80 'Marked {} brightest stars out of {}.'".format(nStarsLimit, self.nSExtracted))
         JPEGcommand.append(jpegFile)
         self.logger.debug("Issuing convert command to create jpeg.")
-#         self.logger.debug("Command: {}".format(repr(JPEGcommand)))
+        try:
+            ConvertSTDOUT = subprocess.check_output(JPEGcommand, stderr=subprocess.STDOUT, universal_newlines=True)
+        except subprocess.CalledProcessError as e:
+            self.logger.error("Failed to create jpeg.")
+            for line in e.output.split("\n"):
+                self.logger.error(line)
+        except OSError as e:
+            self.logger.error("Failed to create jpeg.")
+            for line in e.strerror.split("\n"):
+                self.logger.error(line)
+        except:
+            self.logger.error("Convert process failed: {0} {1} {2}".format(sys.exc_info()[0], sys.exc_info()[1], sys.exc_info()[2]))
+        else:
+            for line in ConvertSTDOUT.split("\n"):
+                if len(line) > 0:
+                    self.logger.debug(line)
+            self.jpegFileNames.append(jpegFileName)
+
+
+    ##-------------------------------------------------------------------------
+    ## Make JPEG of Image
+    ##-------------------------------------------------------------------------
+    def old_MakeJPEG(self, jpegFileName, markDetectedStars=False, markPointing=False, rotate=False, binning=1, backgroundSubtracted=False):
+        '''
+        Make jpegs of image.
+        '''
+        nStarsMarked = 0
+        nStarsLimit = 5000
+        jpegFile = os.path.join(self.config.pathPlots, jpegFileName)
+        self.logger.info("Making jpeg (binning = {0}): {1}.".format(binning, jpegFileName))
+        if os.path.exists(jpegFile): os.remove(jpegFile)
+        binningString = str(1./binning*100)+"%"
+        JPEGcommand = ["convert", "-contrast-stretch", "0.9%,1%", "-compress", "JPEG", "-quality", "70", "-resize", binningString]
+        ## Mark Target Coordinates as read from header
+        if markPointing and self.imageWCS and self.coordinate_header:
+            self.logger.debug("Marking target pointing in jpeg.")
+            markSize = (self.tel.pointingMarkerSize.to(u.arcsec)/self.tel.pixelScale).value/binning
+            ## Mark Central Pixel with a White Cross
+            JPEGcommand.append("-stroke")
+            JPEGcommand.append("white")
+            JPEGcommand.append("-strokewidth")
+            JPEGcommand.append("3")
+            JPEGcommand.append("-fill")
+            JPEGcommand.append("none")
+            pixelCenter = [self.nXPix/2/binning, self.nYPix/2/binning]
+            self.logger.debug("Marking central pixel of JPEG: {:.1f},{:.1f}".format(pixelCenter[0], pixelCenter[1]))
+            JPEGcommand.append('-draw')
+            JPEGcommand.append("line %d,%d %d,%d" % (pixelCenter[0], pixelCenter[1]+markSize,
+                               pixelCenter[0], pixelCenter[1]+markSize*0.3))
+            JPEGcommand.append('-draw')
+            JPEGcommand.append("line %d,%d %d,%d" % (pixelCenter[0]+markSize, pixelCenter[1],
+                               pixelCenter[0]+markSize*0.3, pixelCenter[1]))
+            JPEGcommand.append('-draw')
+            JPEGcommand.append("line %d,%d %d,%d" % (pixelCenter[0], pixelCenter[1]-markSize,
+                               pixelCenter[0], pixelCenter[1]-markSize*0.3))
+            JPEGcommand.append('-draw')
+            JPEGcommand.append("line %d,%d %d,%d" % (pixelCenter[0]-markSize, pixelCenter[1],
+                               pixelCenter[0]-markSize*0.3, pixelCenter[1]))
+            ## Mark Coordinates of Target with a blue Circle
+            JPEGcommand.append("-stroke")
+            JPEGcommand.append("blue")
+            JPEGcommand.append("-strokewidth")
+            JPEGcommand.append("3")
+            JPEGcommand.append("-fill")
+            JPEGcommand.append("none")
+            ## This next block of code seems to make the call to wcs_world2pix
+            ## happy, but I'm not sure I understand why.
+            foo = np.array([[self.coordinate_header.ra.hour*15., self.coordinate_header.dec.radian*180./math.pi], 
+                            [self.coordinate_header.ra.hour*15., self.coordinate_header.dec.radian*180./math.pi]])
+            targetPixel = (self.imageWCS.wcs_world2pix(foo, 1)[0])
+            self.logger.debug("Pixel of target on raw image: {:.1f},{:.1f}".format(targetPixel[0], targetPixel[1]))
+            ## Adjust target pixel value for different origin in ImageMagick
+            TargetXPos = targetPixel[0]
+            if not self.cropped:
+                TargetYPos = self.nYPix - targetPixel[1]
+            else:
+                TargetYPos = self.original_nYPix - targetPixel[1]
+            ## Adjust target pixel value for cropping
+            if self.cropped:
+                TargetXPos = TargetXPos - self.crop_x1
+                TargetYPos = TargetYPos - self.crop_y1
+            ## Adjust target pixel value for binning
+            TargetXPos = TargetXPos/binning
+            TargetYPos = TargetYPos/binning
+            self.logger.debug("Marking pixel of target on JPEG: {:.1f},{:.1f}".format(TargetXPos, TargetYPos))
+            JPEGcommand.append('-draw')
+            JPEGcommand.append("circle %d,%d %d,%d" % (TargetXPos, TargetYPos,
+                               TargetXPos+markSize/2, TargetYPos))
+        ## Mark Stars Detected by SExtractor
+        if markDetectedStars and self.SExtractorResults:
+            self.logger.debug("Marking stars found by SExtractor in jpeg.")
+            JPEGcommand.append("-stroke")
+            JPEGcommand.append("red")
+            JPEGcommand.append("-strokewidth")
+            JPEGcommand.append("1")
+            JPEGcommand.append("-fill")
+            JPEGcommand.append("none")
+            if self.FWHM:
+                MarkRadius=max([4, 2*math.ceil(self.FWHM.value)])
+            else:
+                MarkRadius = 4
+            sortedSExtractorResults = np.sort(self.SExtractorResults, order=['MAG_AUTO'])
+            for star in sortedSExtractorResults:
+                nStarsMarked += 1
+                if nStarsMarked <= nStarsLimit:
+                    MarkXPos = star['XWIN_IMAGE']
+                    MarkYPos = self.nYPix - star['YWIN_IMAGE']
+                    JPEGcommand.append('-draw')
+                    JPEGcommand.append("circle %d,%d %d,%d" % (MarkXPos, MarkYPos, MarkXPos+MarkRadius, MarkYPos))
+                else:
+                    self.logger.warning("Only marked brightest {} stars found in image.".format(nStarsLimit))
+                    break
+        ## Rotate jpeg according to WCS (for images which have not had SWarp applied)
+        if rotate and self.positionAngle:
+            self.logger.debug("Rotating jpeg by {0:.1f} deg".format(self.positionAngle.to(u.deg).value))
+            if self.positionAngle:
+                JPEGcommand.append("-rotate")
+                JPEGcommand.append(str(self.positionAngle.to(u.deg).value))
+                if self.imageFlipped:
+                    JPEGcommand.append("-flop")
+            else:
+                self.logger.warning("No position angle value found.  Not rotating JPEG.")
+        ## Write label describing marking of pointing
+        if markPointing and self.imageWCS and self.coordinate_header:
+            JPEGcommand.append("-stroke")
+            JPEGcommand.append("none")
+            JPEGcommand.append("-fill")
+            JPEGcommand.append("white")
+            JPEGcommand.append("-pointsize")
+            JPEGcommand.append("28")
+            JPEGcommand.append('-font')
+            JPEGcommand.append('fixed')
+            JPEGcommand.append('-draw')
+            JPEGcommand.append("text 200,40 'Blue circle centered on target is {:.1f} arcmin diameter.'".format(self.tel.pointingMarkerSize.to(u.arcmin).value))
+        ## Use background subtracted image generated by SExtractor
+        if not backgroundSubtracted:
+            JPEGcommand.append(self.workingFile)
+        else:
+            JPEGcommand.append("-stroke")
+            JPEGcommand.append("none")
+            JPEGcommand.append("-fill")
+            JPEGcommand.append("white")
+            JPEGcommand.append("-pointsize")
+            JPEGcommand.append("28")
+            JPEGcommand.append('-font')
+            JPEGcommand.append('fixed')
+            JPEGcommand.append('-draw')
+            JPEGcommand.append("text 200,120 'Background Subtracted Image'")
+            JPEGcommand.append(self.CheckImageFile)
+        if markDetectedStars and nStarsMarked > nStarsLimit:
+            JPEGcommand.append("-stroke")
+            JPEGcommand.append("none")
+            JPEGcommand.append("-fill")
+            JPEGcommand.append("white")
+            JPEGcommand.append("-pointsize")
+            JPEGcommand.append("28")
+            JPEGcommand.append('-font')
+            JPEGcommand.append('fixed')
+            JPEGcommand.append('-draw')
+            JPEGcommand.append("text 200,80 'Marked {} brightest stars out of {}.'".format(nStarsLimit, self.nSExtracted))
+        JPEGcommand.append(jpegFile)
+        self.logger.debug("Issuing convert command to create jpeg.")
         try:
             ConvertSTDOUT = subprocess.check_output(JPEGcommand, stderr=subprocess.STDOUT, universal_newlines=True)
         except subprocess.CalledProcessError as e:
