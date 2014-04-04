@@ -511,7 +511,7 @@ class Image(object):
             self.positionAngle = None
             self.imageFlipped = None
         else:
-            self.logger.debug("  Found {} PCn_m values in WCS.".format(len(PCexists))
+            self.logger.debug("  Found {} PCn_m values in WCS.".format(len(PCexists)))
             if (abs(PC21) > abs(PC22)) and (PC21 >= 0): 
                 North = "Right"
                 self.positionAngle = 270.*u.deg + math.degrees(math.atan(PC22/PC21))*u.deg
@@ -912,6 +912,7 @@ class Image(object):
         Determine typical FWHM of image from SExtractor results.
         '''
         if self.nStarsSEx > 1:
+            self.logger.info('Analyzing SExtractor results to determine typical image quality.')
             IQRadiusFactor = 1.0
             DiagonalRadius = math.sqrt((self.nXPix/2)**2+(self.nYPix/2)**2)
             IQRadius = DiagonalRadius*IQRadiusFactor
@@ -925,12 +926,12 @@ class Image(object):
                 self.major_axis = np.median(CentralAs) * u.pix
                 self.minor_axis = np.median(CentralBs) * u.pix
             else:
-                self.logger.warning("Not enough stars detected in central region of image to form median FWHM.")
+                self.logger.warning("  Not enough stars detected in central region of image to form median FWHM.")
             self.logger.debug("  Using {0} stars in central region to determine FWHM and ellipticity.".format(len(CentralFWHMs)))
-            self.logger.info("Median FWHM in inner region is {0:.2f} pixels".format(self.FWHM.to(u.pix).value))
-            self.logger.info("Median Minor Axis in inner region is {0:.2f}".format(2.355*self.minor_axis.to(u.pix).value))
-            self.logger.info("Median Major Axis in inner region is {0:.2f}".format(2.355*self.major_axis.to(u.pix).value))
-            self.logger.info("Median Ellipticity in inner region is {0:.2f}".format(self.ellipticity))
+            self.logger.info("  Median FWHM in inner region is {0:.2f} pixels".format(self.FWHM.to(u.pix).value))
+            self.logger.info("  Median Minor Axis in inner region is {0:.2f}".format(2.355*self.minor_axis.to(u.pix).value))
+            self.logger.info("  Median Major Axis in inner region is {0:.2f}".format(2.355*self.major_axis.to(u.pix).value))
+            self.logger.info("  Median Ellipticity in inner region is {0:.2f}".format(self.ellipticity))
         else:
             self.FWHM = None
             self.ellipticity = None
@@ -1147,7 +1148,7 @@ class Image(object):
         for key in SWarp_params.keys():
             SWarpCommand.append('-{}'.format(key))
             SWarpCommand.append('{}'.format(SWarp_params[key]))
-        self.logger.info("Invoking SWarp.")
+        self.logger.info("Running SWarp.")
         self.logger.debug("  SWarp command: {}".format(SWarpCommand))
         try:
             SWarp_STDOUT = subprocess.check_output(SWarpCommand, stderr=subprocess.STDOUT, universal_newlines=True)
