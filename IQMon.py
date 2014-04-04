@@ -815,6 +815,7 @@ class Image(object):
         for param in params:
             defaultparamsFO.write(param+'\n')
         defaultparamsFO.close()
+        self.tempFiles.append(sextractor_output_param_file)
 
         self.CheckImageFile = os.path.join(self.config.pathPlots, self.rawFileBasename+"_bksub.fits")
         self.tempFiles.append(self.CheckImageFile)
@@ -1064,7 +1065,7 @@ class Image(object):
                         'DISTORT_DEGREES': distortion_order,
                         'AHEADER_GLOBAL': aheader,
                         'ASTREF_CATALOG': catalog,
-                        'SAVE_REFCATALOG': 'Y',
+                        'SAVE_REFCATALOG': 'N',
                         'REFOUT_CATPATH': self.config.pathTemp,
                         'MERGEDOUTCAT_NAME': mergedcat_name,
                         'MERGEDOUTCAT_TYPE': mergedcat_type,
@@ -1087,6 +1088,7 @@ class Image(object):
         self.logger.debug("SCAMP command: {}".format(SCAMPCommand))
         try:
             SCAMP_STDOUT = subprocess.check_output(SCAMPCommand, stderr=subprocess.STDOUT, universal_newlines=True)
+            self.tempFiles.append(os.path.join(self.config.pathTemp, 'scamp.xml'))
         except subprocess.CalledProcessError as e:
             self.logger.error("SCAMP failed.  Command: {}".format(e.cmd))
             self.logger.error("SCAMP failed.  Returncode: {}".format(e.returncode))
@@ -1114,6 +1116,7 @@ class Image(object):
         ## Populate FITS header with SCAMP derived header values in .head file
         head_file = os.path.splitext(self.workingFile)[0]+'.head'
         if os.path.exists(head_file):
+            self.tempFiles.append(head_file)
             self.logger.info('Writing SCAMP .head file back in to fits header on {}'.format(self.workingFile))
             missfits_cmd = 'missfits -SAVE_TYPE REPLACE -WRITE_XML N {}'.format(self.workingFile)
             self.logger.debug('    Running: {}'.format(missfits_cmd))
@@ -1162,6 +1165,7 @@ class Image(object):
                 self.logger.debug("  SWarp Output: "+line)
         ## Replace workingFile with SWarp output file
         if os.path.exists(swarp_file):
+            self.tempFiles.append(os.path.join(self.config.pathTemp, 'swarp.xml'))
             self.logger.debug('  SWarp process succeeded.')
             self.logger.debug('  Moving SWapped file to working file.')
             if os.path.exists(self.workingFile): os.remove(self.workingFile)
@@ -1214,19 +1218,28 @@ class Image(object):
 
 
     ##-------------------------------------------------------------------------
+    ## Measure Zero Point
+    ##-------------------------------------------------------------------------
+    def MeasureZeroPoint(self):
+        '''
+        '''
+        assert self.catalog
+        assert os.path.exists(self.config.pathTemp, 'scamp.xml')
+
+
+    ##-------------------------------------------------------------------------
     ## Make JPEG of Image
     ##-------------------------------------------------------------------------
     def MakeJPEG(self, jpegFileName, binning=1, markCatalogStars=False, markDetectedStars=False, markPointing=False, backgroundSubtracted=False):
         '''
         Make jpegs of image.
         '''
-        nStarsMarked = 0
         nStarsLimit = 5000
         jpegFile = os.path.join(self.config.pathPlots, jpegFileName)
         self.logger.info("Making jpeg (binning = {0}): {1}.".format(binning, jpegFileName))
         if os.path.exists(jpegFile): os.remove(jpegFile)
         binningString = str(1./binning*100)+"%"
-        JPEGcommand = ["convert", "-contrast-stretch", "0.9%,1%", "-compress", "JPEG", "-quality", "70", "-resize", binningString]
+        JPEGcommand = ["convert", "-contrast-stretch", "0.2%,1%", "-compress", "JPEG", "-quality", "70", "-resize", binningString]
         ## Mark Intended Pointing Coordinates as read from header
         if markPointing and self.imageWCS and self.coordinate_header:
             self.logger.debug("Marking target pointing in jpeg.")
@@ -1297,6 +1310,7 @@ class Image(object):
 
         ## Mark Stars Detected by SExtractor
         if markDetectedStars and self.SExtractorResults:
+            nStarsMarked = 0
             self.logger.debug("Marking stars found by SExtractor in jpeg.")
             JPEGcommand.append("-stroke")
             JPEGcommand.append("red")
@@ -1335,6 +1349,7 @@ class Image(object):
         ## Mark Catalog Stars
         if markCatalogStars and self.imageWCS:
             ## Need to check if header includes distortion terms
+            nStarsMarked = 0
             self.logger.debug("Marking stars from catalog in jpeg.")
             JPEGcommand.append("-stroke")
             JPEGcommand.append("green")
@@ -1368,7 +1383,7 @@ class Image(object):
             JPEGcommand.append('fixed')
             JPEGcommand.append('-draw')
             if nStarsMarked > nStarsLimit:
-                JPEGcommand.append("text 200,120 'Green circles indicate catalog stars.  Marked {} brightest stars out of {} downloaded.'".format(nStarsLimit, self.nSExtracted))
+                JPEGcommand.append("text 200,120 'Green circles indicate catalog stars.  Marked {} brightest stars out of {} downloaded.'".format(nStarsLimit, len(self.catalog)))
             else:
                 JPEGcommand.append("text 200,120 'Green circles indicate catalog stars.  Marked {} detected stars.'".format(self.nSExtracted))
         ## Use background subtracted image generated by SExtractor
