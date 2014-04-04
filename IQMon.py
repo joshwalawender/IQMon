@@ -480,22 +480,38 @@ class Image(object):
             self.logger.debug("Found WCS in image header.")
 
         ## Determine PA of Image
-        try:
+        if 'PC1_1' in self.imageWCS.to_header().keys():
             PC11 = float(self.imageWCS.to_header()['PC1_1'])
+        elif 'CD1_1' in self.imageWCS.to_header().keys():
+            PC11 = float(self.imageWCS.to_header()['CD1_1'])
+        else:
+            PC11 = 0.
+        if 'PC1_2' in self.imageWCS.to_header().keys():
             PC12 = float(self.imageWCS.to_header()['PC1_2'])
+        elif 'CD1_2' in self.imageWCS.to_header().keys():
+            PC12 = float(self.imageWCS.to_header()['CD1_2'])
+        else:
+            PC12 = 0.
+        if 'PC2_1' in self.imageWCS.to_header().keys():
             PC21 = float(self.imageWCS.to_header()['PC2_1'])
+        elif 'CD2_1' in self.imageWCS.to_header().keys():
+            PC21 = float(self.imageWCS.to_header()['CD2_1'])
+        else:
+            PC21 = 0.
+        if 'PC2_2' in self.imageWCS.to_header().keys():
             PC22 = float(self.imageWCS.to_header()['PC2_2'])
-        except:
+        elif 'CD2_2' in self.imageWCS.to_header().keys():
+            PC22 = float(self.imageWCS.to_header()['CD2_2'])
+        else:
+            PC22 = 0.
+
+        PCexists = [1 for val in [PC11, PC12, PC21, PC22] if val != 0.0]
+        if len(PCexists) < 2:
             self.logger.debug("Could not find PCn_m values in WCS.")
-            try:
-                PC11 = float(self.imageWCS.to_header()['CD1_1'])
-                PC12 = float(self.imageWCS.to_header()['CD1_2'])
-                PC21 = float(self.imageWCS.to_header()['CD2_1'])
-                PC22 = float(self.imageWCS.to_header()['CD2_2'])
-            except:
-                self.logger.debug("Could not find CDn_m values in WCS.")
-                self.imageWCS = None
-        if self.imageWCS:
+            self.positionAngle = None
+            self.imageFlipped = None
+        else:
+            self.logger.debug("Found PCn_m values in WCS.")
             if (abs(PC21) > abs(PC22)) and (PC21 >= 0): 
                 North = "Right"
                 self.positionAngle = 270.*u.deg + math.degrees(math.atan(PC22/PC21))*u.deg
@@ -524,9 +540,6 @@ class Image(object):
             self.logger.debug("Image orientation is North {0}, East {1}.".format(North, East))
             if self.imageFlipped:
                 self.logger.debug("Image is mirrored.")
-        else:
-            self.positionAngle = None
-            self.imageFlipped = None
 
 
         ## Determine Alt, Az, Moon Sep, Moon Illum using ephem module
@@ -1058,10 +1071,11 @@ class Image(object):
                         'CHECKPLOT_RES': '1200,1200',
                         'CHECKPLOT_TYPE': 'FGROUPS,DISTORTION,ASTR_REFERROR2D,ASTR_REFERROR1D,PHOT_ZPCORR,ASTR_REFSYSMAP',
                         'CHECKPLOT_NAME': 'fgroups,distortion,astr_referror2d,astr_referror1d,phot_zpcorr,astr_refsysmap',
-                        'WRITE_XML': 'N',
                         'CROSSID_RADIUS': 6.0,
                         'SOLVE_PHOTOM': 'Y',
                         'ASTRINSTRU_KEY': 'QRUNID',
+                        'WRITE_XML': 'Y',
+                        'XML_NAME': os.path.join(self.config.pathTemp, 'scamp.xml'),
                         }
         SCAMPCommand = ["scamp", self.SExtractorCatalog]
         for key in SCAMP_params.keys():
@@ -1122,7 +1136,11 @@ class Image(object):
         ## Parameters for SWarp
         swarp_file = os.path.join(self.config.pathTemp, 'swarpped.fits')
         if os.path.exists(swarp_file): os.remove(swarp_file)
-        SWarp_params = {'IMAGEOUT_NAME': swarp_file}
+        SWarp_params = {'IMAGEOUT_NAME': swarp_file,
+                        'COPY_KEYWORDS': 'FILTER,FOCUSPOS,OBJECT,AIRMASS,DATE-OBS,LAT-OBS,LONG-OBS,ALT-OBS,RA,DEC',
+                        'WRITE_XML': 'Y',
+                        'XML_NAME': os.path.join(self.config.pathTemp, 'swarp.xml'),
+                       }
         SWarpCommand = ["swarp", self.workingFile]
         for key in SWarp_params.keys():
             SWarpCommand.append('-{}'.format(key))
@@ -1185,20 +1203,20 @@ class Image(object):
                 self.tempFiles.append(ucac_file_path)
 
         ## Read in UCAC catalog
-        self.UCACtable = ascii.read(ucac_file_path, Reader=ascii.FixedWidthNoHeader,
-                                    data_start=1, guess=False,
-                                    names=('id', 'RA', 'Dec', 'mag1', 'mag2', 'smag', 'ot', 'dsf', 'RAepoch', 'Decepoch', 'dRA', 'dde', 'nt', 'nu', 'nc', 'pmRA', 'pmDec', 'sRA', 'sDec', '2mass', 'j', 'h', 'k', 'e2mphos', 'icq_flag', 'B', 'V', 'g', 'r', 'i'),
-                                    col_starts=(0, 10, 24, 36, 43, 50, 54, 57, 60, 68, 76, 80, 84, 87, 90, 93, 100, 107, 111, 115, 126, 133, 140, 147, 159, 168, 175, 182, 189, 196),
-                                    col_ends=(  9, 22, 35, 42, 49, 53, 56, 59, 67, 75, 79, 83, 86, 89, 92, 99, 106, 110, 114, 125, 132, 139, 146, 158, 167, 174, 181, 188, 195, 202),
-                                   )
-        nUCACStars = len(self.UCACtable)
+        self.catalog = ascii.read(ucac_file_path, Reader=ascii.FixedWidthNoHeader,
+                                  data_start=1, guess=False,
+                                  names=('id', 'RA', 'Dec', 'mag1', 'mag2', 'smag', 'ot', 'dsf', 'RAepoch', 'Decepoch', 'dRA', 'dde', 'nt', 'nu', 'nc', 'pmRA', 'pmDec', 'sRA', 'sDec', '2mass', 'j', 'h', 'k', 'e2mphos', 'icq_flag', 'B', 'V', 'g', 'r', 'i'),
+                                  col_starts=(0, 10, 24, 36, 43, 50, 54, 57, 60, 68, 76, 80, 84, 87, 90, 93, 100, 107, 111, 115, 126, 133, 140, 147, 159, 168, 175, 182, 189, 196),
+                                  col_ends=(  9, 22, 35, 42, 49, 53, 56, 59, 67, 75, 79, 83, 86, 89, 92, 99, 106, 110, 114, 125, 132, 139, 146, 158, 167, 174, 181, 188, 195, 202),
+                                 )
+        nUCACStars = len(self.catalog)
         self.logger.info("  Retrieved {} lines from UCAC catalog.".format(nUCACStars))
 
 
     ##-------------------------------------------------------------------------
     ## Make JPEG of Image
     ##-------------------------------------------------------------------------
-    def MakeJPEG(self, jpegFileName, markDetectedStars=False, markPointing=False, binning=1, backgroundSubtracted=False):
+    def MakeJPEG(self, jpegFileName, binning=1, markCatalogStars=False, markDetectedStars=False, markPointing=False, backgroundSubtracted=False):
         '''
         Make jpegs of image.
         '''
@@ -1209,7 +1227,7 @@ class Image(object):
         if os.path.exists(jpegFile): os.remove(jpegFile)
         binningString = str(1./binning*100)+"%"
         JPEGcommand = ["convert", "-contrast-stretch", "0.9%,1%", "-compress", "JPEG", "-quality", "70", "-resize", binningString]
-        ## Mark Target Coordinates as read from header
+        ## Mark Intended Pointing Coordinates as read from header
         if markPointing and self.imageWCS and self.coordinate_header:
             self.logger.debug("Marking target pointing in jpeg.")
             markSize = (self.tel.pointingMarkerSize.to(u.arcsec)/self.tel.pixelScale).value/binning
@@ -1264,6 +1282,19 @@ class Image(object):
             JPEGcommand.append('-draw')
             JPEGcommand.append("circle %d,%d %d,%d" % (TargetXPos, TargetYPos,
                                TargetXPos+markSize/2, TargetYPos))
+            ## Write label describing marking of pointing
+            JPEGcommand.append("-stroke")
+            JPEGcommand.append("none")
+            JPEGcommand.append("-fill")
+            JPEGcommand.append("white")
+            JPEGcommand.append("-pointsize")
+            JPEGcommand.append("28")
+            JPEGcommand.append('-font')
+            JPEGcommand.append('fixed')
+            JPEGcommand.append('-draw')
+            JPEGcommand.append("text 200,40 'Blue circle centered on target is {:.1f} arcmin diameter.'".format(self.tel.pointingMarkerSize.to(u.arcmin).value))
+
+
         ## Mark Stars Detected by SExtractor
         if markDetectedStars and self.SExtractorResults:
             self.logger.debug("Marking stars found by SExtractor in jpeg.")
@@ -1288,8 +1319,6 @@ class Image(object):
                 else:
                     self.logger.warning("Only marked brightest {} stars found in image.".format(nStarsLimit))
                     break
-        ## Write label describing marking of pointing
-        if markPointing and self.imageWCS and self.coordinate_header:
             JPEGcommand.append("-stroke")
             JPEGcommand.append("none")
             JPEGcommand.append("-fill")
@@ -1299,7 +1328,49 @@ class Image(object):
             JPEGcommand.append('-font')
             JPEGcommand.append('fixed')
             JPEGcommand.append('-draw')
-            JPEGcommand.append("text 200,40 'Blue circle centered on target is {:.1f} arcmin diameter.'".format(self.tel.pointingMarkerSize.to(u.arcmin).value))
+            if nStarsMarked > nStarsLimit:
+                JPEGcommand.append("text 200,80 'Red circles indicate SExtractor detected stars.  Marked {} brightest stars out of {} detected.'".format(nStarsLimit, self.nSExtracted))
+            else:
+                JPEGcommand.append("text 200,80 'Red circles indicate SExtractor detected stars.  Marked {} detected stars.'".format(self.nSExtracted))
+        ## Mark Catalog Stars
+        if markCatalogStars and self.imageWCS:
+            ## Need to check if header includes distortion terms
+            self.logger.debug("Marking stars from catalog in jpeg.")
+            JPEGcommand.append("-stroke")
+            JPEGcommand.append("green")
+            JPEGcommand.append("-strokewidth")
+            JPEGcommand.append("1")
+            JPEGcommand.append("-fill")
+            JPEGcommand.append("none")
+            if self.FWHM:
+                MarkRadius=max([4, 2*math.ceil(self.FWHM.value)])
+            else:
+                MarkRadius = 4
+            sorted_catalog = np.sort(self.catalog, order=['mag1'])
+            for star in sorted_catalog:
+                nStarsMarked += 1
+                if nStarsMarked <= nStarsLimit:
+                    pix = self.imageWCS.wcs_world2pix([[star['RA'], star['Dec']]], 1)
+                    MarkXPos = pix[0][0]
+                    MarkYPos = self.nYPix - pix[0][1]
+                    JPEGcommand.append('-draw')
+                    JPEGcommand.append("circle %d,%d %d,%d" % (MarkXPos, MarkYPos, MarkXPos+MarkRadius, MarkYPos))
+                else:
+                    self.logger.warning("Only marked brightest {} stars found in image.".format(nStarsLimit))
+                    break
+            JPEGcommand.append("-stroke")
+            JPEGcommand.append("none")
+            JPEGcommand.append("-fill")
+            JPEGcommand.append("white")
+            JPEGcommand.append("-pointsize")
+            JPEGcommand.append("28")
+            JPEGcommand.append('-font')
+            JPEGcommand.append('fixed')
+            JPEGcommand.append('-draw')
+            if nStarsMarked > nStarsLimit:
+                JPEGcommand.append("text 200,120 'Green circles indicate catalog stars.  Marked {} brightest stars out of {} downloaded.'".format(nStarsLimit, self.nSExtracted))
+            else:
+                JPEGcommand.append("text 200,120 'Green circles indicate catalog stars.  Marked {} detected stars.'".format(self.nSExtracted))
         ## Use background subtracted image generated by SExtractor
         if not backgroundSubtracted:
             JPEGcommand.append(self.workingFile)
@@ -1315,19 +1386,8 @@ class Image(object):
             JPEGcommand.append('-draw')
             JPEGcommand.append("text 200,120 'Background Subtracted Image'")
             JPEGcommand.append(self.CheckImageFile)
-        if markDetectedStars and nStarsMarked > nStarsLimit:
-            JPEGcommand.append("-stroke")
-            JPEGcommand.append("none")
-            JPEGcommand.append("-fill")
-            JPEGcommand.append("white")
-            JPEGcommand.append("-pointsize")
-            JPEGcommand.append("28")
-            JPEGcommand.append('-font')
-            JPEGcommand.append('fixed')
-            JPEGcommand.append('-draw')
-            JPEGcommand.append("text 200,80 'Marked {} brightest stars out of {}.'".format(nStarsLimit, self.nSExtracted))
         JPEGcommand.append(jpegFile)
-        self.logger.debug("Issuing convert command to create jpeg.")
+        self.logger.debug("Issuing convert command to create jpeg from {}.".format(self.workingFile))
         try:
             ConvertSTDOUT = subprocess.check_output(JPEGcommand, stderr=subprocess.STDOUT, universal_newlines=True)
         except subprocess.CalledProcessError as e:
