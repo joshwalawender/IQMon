@@ -334,6 +334,7 @@ class Image(object):
         self.original_nXPix = None
         self.original_nYPix = None
         self.SCAMP_catalog = None
+        self.catalog_file_path = None
 
     ##-------------------------------------------------------------------------
     ## Make Logger Object
@@ -786,10 +787,11 @@ class Image(object):
         else:
             self.logger.warning("Pointing error not calculated.")
 
+
     ##-------------------------------------------------------------------------
     ## Run SExtractor
     ##-------------------------------------------------------------------------
-    def RunSExtractor(self):
+    def RunSExtractor(self, assoc=False, filter='r'):
         '''
         Run SExtractor on image.
         '''
@@ -811,6 +813,7 @@ class Image(object):
                   'FLUX_AUTO', 'FLUXERR_AUTO', 'MAG_AUTO', 'MAGERR_AUTO',
                   'FLAGS', 'FLAGS_WEIGHT', 'FLUX_RADIUS'
                  ]
+        if assoc: params.append('VECTOR_ASSOC(3)')
         for param in params:
             defaultparamsFO.write(param+'\n')
         defaultparamsFO.close()
@@ -838,6 +841,33 @@ class Image(object):
             for key in SExtractor_default.keys():
                 if not key in self.tel.SExtractorParams.keys():
                     SExtractor_params[key] = SExtractor_default[key]
+
+        if assoc:
+            assert os.path.exists(self.catalog_file_path)
+            assert os.path.exists(os.path.join(self.config.pathTemp, 'scamp.xml'))
+            assert filter in self.catalog.keys()
+
+            ## Create Assoc file with pixel coordinates of catalog stars
+            assoc_file = os.path.join(self.config.pathTemp, 'assoc.txt')
+            self.tempFiles.append(assoc_file)
+            if os.path.exists(assoc_file): os.remove(assoc_file)
+            assocFO = open(assoc_file, 'w')
+            for star in self.catalog:
+                pix = self.imageWCS.wcs_world2pix([[star['RA'], star['Dec']]], 1)
+                try:
+                    assocFO.write('{:8.1f} {:8.1f} {:8.1f}\n'.format(pix[0][0], pix[0][1], star[filter]))
+                except:
+                    pass
+            assocFO.close()
+
+            ## Add ASSOC parameters
+            original_params = self.tel.SExtractorParams
+            self.tel.SExtractorParams['ASSOC_NAME'] = assoc_file
+            self.tel.SExtractorParams['ASSOC_DATA'] = '0'
+            self.tel.SExtractorParams['ASSOC_PARAMS'] = '1,2,3'
+            self.tel.SExtractorParams['ASSOC_RADIUS'] = '2.0'
+            self.tel.SExtractorParams['ASSOC_TYPE'] = 'NEAREST'
+            self.tel.SExtractorParams['ASSOCSELEC_TYPE'] = 'MATCHED'
 
         ## Run SExtractor
         SExtractorCommand = ["sex", self.workingFile]
@@ -895,13 +925,19 @@ class Image(object):
             self.SExtractorResults = table.Table(hdu[2].data)
             SExImageRadius = []
             SExAngleInImage = []
+            zp_diff = []
             for star in self.SExtractorResults:
                 SExImageRadius.append(math.sqrt((self.nXPix/2-star['XWIN_IMAGE'])**2 + (self.nYPix/2-star['YWIN_IMAGE'])**2))
                 SExAngleInImage.append(math.atan((star['XWIN_IMAGE']-self.nXPix/2)/(self.nYPix/2-star['YWIN_IMAGE']))*180.0/math.pi)
+                if assoc:
+                    zp_diff.append(star['VECTOR_ASSOC'][2] - star['MAG_AUTO'])
             self.SExtractorResults.add_column(table.Column(data=SExImageRadius, name='ImageRadius'))
             self.SExtractorResults.add_column(table.Column(data=SExAngleInImage, name='AngleInImage'))
             self.nStarsSEx = len(self.SExtractorResults)
             self.logger.info("  Read in {0} stars from SExtractor catalog.".format(self.nStarsSEx))
+        if assoc:
+            self.SExtractorResults.add_column(table.Column(data=zp_diff, name='MagDiff'))
+            self.tel.SExtractorParams = original_params
 
 
     ##-------------------------------------------------------------------------
@@ -1202,12 +1238,12 @@ class Image(object):
             if os.path.exists("ucac4.txt"): os.remove("ucac4.txt")
             result = subprocess.call(UCACcommand)
             if os.path.exists('ucac4.txt'):
-                ucac_file_path = os.path.join(self.config.pathTemp, 'ucac4.txt')
-                shutil.move('ucac4.txt', ucac_file_path)
-                self.tempFiles.append(ucac_file_path)
+                self.catalog_file_path = os.path.join(self.config.pathTemp, 'ucac4.txt')
+                shutil.move('ucac4.txt', self.catalog_file_path)
+                self.tempFiles.append(self.catalog_file_path)
 
         ## Read in UCAC catalog
-        self.catalog = ascii.read(ucac_file_path, Reader=ascii.FixedWidthNoHeader,
+        self.catalog = ascii.read(self.catalog_file_path, Reader=ascii.FixedWidthNoHeader,
                                   data_start=1, guess=False,
                                   names=('id', 'RA', 'Dec', 'mag1', 'mag2', 'smag', 'ot', 'dsf', 'RAepoch', 'Decepoch', 'dRA', 'dde', 'nt', 'nu', 'nc', 'pmRA', 'pmDec', 'sRA', 'sDec', '2mass', 'j', 'h', 'k', 'e2mphos', 'icq_flag', 'B', 'V', 'g', 'r', 'i'),
                                   col_starts=(0, 10, 24, 36, 43, 50, 54, 57, 60, 68, 76, 80, 84, 87, 90, 93, 100, 107, 111, 115, 126, 133, 140, 147, 159, 168, 175, 182, 189, 196),
@@ -1223,8 +1259,14 @@ class Image(object):
     def MeasureZeroPoint(self):
         '''
         '''
-        assert self.catalog
-        assert os.path.exists(self.config.pathTemp, 'scamp.xml')
+        assert 'VECTOR_ASSOC' in self.SExtractorResults.keys()
+        assert 'MagDiff' in self.SExtractorResults.keys()
+        ZeroPoint_mean = np.mean(self.SExtractorResults['MagDiff'])
+        ZeroPoint_median = np.median(self.SExtractorResults['MagDiff'])
+        self.logger.debug('Mean Zero Point = {:.2f}'.format(ZeroPoint_mean))
+        self.logger.info('Median Zero Point = {:.2f}'.format(ZeroPoint_median))
+        self.zeroPoint = ZeroPoint_median
+
 
 
     ##-------------------------------------------------------------------------
