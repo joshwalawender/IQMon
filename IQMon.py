@@ -1331,7 +1331,7 @@ class Image(object):
                     JPEGcommand.append('-draw')
                     JPEGcommand.append("circle %d,%d %d,%d" % (MarkXPos, MarkYPos, MarkXPos+MarkRadius, MarkYPos))
                 else:
-                    self.logger.warning("Only marked brightest {} stars found in image.".format(nStarsLimit))
+                    self.logger.info("  Only marked brightest {} stars found in image.".format(nStarsLimit))
                     break
             JPEGcommand.append("-stroke")
             JPEGcommand.append("none")
@@ -1371,7 +1371,7 @@ class Image(object):
                     JPEGcommand.append('-draw')
                     JPEGcommand.append("circle %d,%d %d,%d" % (MarkXPos, MarkYPos, MarkXPos+MarkRadius, MarkYPos))
                 else:
-                    self.logger.warning("Only marked brightest {} stars found in image.".format(nStarsLimit))
+                    self.logger.info("  Only marked brightest {} stars found in image.".format(nStarsLimit))
                     break
             JPEGcommand.append("-stroke")
             JPEGcommand.append("none")
@@ -1513,7 +1513,7 @@ class Image(object):
                     JPEGcommand.append('-draw')
                     JPEGcommand.append("circle %d,%d %d,%d" % (MarkXPos, MarkYPos, MarkXPos+MarkRadius, MarkYPos))
                 else:
-                    self.logger.warning("Only marked brightest {} stars found in image.".format(nStarsLimit))
+                    self.logger.info("  Only marked brightest {} stars found in image.".format(nStarsLimit))
                     break
         ## Rotate jpeg according to WCS (for images which have not had SWarp applied)
         if rotate and self.positionAngle:
