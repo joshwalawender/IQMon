@@ -94,6 +94,9 @@ class Config(object):
             IsConfigPath = re.match("CONFIGPATH\s=\s([\w/\-\.]+)", line)
             if IsConfigPath:
                 self.pathConfig = os.path.abspath(IsConfigPath.group(1))
+            IsCatalogPath = re.match("CATALOGPATH\s=\s([\w/\-\.]+)", line)
+            if IsCatalogPath:
+                self.pathCatalog = os.path.abspath(IsCatalogPath.group(1))
 
         ## Create Log Path if it doesn't exist
         SplitPath = [self.pathLog]
@@ -511,6 +514,7 @@ class Image(object):
             self.logger.debug("  Could not find PCn_m values in WCS.")
             self.positionAngle = None
             self.imageFlipped = None
+            self.imageWCS = None
         else:
             self.logger.debug("  Found {} PCn_m values in WCS.".format(len(PCexists)))
             if (abs(PC21) > abs(PC22)) and (PC21 >= 0): 
@@ -1212,12 +1216,18 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Get UCAC4 Catalog for Image from Local File
     ##-------------------------------------------------------------------------
-    def GetLocalUCAC4(self, filter='i', local_UCAC_command="/Volumes/Data/UCAC4/access/u4test", local_UCAC_data="/Volumes/Data/UCAC4/u4b"):
+    def GetLocalUCAC4(self, filter='i', local_UCAC_command=None, local_UCAC_data=None):
         '''
         Determine zero point by comparing measured magnitudes with catalog
         magnitudes.
         '''
         assert type(self.center_coordinate) == coords.builtin_systems.ICRS
+        assert os.path.exists(self.pathCatalog)
+
+        if not local_UCAC_command:
+            local_UCAC_command = os.path.join(self.pathCatalog, 'u4test')
+        if not local_UCAC_data:
+            local_UCAC_data = os.path.join(self.pathCatalog, 'u4b')
 
         if not os.path.exists(local_UCAC_command):
             logger.warning('Cannot find local UCAC command: {}'.format(local_UCAC_command))
@@ -1283,7 +1293,7 @@ class Image(object):
         binningString = str(1./binning*100)+"%"
         JPEGcommand = ["convert", "-contrast-stretch", "0.2%,1%", "-compress", "JPEG", "-quality", "70", "-resize", binningString]
         ## Mark Intended Pointing Coordinates as read from header
-        if markPointing and self.imageWCS and self.coordinate_header:
+        if markPointing and self.imageWCS:
             self.logger.debug("  Marking target pointing in jpeg.")
             markSize = (self.tel.pointingMarkerSize.to(u.arcsec)/self.tel.pixelScale).value/binning
             ## Mark Central Pixel with a White Cross
