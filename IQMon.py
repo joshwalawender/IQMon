@@ -168,6 +168,7 @@ class Telescope(object):
     def __init__(self):
         self.name = None
         self.longName = None
+        self.aheader = None
         self.focalLength = None
         self.pixelSize = None
         self.aperture = None
@@ -1092,11 +1093,15 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Run SCAMP
     ##-------------------------------------------------------------------------
-    def RunSCAMP(self, catalog='USNO-B1', distortion_order=3, mergedcat_name='scamp.cat', mergedcat_type='ASCII_HEAD', aheader='scamp.ahead'):
+    def RunSCAMP(self, catalog='USNO-B1', distortion_order=3, mergedcat_name='scamp.cat', mergedcat_type='ASCII_HEAD'):
         '''
         Run SCAMP on SExtractor output catalog.
         '''
         ## Parameters for SCAMP
+        if self.tel.aheader:
+            aheader = self.tel.aheader
+        else:
+            aheader = 'scamp.ahead'
         SCAMP_params = {
                         'DISTORT_DEGREES': distortion_order,
                         'AHEADER_GLOBAL': aheader,
