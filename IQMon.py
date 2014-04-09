@@ -183,6 +183,7 @@ class Telescope(object):
         self.pixelScale = None
         self.fRatio = None
         self.SExtractorParams = None
+        self.distortionOrder = 1
 #         self.SExtractorPhotAperture = None
 #         self.SExtractorSeeing = None
 #         self.SExtractorSaturation = None
@@ -1093,7 +1094,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Run SCAMP
     ##-------------------------------------------------------------------------
-    def RunSCAMP(self, catalog='USNO-B1', distortion_order=3, mergedcat_name='scamp.cat', mergedcat_type='ASCII_HEAD'):
+    def RunSCAMP(self, catalog='USNO-B1', mergedcat_name='scamp.cat', mergedcat_type='ASCII_HEAD'):
         '''
         Run SCAMP on SExtractor output catalog.
         '''
@@ -1103,7 +1104,7 @@ class Image(object):
         else:
             aheader = 'scamp.ahead'
         SCAMP_params = {
-                        'DISTORT_DEGREES': distortion_order,
+                        'DISTORT_DEGREES': self.tel.distortionOrder,
                         'AHEADER_GLOBAL': aheader,
                         'ASTREF_CATALOG': catalog,
                         'SAVE_REFCATALOG': 'N',
@@ -1123,7 +1124,7 @@ class Image(object):
         for key in SCAMP_params.keys():
             SCAMPCommand.append('-{}'.format(key))
             SCAMPCommand.append('{}'.format(SCAMP_params[key]))
-        self.logger.info("Running SCAMP using {} catalog with distortion polynomial of order {}.".format(catalog, distortion_order))
+        self.logger.info("Running SCAMP using {} catalog with distortion polynomial of order {}.".format(catalog, self.tel.distortionOrder))
         if aheader:
             self.logger.info("  Using aheader file: {}".format(aheader))
         self.logger.debug("  SCAMP command: {}".format(SCAMPCommand))
@@ -1225,9 +1226,9 @@ class Image(object):
         assert type(self.center_coordinate) == coords.builtin_systems.ICRS
 
         if not os.path.exists(local_UCAC_command):
-            logger.warning('Cannot find local UCAC command: {}'.format(local_UCAC_command))
+            self.logger.warning('Cannot find local UCAC command: {}'.format(local_UCAC_command))
         elif not os.path.exists(local_UCAC_data):
-            logger.warning('Cannot find local UCAC data: {}'.format(local_UCAC_data))
+            self.logger.warning('Cannot find local UCAC data: {}'.format(local_UCAC_data))
         else:
             corners = self.imageWCS.wcs_pix2world([[0, 0], [self.nXPix, 0], [0, self.nYPix], [self.nXPix, self.nYPix]], 1)
             field_size_RA = max(corners[:,0]) - min(corners[:,0])
@@ -1261,7 +1262,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Measure Zero Point
     ##-------------------------------------------------------------------------
-    def MeasureZeroPoint(self):
+    def MeasureZeroPoint(self, plot=False):
         '''
         '''
         assert 'VECTOR_ASSOC' in self.SExtractorResults.keys()
@@ -1271,7 +1272,19 @@ class Image(object):
         self.logger.debug('Mean Zero Point = {:.2f}'.format(ZeroPoint_mean))
         self.logger.info('Median Zero Point = {:.2f}'.format(ZeroPoint_median))
         self.zeroPoint = ZeroPoint_median
-
+        ## Make Plot if Requested
+        if plot:
+            self.logger.info('Making ZeroPoint Plot')
+            plotfile = os.path.join(self.config.pathPlots, self.rawFileBasename+'_ZP.png')
+            pyplot.figure(figsize=(12,11), dpi=100)
+            MainFig = pyplot.axes([0.0, 1.0, 1.0, 1.0])
+            pyplot.title('Instrumental Magnitudes vs. Calalog Magnitudes')
+            pyplot.plot(self.SExtractorResults['VECTOR_ASSOC'].data[:,2], self.SExtractorResults['MAG_AUTO'],\
+                        'bo', markersize=4, markeredgewidth=0)
+            pyplot.xlabel('UCAC4 Magnitude')
+            pyplot.ylabel('Instrumental Magnitude')
+            pyplot.grid()
+            pyplot.savefig(plotfile, dpi=100, bbox_inches='tight', pad_inches=0.10)
 
 
     ##-------------------------------------------------------------------------
@@ -1288,7 +1301,7 @@ class Image(object):
         binningString = str(1./binning*100)+"%"
         JPEGcommand = ["convert", "-contrast-stretch", "0.2%,1%", "-compress", "JPEG", "-quality", "70", "-resize", binningString]
         ## Mark Intended Pointing Coordinates as read from header
-        if markPointing and self.imageWCS and self.coordinate_header:
+        if markPointing and self.imageWCS:
             self.logger.debug("  Marking target pointing in jpeg.")
             markSize = (self.tel.pointingMarkerSize.to(u.arcsec)/self.tel.pixelScale).value/binning
             ## Mark Central Pixel with a White Cross
@@ -1413,8 +1426,8 @@ class Image(object):
                 nStarsMarked += 1
                 if nStarsMarked <= nStarsLimit:
                     pix = self.imageWCS.wcs_world2pix([[star['RA'], star['Dec']]], 1)
-                    MarkXPos = pix[0][0]
-                    MarkYPos = self.nYPix - pix[0][1]
+                    MarkXPos = pix[0][0]/binning
+                    MarkYPos = self.nYPix - pix[0][1]/binning
                     JPEGcommand.append('-draw')
                     JPEGcommand.append("circle %d,%d %d,%d" % (MarkXPos, MarkYPos, MarkXPos+MarkRadius, MarkYPos))
                 else:
