@@ -1921,15 +1921,15 @@ class Image(object):
         ## Write WCS position angle
         if "PosAng" in fields:
             if self.positionAngle:
-                HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format("black", self.positionAngle.to(u.deg).value))
+                HTML.write("      <td style='color:{}'>{:.1f}</td>\n".format("black", self.positionAngle.to(u.deg).value))
             else:
-                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+                HTML.write("      <td style='color:{}'>{}</td>\n".format("black", ""))
         ## Write zero point
         if "ZeroPoint" in fields:
             if self.zeroPoint:
-                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", self.zeroPoint))
+                HTML.write("      <td style='color:{}'>{:.2f}</td>\n".format("black", self.zeroPoint))
             else:
-                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+                HTML.write("      <td style='color:{}'>{}</td>\n".format("black", ""))
         ## Write number of stars detected by SExtractor
         if "nStars" in fields:
             if self.nStarsSEx:
