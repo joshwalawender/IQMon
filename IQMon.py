@@ -837,7 +837,7 @@ class Image(object):
         defaultparamsFO.close()
         self.tempFiles.append(sextractor_output_param_file)
 
-        self.CheckImageFile = os.path.join(self.config.pathPlots, self.rawFileBasename+"_bksub.fits")
+        self.CheckImageFile = os.path.join(self.config.pathTemp, self.rawFileBasename+"_bksub.fits")
         self.tempFiles.append(self.CheckImageFile)
         ## Compare input parameters dict to default
         SExtractor_default = {
