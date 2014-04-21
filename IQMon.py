@@ -171,6 +171,7 @@ class Telescope(object):
     def __init__(self):
         self.name = None
         self.longName = None
+        self.aheader = None
         self.focalLength = None
         self.pixelSize = None
         self.aperture = None
@@ -185,6 +186,7 @@ class Telescope(object):
         self.pixelScale = None
         self.fRatio = None
         self.SExtractorParams = None
+        self.distortionOrder = 1
 #         self.SExtractorPhotAperture = None
 #         self.SExtractorSeeing = None
 #         self.SExtractorSaturation = None
@@ -308,6 +310,7 @@ class Image(object):
         self.header = None
         self.exptime = None
         self.filter = None
+        self.catalog_filter = None
         self.focusPos = None
         self.objectName = None
         self.astrometrySolved = None
@@ -322,9 +325,11 @@ class Image(object):
         self.nStarsSEx = None
         self.positionAngle = None
         self.zeroPoint = None
+        self.zeroPoint_plotfile = None
         self.processTime = None
         self.FWHM = None
         self.ellipticity = None
+        self.PSF_plotfile = None
         self.pointingError = None
         self.imageFlipped = None
         self.jpegFileNames = []
@@ -795,13 +800,26 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Run SExtractor
     ##-------------------------------------------------------------------------
-    def RunSExtractor(self, assoc=False, filter='r'):
+    def RunSExtractor(self, assoc=False):
         '''
         Run SExtractor on image.
         '''
         assert type(self.tel.gain) == u.quantity.Quantity
         assert type(self.tel.pixelScale) == u.quantity.Quantity
         
+        if assoc:
+            if self.filter:
+                if self.filter in self.catalog.keys():
+                    self.catalog_filter = self.filter
+                else:
+                    self.logger.warning('  Filter from header ({}), not found in UCAC catalog table.'.format(self.filter))
+                    self.logger.info('  Using r filter for catalog magnitudes.')
+                    self.catalog_filter = 'r'
+            else:
+                self.logger.warning('  Filter from header ({}), not found in UCAC catalog table.'.format(self.filter))
+                self.logger.info('  Using r filter for catalog magnitudes.')
+                self.catalog_filter = 'r'
+
         ## Set up file names
         self.SExtractorCatalog = os.path.join(self.config.pathTemp, self.rawFileBasename+".cat")
         self.tempFiles.append(self.SExtractorCatalog)
@@ -823,7 +841,7 @@ class Image(object):
         defaultparamsFO.close()
         self.tempFiles.append(sextractor_output_param_file)
 
-        self.CheckImageFile = os.path.join(self.config.pathPlots, self.rawFileBasename+"_bksub.fits")
+        self.CheckImageFile = os.path.join(self.config.pathTemp, self.rawFileBasename+"_bksub.fits")
         self.tempFiles.append(self.CheckImageFile)
         ## Compare input parameters dict to default
         SExtractor_default = {
@@ -849,7 +867,7 @@ class Image(object):
         if assoc:
             assert os.path.exists(self.catalog_file_path)
             assert os.path.exists(os.path.join(self.config.pathTemp, 'scamp.xml'))
-            assert filter in self.catalog.keys()
+            assert self.catalog_filter in self.catalog.keys()
 
             ## Create Assoc file with pixel coordinates of catalog stars
             assoc_file = os.path.join(self.config.pathTemp, 'assoc.txt')
@@ -859,7 +877,7 @@ class Image(object):
             for star in self.catalog:
                 pix = self.imageWCS.wcs_world2pix([[star['RA'], star['Dec']]], 1)
                 try:
-                    assocFO.write('{:8.1f} {:8.1f} {:8.1f}\n'.format(pix[0][0], pix[0][1], star[filter]))
+                    assocFO.write('{:8.1f} {:8.1f} {:8.1f}\n'.format(pix[0][0], pix[0][1], star[self.catalog_filter]))
                 except:
                     pass
             assocFO.close()
@@ -980,13 +998,13 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Make Ellipticity Plot
     ##-------------------------------------------------------------------------
-    def MakePSFplot(self, plotfilename):
+    def MakePSFplot(self):
         '''
         Plot ellipticity vectors of stars in image.
         Plot histogram of theta - image_angle values.
         '''
         self.logger.info('Calculating histogram of PSF angles.')
-        plotfile = os.path.join(self.config.pathPlots, plotfilename)
+        self.PSF_plotfile = os.path.join(self.config.pathPlots, self.rawFileBasename+'_PSFinfo.png')
 
         ellip_threshold = 0.15
         star_angles = [star['THETAWIN_IMAGE'] for star in self.SExtractorResults if star['ELLIPTICITY'] >= ellip_threshold]
@@ -1030,8 +1048,8 @@ class Image(object):
 
 
 
-        if plotfilename:
-            self.logger.debug('  Generating figure {}'.format(plotfilename))
+        if self.PSF_plotfile:
+            self.logger.debug('  Generating figure {}'.format(self.PSF_plotfile))
 
             pyplot.figure(figsize=(12,11), dpi=100)
             Left1 = pyplot.axes([0.000, 0.750, 0.465, 0.240])
@@ -1090,19 +1108,23 @@ class Image(object):
             pyplot.ylim(-100,100)
             pyplot.yticks(30*(np.arange(7)-3), size=10)
 
-            pyplot.savefig(plotfile, dpi=100, bbox_inches='tight', pad_inches=0.10)
+            pyplot.savefig(self.PSF_plotfile, dpi=100, bbox_inches='tight', pad_inches=0.10)
 
 
     ##-------------------------------------------------------------------------
     ## Run SCAMP
     ##-------------------------------------------------------------------------
-    def RunSCAMP(self, catalog='USNO-B1', distortion_order=3, mergedcat_name='scamp.cat', mergedcat_type='ASCII_HEAD', aheader='scamp.ahead'):
+    def RunSCAMP(self, catalog='USNO-B1', mergedcat_name='scamp.cat', mergedcat_type='ASCII_HEAD'):
         '''
         Run SCAMP on SExtractor output catalog.
         '''
         ## Parameters for SCAMP
+        if self.tel.aheader:
+            aheader = self.tel.aheader
+        else:
+            aheader = 'scamp.ahead'
         SCAMP_params = {
-                        'DISTORT_DEGREES': distortion_order,
+                        'DISTORT_DEGREES': self.tel.distortionOrder,
                         'AHEADER_GLOBAL': aheader,
                         'ASTREF_CATALOG': catalog,
                         'SAVE_REFCATALOG': 'N',
@@ -1122,7 +1144,7 @@ class Image(object):
         for key in SCAMP_params.keys():
             SCAMPCommand.append('-{}'.format(key))
             SCAMPCommand.append('{}'.format(SCAMP_params[key]))
-        self.logger.info("Running SCAMP using {} catalog with distortion polynomial of order {}.".format(catalog, distortion_order))
+        self.logger.info("Running SCAMP using {} catalog with distortion polynomial of order {}.".format(catalog, self.tel.distortionOrder))
         if aheader:
             self.logger.info("  Using aheader file: {}".format(aheader))
         self.logger.debug("  SCAMP command: {}".format(SCAMPCommand))
@@ -1216,7 +1238,11 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Get UCAC4 Catalog for Image from Local File
     ##-------------------------------------------------------------------------
+<<<<<<< HEAD
     def GetLocalUCAC4(self, filter='i', local_UCAC_command=None, local_UCAC_data=None):
+=======
+    def GetLocalUCAC4(self, local_UCAC_command="/Volumes/Data/UCAC4/access/u4test", local_UCAC_data="/Volumes/Data/UCAC4/u4b"):
+>>>>>>> bb140a6e59464fb963e31070c2f114e6078cde19
         '''
         Determine zero point by comparing measured magnitudes with catalog
         magnitudes.
@@ -1230,9 +1256,9 @@ class Image(object):
             local_UCAC_data = os.path.join(self.pathCatalog, 'u4b')
 
         if not os.path.exists(local_UCAC_command):
-            logger.warning('Cannot find local UCAC command: {}'.format(local_UCAC_command))
+            self.logger.warning('Cannot find local UCAC command: {}'.format(local_UCAC_command))
         elif not os.path.exists(local_UCAC_data):
-            logger.warning('Cannot find local UCAC data: {}'.format(local_UCAC_data))
+            self.logger.warning('Cannot find local UCAC data: {}'.format(local_UCAC_data))
         else:
             corners = self.imageWCS.wcs_pix2world([[0, 0], [self.nXPix, 0], [0, self.nYPix], [self.nXPix, self.nYPix]], 1)
             field_size_RA = max(corners[:,0]) - min(corners[:,0])
@@ -1252,21 +1278,21 @@ class Image(object):
                 shutil.move('ucac4.txt', self.catalog_file_path)
                 self.tempFiles.append(self.catalog_file_path)
 
-        ## Read in UCAC catalog
-        self.catalog = ascii.read(self.catalog_file_path, Reader=ascii.FixedWidthNoHeader,
-                                  data_start=1, guess=False,
-                                  names=('id', 'RA', 'Dec', 'mag1', 'mag2', 'smag', 'ot', 'dsf', 'RAepoch', 'Decepoch', 'dRA', 'dde', 'nt', 'nu', 'nc', 'pmRA', 'pmDec', 'sRA', 'sDec', '2mass', 'j', 'h', 'k', 'e2mphos', 'icq_flag', 'B', 'V', 'g', 'r', 'i'),
-                                  col_starts=(0, 10, 24, 36, 43, 50, 54, 57, 60, 68, 76, 80, 84, 87, 90, 93, 100, 107, 111, 115, 126, 133, 140, 147, 159, 168, 175, 182, 189, 196),
-                                  col_ends=(  9, 22, 35, 42, 49, 53, 56, 59, 67, 75, 79, 83, 86, 89, 92, 99, 106, 110, 114, 125, 132, 139, 146, 158, 167, 174, 181, 188, 195, 202),
-                                 )
-        nUCACStars = len(self.catalog)
-        self.logger.info("  Retrieved {} lines from UCAC catalog.".format(nUCACStars))
+            ## Read in UCAC catalog
+            self.catalog = ascii.read(self.catalog_file_path, Reader=ascii.FixedWidthNoHeader,
+                                      data_start=1, guess=False,
+                                      names=('id', 'RA', 'Dec', 'mag1', 'mag2', 'smag', 'ot', 'dsf', 'RAepoch', 'Decepoch', 'dRA', 'dde', 'nt', 'nu', 'nc', 'pmRA', 'pmDec', 'sRA', 'sDec', '2mass', 'j', 'h', 'k', 'e2mphos', 'icq_flag', 'B', 'V', 'g', 'r', 'i'),
+                                      col_starts=(0, 10, 24, 36, 43, 50, 54, 57, 60, 68, 76, 80, 84, 87, 90, 93, 100, 107, 111, 115, 126, 133, 140, 147, 159, 168, 175, 182, 189, 196),
+                                      col_ends=(  9, 22, 35, 42, 49, 53, 56, 59, 67, 75, 79, 83, 86, 89, 92, 99, 106, 110, 114, 125, 132, 139, 146, 158, 167, 174, 181, 188, 195, 202),
+                                     )
+            nUCACStars = len(self.catalog)
+            self.logger.info("  Retrieved {} lines from UCAC catalog.".format(nUCACStars))
 
 
     ##-------------------------------------------------------------------------
     ## Measure Zero Point
     ##-------------------------------------------------------------------------
-    def MeasureZeroPoint(self):
+    def MeasureZeroPoint(self, plot=False):
         '''
         '''
         assert 'VECTOR_ASSOC' in self.SExtractorResults.keys()
@@ -1276,7 +1302,54 @@ class Image(object):
         self.logger.debug('Mean Zero Point = {:.2f}'.format(ZeroPoint_mean))
         self.logger.info('Median Zero Point = {:.2f}'.format(ZeroPoint_median))
         self.zeroPoint = ZeroPoint_median
+        ## Make Plot if Requested
+        if plot:
+            self.logger.info('Making ZeroPoint Plot')
+            self.zeroPoint_plotfile = os.path.join(self.config.pathPlots, self.rawFileBasename+'_ZeroPoint.png')
+            pyplot.figure(figsize=(9,11), dpi=100)
 
+            Fig1 = pyplot.axes([0.0, 0.5, 1.0, 0.4])
+            pyplot.title('Instrumental Magnitudes vs. Calalog Magnitudes (Zero Point = {:.2f})'.format(self.zeroPoint))
+            pyplot.plot(self.SExtractorResults['VECTOR_ASSOC'].data[:,2], self.SExtractorResults['MAG_AUTO'],\
+                        'bo', markersize=4, markeredgewidth=0)
+            pyplot.xlabel('UCAC4 {} Magnitude'.format(self.catalog_filter))
+            pyplot.ylabel('Instrumental Magnitude')
+            pyplot.grid()
+            reject_fraction = 0.01
+            ## Set Limits to XXth percentile of magnitudes in Y axis
+            sorted_inst_mag = sorted(self.SExtractorResults['MAG_AUTO'])
+            minmax_idx_inst_mag = [int(reject_fraction*len(sorted_inst_mag)), int((1.0-reject_fraction)*len(sorted_inst_mag))]
+            pyplot.ylim(math.floor(sorted_inst_mag[minmax_idx_inst_mag[0]]), math.ceil(sorted_inst_mag[minmax_idx_inst_mag[1]]))
+            ## Set Limits to XXth percentile of magnitudes in X axis
+            sorted_cat_mag = sorted(self.SExtractorResults['VECTOR_ASSOC'].data[:,2])
+            minmax_idx_cat_mag = [int(reject_fraction*len(sorted_cat_mag)), int((1.0-reject_fraction)*len(sorted_cat_mag))]
+            pyplot.xlim(math.floor(sorted_cat_mag[minmax_idx_cat_mag[0]]), math.ceil(sorted_cat_mag[minmax_idx_cat_mag[1]]))
+            ## Plot Fitted Line
+            fit_mags_cat = [math.floor(sorted_cat_mag[minmax_idx_cat_mag[0]]), math.ceil(sorted_cat_mag[minmax_idx_cat_mag[1]])]
+            fit_mags_inst = fit_mags_cat - self.zeroPoint
+            pyplot.plot(fit_mags_cat, fit_mags_inst, 'k-', alpha=0.5, label='Zero Point = {:.2f}'.format(self.zeroPoint))
+
+            Fig2 = pyplot.axes([0.0, 0.0, 1.0, 0.4])
+            pyplot.title('Magnitude Residuals (Zero Point = {:.2f})'.format(self.zeroPoint))
+            residuals = (self.SExtractorResults['MAG_AUTO'].data + self.zeroPoint) - self.SExtractorResults['VECTOR_ASSOC'].data[:,2]
+            pyplot.plot(self.SExtractorResults['VECTOR_ASSOC'].data[:,2], residuals, \
+                        'bo', markersize=4, markeredgewidth=0)
+            pyplot.xlabel('UCAC4 {} Magnitude'.format(self.catalog_filter))
+            pyplot.ylabel('Magnitude Residual')
+            pyplot.grid()
+            ## Set Limits to XXth percentile of magnitudes in X axis
+            reject_fraction = 0.01
+            sorted_cat_mag = sorted(self.SExtractorResults['VECTOR_ASSOC'].data[:,2])
+            minmax_idx_cat_mag = [int(reject_fraction*len(sorted_cat_mag)), int((1.0-reject_fraction)*len(sorted_cat_mag))]
+            pyplot.xlim(math.floor(sorted_cat_mag[minmax_idx_cat_mag[0]]), math.ceil(sorted_cat_mag[minmax_idx_cat_mag[1]]))
+            ## Set Limits to XXth percentile of magnitudes in Y axis
+            sorted_residuals = sorted(residuals)
+            minmax_idx_residuals = [int(reject_fraction*len(sorted_residuals)), int((1.0-reject_fraction)*len(sorted_residuals))]
+            pyplot.ylim(sorted_residuals[minmax_idx_residuals[0]]-0.1, sorted_residuals[minmax_idx_residuals[1]]+0.1)
+            ## Plot Zero Line
+            pyplot.plot(fit_mags_cat, [0, 0], 'k-', alpha=0.5, label='Zero Point = {:.2f}'.format(self.zeroPoint))
+
+            pyplot.savefig(self.zeroPoint_plotfile, dpi=100, bbox_inches='tight', pad_inches=0.10)
 
 
     ##-------------------------------------------------------------------------
@@ -1371,15 +1444,15 @@ class Image(object):
             JPEGcommand.append("-fill")
             JPEGcommand.append("none")
             if self.FWHM:
-                MarkRadius=max([4, 2*math.ceil(self.FWHM.value)])
+                MarkRadius=max([4, 2*math.ceil(self.FWHM.value)])/binning
             else:
                 MarkRadius = 4
             sortedSExtractorResults = np.sort(self.SExtractorResults, order=['MAG_AUTO'])
             for star in sortedSExtractorResults:
                 nStarsMarked += 1
                 if nStarsMarked <= nStarsLimit:
-                    MarkXPos = star['XWIN_IMAGE']
-                    MarkYPos = self.nYPix - star['YWIN_IMAGE']
+                    MarkXPos = star['XWIN_IMAGE']/binning
+                    MarkYPos = (self.nYPix - star['YWIN_IMAGE'])/binning
                     JPEGcommand.append('-draw')
                     JPEGcommand.append("circle %d,%d %d,%d" % (MarkXPos, MarkYPos, MarkXPos+MarkRadius, MarkYPos))
                 else:
@@ -1410,7 +1483,7 @@ class Image(object):
             JPEGcommand.append("-fill")
             JPEGcommand.append("none")
             if self.FWHM:
-                MarkRadius=max([4, 2*math.ceil(self.FWHM.value)])
+                MarkRadius=max([4, 2*math.ceil(self.FWHM.value)])/binning
             else:
                 MarkRadius = 4
             sorted_catalog = np.sort(self.catalog, order=['mag1'])
@@ -1418,8 +1491,8 @@ class Image(object):
                 nStarsMarked += 1
                 if nStarsMarked <= nStarsLimit:
                     pix = self.imageWCS.wcs_world2pix([[star['RA'], star['Dec']]], 1)
-                    MarkXPos = pix[0][0]
-                    MarkYPos = self.nYPix - pix[0][1]
+                    MarkXPos = pix[0][0]/binning
+                    MarkYPos = (self.nYPix - pix[0][1])/binning
                     JPEGcommand.append('-draw')
                     JPEGcommand.append("circle %d,%d %d,%d" % (MarkXPos, MarkYPos, MarkXPos+MarkRadius, MarkYPos))
                 else:
@@ -1435,9 +1508,9 @@ class Image(object):
             JPEGcommand.append('fixed')
             JPEGcommand.append('-draw')
             if nStarsMarked > nStarsLimit:
-                JPEGcommand.append("text 200,120 'Green circles indicate catalog stars.  Marked {} brightest stars out of {} downloaded.'".format(nStarsLimit, len(self.catalog)))
+                JPEGcommand.append("text 200,120 'Green circles indicate catalog stars.  Marked {} brightest stars out of {} in catalog.'".format(nStarsLimit, len(self.catalog)))
             else:
-                JPEGcommand.append("text 200,120 'Green circles indicate catalog stars.  Marked {} detected stars.'".format(self.nSExtracted))
+                JPEGcommand.append("text 200,120 'Green circles indicate catalog stars.  Marked {} catalog stars.'".format(self.nSExtracted))
         ## Use background subtracted image generated by SExtractor
         if not backgroundSubtracted:
             JPEGcommand.append(self.workingFile)
@@ -1749,13 +1822,31 @@ class Image(object):
         ## Write Filename (and links to jpegs)
         if "Filename" in fields:
             if len(self.jpegFileNames) == 0:
-                HTML.write("      <td style='color:black;text-align:left'>{0}</td>\n".format(self.rawFileBasename))
+                JPEG1_html = ""
+                JPEG2_html = ""
+                JPEG3_html = ""
             elif len(self.jpegFileNames) == 1:
-                HTML.write("      <td style='color:black;text-align:left'><a href='{0}'>{1}</a></td>\n".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]), self.rawFileBasename))
+                JPEG1_html = "<a href='{}'>".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]))
+                JPEG2_html = ""
+                JPEG3_html = ""
             elif len(self.jpegFileNames) == 2:
-                HTML.write("      <td style='color:black;text-align:left'><a href='{0}'>{1}</a> (<a href='{2}'>JPEG2</a>)</td>\n".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]), self.rawFileBasename, os.path.join("..", "..", "Plots", self.jpegFileNames[1])))                
+                JPEG1_html = "<a href='{}'>".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]))
+                JPEG2_html = " (<a href='{}'>JPEG2</a>)".format(os.path.join("..", "..", "Plots", self.jpegFileNames[1]))
+                JPEG3_html = ""
             elif len(self.jpegFileNames) >= 3:
-                HTML.write("      <td style='color:black;text-align:left'><a href='{0}'>{1}</a> (<a href='{2}'>JPEG2</a>)(<a href='{3}'>JPEG3</a>)</td>\n".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]), self.rawFileBasename, os.path.join("..", "..", "Plots", self.jpegFileNames[1]), os.path.join("..", "..", "Plots", self.jpegFileNames[2])))
+                JPEG1_html = "<a href='{}'>".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]))
+                JPEG2_html = " (<a href='{}'>JPEG2</a>)".format(os.path.join("..", "..", "Plots", self.jpegFileNames[1]))
+                JPEG3_html = " (<a href='{}'>JPEG3</a>)".format(os.path.join("..", "..", "Plots", self.jpegFileNames[2]))
+            if self.PSF_plotfile:
+                PSFplot_html = " (<a href='{}'>PSF</a>)".format(os.path.join("..", "..", "Plots", self.PSF_plotfile))
+            else:
+                PSFplot_html = ""
+            if self.zeroPoint_plotfile:
+                ZPplot_html = " (<a href='{}'>ZP</a>)".format(os.path.join("..", "..", "Plots", self.zeroPoint_plotfile))
+            else:
+                ZPplot_html = ""
+            htmlline = "      <td style='color:black;text-align:left'>" + JPEG1_html + "{}</a>".format(self.rawFileBasename) + JPEG2_html + JPEG3_html + PSFplot_html + ZPplot_html + "</td>\n"
+            HTML.write(htmlline)
         ## Write Target Name
         if "Target" in fields:
             if self.objectName:
@@ -1844,15 +1935,15 @@ class Image(object):
         ## Write WCS position angle
         if "PosAng" in fields:
             if self.positionAngle:
-                HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format("black", self.positionAngle.to(u.deg).value))
+                HTML.write("      <td style='color:{}'>{:.1f}</td>\n".format("black", self.positionAngle.to(u.deg).value))
             else:
-                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+                HTML.write("      <td style='color:{}'>{}</td>\n".format("black", ""))
         ## Write zero point
         if "ZeroPoint" in fields:
             if self.zeroPoint:
-                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", self.zeroPoint))
+                HTML.write("      <td style='color:{}'>{:.2f}</td>\n".format("black", self.zeroPoint))
             else:
-                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
+                HTML.write("      <td style='color:{}'>{}</td>\n".format("black", ""))
         ## Write number of stars detected by SExtractor
         if "nStars" in fields:
             if self.nStarsSEx:
