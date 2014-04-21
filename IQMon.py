@@ -1238,11 +1238,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Get UCAC4 Catalog for Image from Local File
     ##-------------------------------------------------------------------------
-<<<<<<< HEAD
     def GetLocalUCAC4(self, filter='i', local_UCAC_command=None, local_UCAC_data=None):
-=======
-    def GetLocalUCAC4(self, local_UCAC_command="/Volumes/Data/UCAC4/access/u4test", local_UCAC_data="/Volumes/Data/UCAC4/u4b"):
->>>>>>> bb140a6e59464fb963e31070c2f114e6078cde19
         '''
         Determine zero point by comparing measured magnitudes with catalog
         magnitudes.
