@@ -1034,7 +1034,7 @@ class Image(object):
         ellip_centers = (ellip_bins[:-1] + ellip_bins[1:]) / 2
 
         fwhm_binsize = 0.1
-        fwhm_hist, fwhm_bins = np.histogram(self.SExtractorResults['FWHM_IMAGE'], bins=fwhm_binsize*np.arange(31))
+        fwhm_hist, fwhm_bins = np.histogram(self.SExtractorResults['FWHM_IMAGE'], bins=fwhm_binsize*np.arange(91))
         fwhm_centers = (fwhm_bins[:-1] + fwhm_bins[1:]) / 2
 
         star_angle_mean = np.mean(star_angles)
