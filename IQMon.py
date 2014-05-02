@@ -994,13 +994,17 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Make Ellipticity Plot
     ##-------------------------------------------------------------------------
-    def MakePSFplot(self):
+    def MakePSFplot(self, plotFileName=None):
         '''
         Plot ellipticity vectors of stars in image.
         Plot histogram of theta - image_angle values.
         '''
         self.logger.info('Calculating histogram of PSF angles.')
-        self.PSF_plotfile = os.path.join(self.config.pathPlots, self.rawFileBasename+'_PSFinfo.png')
+        if plotFileName:
+            self.PSF_plotfilename = plotFileName
+        else:
+            self.PSF_plotfilename = self.rawFileBasename+'_PSFinfo.png'
+        self.PSF_plotfile = os.path.join(self.config.pathPlots, self.PSF_plotfilename)
 
         ellip_threshold = 0.15
         star_angles = [star['THETAWIN_IMAGE'] for star in self.SExtractorResults if star['ELLIPTICITY'] >= ellip_threshold]
@@ -1823,7 +1827,7 @@ class Image(object):
                 JPEG2_html = " (<a href='{}'>JPEG2</a>)".format(os.path.join("..", "..", "Plots", self.jpegFileNames[1]))
                 JPEG3_html = " (<a href='{}'>JPEG3</a>)".format(os.path.join("..", "..", "Plots", self.jpegFileNames[2]))
             if self.PSF_plotfile:
-                PSFplot_html = " (<a href='{}'>PSF</a>)".format(os.path.join("..", "..", "Plots", self.PSF_plotfile))
+                PSFplot_html = " (<a href='{}'>PSF</a>)".format(os.path.join("..", "..", "Plots", self.PSF_plotfilename))
             else:
                 PSFplot_html = ""
             if self.zeroPoint_plotfile:
