@@ -714,7 +714,7 @@ class Image(object):
         Solve astrometry in the working image using the astrometry.net solver.
         '''
         self.logger.info("Attempting to create WCS using Astrometry.net solver.")
-        AstrometryCommand = ["solve-field", "-l", "5", "-O", "-p",
+        AstrometryCommand = ["solve-field", "-l", "5", "-O", "-p", "-T",
                              "-L", str(self.tel.pixelScale.value*0.90),
                              "-H", str(self.tel.pixelScale.value*1.10),
                              "-u", "arcsecperpix", "-z", "4", self.workingFile]
@@ -1042,11 +1042,10 @@ class Image(object):
         self.logger.debug('  Mean Difference Angle = {:.0f}'.format(angle_diff_mean))
         self.logger.debug('  Median Difference Angle = {:.0f}'.format(angle_diff_median))
 
-
-
         if self.PSF_plotfile:
             self.logger.debug('  Generating figure {}'.format(self.PSF_plotfile))
 
+            pyplot.ioff()
             pyplot.figure(figsize=(12,11), dpi=100)
             Left1 = pyplot.axes([0.000, 0.750, 0.465, 0.240])
             pyplot.title('PSF Statistics for {}'.format(self.rawFileName), size=10)
