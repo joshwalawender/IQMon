@@ -1069,7 +1069,6 @@ class Image(object):
             pyplot.yticks(size=10)
 
             Left3 = pyplot.axes([0.000, 0.0, 0.465, 0.400])
-            Left3.set_aspect('equal')
             pyplot.plot(self.SExtractorResults['ImageRadius'], self.SExtractorResults['ELLIPTICITY'], 'k,')
             pyplot.title('Correlation of Ellipticity with Image Radius')
             pyplot.xlabel('r (pixels)', size=10)
