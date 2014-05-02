@@ -1074,8 +1074,8 @@ class Image(object):
             pyplot.title('Correlation of Ellipticity with Image Radius')
             pyplot.xlabel('r (pixels)', size=10)
             pyplot.ylabel('Ellipticity', size=10)
-            pyplot.xlim(0, self.nXPix)
-            pyplot.ylim(0, self.nYPix)
+            pyplot.xlim(0, math.sqrt(self.nXPix**2 + self.nYPix**2))
+            pyplot.ylim(0, 1.0)
             pyplot.xticks(size=10)
             pyplot.yticks(size=10)
 
