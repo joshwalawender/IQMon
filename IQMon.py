@@ -1983,7 +1983,7 @@ class Image(object):
             SummaryTable = table.Table(names=("ExpStart", "File", "FWHM (pix)", "Ellipticity", 
                                        "Alt (deg)", "Az (deg)", "Airmass", "PointingError (arcmin)", 
                                        "ZeroPoint", "nStars", "Background", "Background RMS"),
-                                 dtypes=('S22', 'S100', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'i4', 'f4', 'f4'),
+                                 dtype=('S22', 'S100', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'i4', 'f4', 'f4'),
                                  masked=True)
         else:
             self.logger.info("  Reading astropy table object from file: {0}".format(summaryFile))
