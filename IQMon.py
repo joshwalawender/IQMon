@@ -1064,7 +1064,10 @@ class Image(object):
             pyplot.bar(fwhm_centers, fwhm_hist, align='center', width=0.7*fwhm_binsize)
             pyplot.xlabel('FWHM (pixels)', size=10)
             pyplot.ylabel('N Stars', size=10)
-            pyplot.xlim(0,self.FWHM.to(u.pix).value + 3)
+            if self.FWHM:
+                pyplot.xlim(0,self.FWHM.to(u.pix).value + 3)
+            else:
+                pyplot.xlim(0,6)
             pyplot.xticks(size=10)
             pyplot.yticks(size=10)
 
