@@ -189,6 +189,7 @@ class Telescope(object):
 #         self.SExtractorSaturation = None
         self.site = None
         self.pointingMarkerSize = 1*u.arcmin
+        self.measurement_radius = None
         
     def CheckUnits(self):
         '''
@@ -967,9 +968,13 @@ class Image(object):
         '''
         if self.nStarsSEx > 1:
             self.logger.info('Analyzing SExtractor results to determine typical image quality.')
-            IQRadiusFactor = 1.0
-            DiagonalRadius = math.sqrt((self.nXPix/2)**2+(self.nYPix/2)**2)
-            IQRadius = DiagonalRadius*IQRadiusFactor
+            if self.tel.measurement_radius:
+                self.logger.info('  Using stars in the inner {} pixels.'.format(self.tel.measurement_radius))
+                IQRadius = self.tel.measurement_radius
+            else:
+                IQRadiusFactor = 1.0
+                DiagonalRadius = math.sqrt((self.nXPix/2)**2+(self.nYPix/2)**2)
+                IQRadius = DiagonalRadius*IQRadiusFactor
             CentralFWHMs = [star['FWHM_IMAGE'] for star in self.SExtractorResults if star['ImageRadius'] <= IQRadius]
             CentralEllipticities = [star['ELLIPTICITY'] for star in self.SExtractorResults if star['ImageRadius'] <= IQRadius]
             CentralAs = [star['AWIN_IMAGE'] for star in self.SExtractorResults if star['ImageRadius'] <= IQRadius]
