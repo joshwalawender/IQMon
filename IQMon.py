@@ -623,6 +623,7 @@ class Image(object):
         shutil.copy2(self.rawFile, self.workingFile)
         os.chmod(self.workingFile, 0666)
         self.tempFiles.append(self.workingFile)
+        self.fileExt = '.fits'
 
 
     ##-------------------------------------------------------------------------
@@ -751,15 +752,16 @@ class Image(object):
                     self.logger.warning("  %s" % line)
             NewFile = self.workingFile.replace(self.fileExt, ".new")
             NewFitsFile = self.workingFile.replace(self.fileExt, ".new.fits")
-            if not os.path.exists(NewFile):
-                self.logger.warning("No new file created by astrometry.net")
-                self.astrometrySolved = False
-            else:
+            if os.path.exists(NewFile):
+                self.logger.debug("  Found {}".format(NewFile))
                 self.logger.debug("  Astrometry.net succeeded")
                 if os.path.exists(NewFitsFile): os.remove(NewFitsFile)
                 os.rename(NewFile, NewFitsFile)
                 self.astrometrySolved = True
                 self.workingFile = NewFitsFile
+            else:
+                self.logger.warning("No new file created by astrometry.net")
+                self.astrometrySolved = False
             ## Add files created by astrometry.net to tempFiles list
             self.tempFiles.append(os.path.join(self.config.pathTemp, self.rawFileBasename+".axy"))
             self.tempFiles.append(os.path.join(self.config.pathTemp, self.rawFileBasename+".wcs"))
