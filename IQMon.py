@@ -189,6 +189,7 @@ class Telescope(object):
 #         self.SExtractorSaturation = None
         self.site = None
         self.pointingMarkerSize = 1*u.arcmin
+        self.measurement_radius = None
         
     def CheckUnits(self):
         '''
@@ -622,6 +623,7 @@ class Image(object):
         shutil.copy2(self.rawFile, self.workingFile)
         os.chmod(self.workingFile, 0666)
         self.tempFiles.append(self.workingFile)
+        self.fileExt = '.fits'
 
 
     ##-------------------------------------------------------------------------
@@ -714,7 +716,7 @@ class Image(object):
         Solve astrometry in the working image using the astrometry.net solver.
         '''
         self.logger.info("Attempting to create WCS using Astrometry.net solver.")
-        AstrometryCommand = ["solve-field", "-l", "5", "-O", "-p",
+        AstrometryCommand = ["solve-field", "-l", "5", "-O", "-p", "-T",
                              "-L", str(self.tel.pixelScale.value*0.90),
                              "-H", str(self.tel.pixelScale.value*1.10),
                              "-u", "arcsecperpix", "-z", "4", self.workingFile]
@@ -750,15 +752,16 @@ class Image(object):
                     self.logger.warning("  %s" % line)
             NewFile = self.workingFile.replace(self.fileExt, ".new")
             NewFitsFile = self.workingFile.replace(self.fileExt, ".new.fits")
-            if not os.path.exists(NewFile):
-                self.logger.warning("No new file created by astrometry.net")
-                self.astrometrySolved = False
-            else:
+            if os.path.exists(NewFile):
+                self.logger.debug("  Found {}".format(NewFile))
                 self.logger.debug("  Astrometry.net succeeded")
                 if os.path.exists(NewFitsFile): os.remove(NewFitsFile)
                 os.rename(NewFile, NewFitsFile)
                 self.astrometrySolved = True
                 self.workingFile = NewFitsFile
+            else:
+                self.logger.warning("No new file created by astrometry.net")
+                self.astrometrySolved = False
             ## Add files created by astrometry.net to tempFiles list
             self.tempFiles.append(os.path.join(self.config.pathTemp, self.rawFileBasename+".axy"))
             self.tempFiles.append(os.path.join(self.config.pathTemp, self.rawFileBasename+".wcs"))
@@ -967,9 +970,13 @@ class Image(object):
         '''
         if self.nStarsSEx > 1:
             self.logger.info('Analyzing SExtractor results to determine typical image quality.')
-            IQRadiusFactor = 1.0
-            DiagonalRadius = math.sqrt((self.nXPix/2)**2+(self.nYPix/2)**2)
-            IQRadius = DiagonalRadius*IQRadiusFactor
+            if self.tel.measurement_radius:
+                self.logger.info('  Using stars in the inner {} pixels.'.format(self.tel.measurement_radius))
+                IQRadius = self.tel.measurement_radius
+            else:
+                IQRadiusFactor = 1.0
+                DiagonalRadius = math.sqrt((self.nXPix/2)**2+(self.nYPix/2)**2)
+                IQRadius = DiagonalRadius*IQRadiusFactor
             CentralFWHMs = [star['FWHM_IMAGE'] for star in self.SExtractorResults if star['ImageRadius'] <= IQRadius]
             CentralEllipticities = [star['ELLIPTICITY'] for star in self.SExtractorResults if star['ImageRadius'] <= IQRadius]
             CentralAs = [star['AWIN_IMAGE'] for star in self.SExtractorResults if star['ImageRadius'] <= IQRadius]
@@ -994,13 +1001,17 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Make Ellipticity Plot
     ##-------------------------------------------------------------------------
-    def MakePSFplot(self):
+    def MakePSFplot(self, plotFileName=None):
         '''
         Plot ellipticity vectors of stars in image.
         Plot histogram of theta - image_angle values.
         '''
         self.logger.info('Calculating histogram of PSF angles.')
-        self.PSF_plotfile = os.path.join(self.config.pathPlots, self.rawFileBasename+'_PSFinfo.png')
+        if plotFileName:
+            self.PSF_plotfilename = plotFileName
+        else:
+            self.PSF_plotfilename = self.rawFileBasename+'_PSFinfo.png'
+        self.PSF_plotfile = os.path.join(self.config.pathPlots, self.PSF_plotfilename)
 
         ellip_threshold = 0.15
         star_angles = [star['THETAWIN_IMAGE'] for star in self.SExtractorResults if star['ELLIPTICITY'] >= ellip_threshold]
@@ -1030,7 +1041,7 @@ class Image(object):
         ellip_centers = (ellip_bins[:-1] + ellip_bins[1:]) / 2
 
         fwhm_binsize = 0.1
-        fwhm_hist, fwhm_bins = np.histogram(self.SExtractorResults['FWHM_IMAGE'], bins=fwhm_binsize*np.arange(31))
+        fwhm_hist, fwhm_bins = np.histogram(self.SExtractorResults['FWHM_IMAGE'], bins=fwhm_binsize*np.arange(91))
         fwhm_centers = (fwhm_bins[:-1] + fwhm_bins[1:]) / 2
 
         star_angle_mean = np.mean(star_angles)
@@ -1042,11 +1053,10 @@ class Image(object):
         self.logger.debug('  Mean Difference Angle = {:.0f}'.format(angle_diff_mean))
         self.logger.debug('  Median Difference Angle = {:.0f}'.format(angle_diff_median))
 
-
-
         if self.PSF_plotfile:
             self.logger.debug('  Generating figure {}'.format(self.PSF_plotfile))
 
+            pyplot.ioff()
             pyplot.figure(figsize=(12,11), dpi=100)
             Left1 = pyplot.axes([0.000, 0.750, 0.465, 0.240])
             pyplot.title('PSF Statistics for {}'.format(self.rawFileName), size=10)
@@ -1061,20 +1071,33 @@ class Image(object):
             pyplot.bar(fwhm_centers, fwhm_hist, align='center', width=0.7*fwhm_binsize)
             pyplot.xlabel('FWHM (pixels)', size=10)
             pyplot.ylabel('N Stars', size=10)
-            pyplot.xlim(0,self.FWHM.to(u.pix).value + 3)
+            if self.FWHM:
+                pyplot.xlim(0,self.FWHM.to(u.pix).value + 3)
+            else:
+                pyplot.xlim(0,6)
             pyplot.xticks(size=10)
             pyplot.yticks(size=10)
 
             Left3 = pyplot.axes([0.000, 0.0, 0.465, 0.400])
-            Left3.set_aspect('equal')
-            pyplot.plot(star_x, star_y, 'k,')
-            pyplot.title('Positions of {:d}/{:d} stars with ellipticity > {:.2f}'.format(nstars, self.nStarsSEx, ellip_threshold), size=10)
-            pyplot.xlabel('X (pixels)', size=10)
-            pyplot.ylabel('Y (pixels)', size=10)
-            pyplot.xlim(0, self.nXPix)
-            pyplot.ylim(0, self.nYPix)
+            pyplot.plot(self.SExtractorResults['ImageRadius'], self.SExtractorResults['ELLIPTICITY'], 'k,')
+            pyplot.title('Correlation of Ellipticity with Image Radius')
+            pyplot.xlabel('r (pixels)', size=10)
+            pyplot.ylabel('Ellipticity', size=10)
+            pyplot.xlim(0, math.sqrt(self.nXPix**2 + self.nYPix**2)/2.)
+            pyplot.ylim(0, 1.0)
             pyplot.xticks(size=10)
             pyplot.yticks(size=10)
+
+#             Left3 = pyplot.axes([0.000, 0.0, 0.465, 0.400])
+#             Left3.set_aspect('equal')
+#             pyplot.plot(star_x, star_y, 'k,')
+#             pyplot.title('Positions of {:d}/{:d} stars with ellipticity > {:.2f}'.format(nstars, self.nStarsSEx, ellip_threshold), size=10)
+#             pyplot.xlabel('X (pixels)', size=10)
+#             pyplot.ylabel('Y (pixels)', size=10)
+#             pyplot.xlim(0, self.nXPix)
+#             pyplot.ylim(0, self.nYPix)
+#             pyplot.xticks(size=10)
+#             pyplot.yticks(size=10)
 
             Right1 = pyplot.axes([0.535, 0.750, 0.465, 0.240])
             pyplot.title('PSF Angles for {:d}/{:d} stars with ellipticity > {:.2f}'.format(nstars, self.nStarsSEx, ellip_threshold), size=10)
@@ -1824,7 +1847,7 @@ class Image(object):
                 JPEG2_html = " (<a href='{}'>JPEG2</a>)".format(os.path.join("..", "..", "Plots", self.jpegFileNames[1]))
                 JPEG3_html = " (<a href='{}'>JPEG3</a>)".format(os.path.join("..", "..", "Plots", self.jpegFileNames[2]))
             if self.PSF_plotfile:
-                PSFplot_html = " (<a href='{}'>PSF</a>)".format(os.path.join("..", "..", "Plots", self.PSF_plotfile))
+                PSFplot_html = " (<a href='{}'>PSF</a>)".format(os.path.join("..", "..", "Plots", self.PSF_plotfilename))
             else:
                 PSFplot_html = ""
             if self.zeroPoint_plotfile:
@@ -1962,7 +1985,7 @@ class Image(object):
             SummaryTable = table.Table(names=("ExpStart", "File", "FWHM (pix)", "Ellipticity", 
                                        "Alt (deg)", "Az (deg)", "Airmass", "PointingError (arcmin)", 
                                        "ZeroPoint", "nStars", "Background", "Background RMS"),
-                                 dtypes=('S22', 'S100', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'i4', 'f4', 'f4'),
+                                 dtype=('S22', 'S100', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'i4', 'f4', 'f4'),
                                  masked=True)
         else:
             self.logger.info("  Reading astropy table object from file: {0}".format(summaryFile))
