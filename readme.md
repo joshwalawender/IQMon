@@ -18,12 +18,14 @@ If the image contains a WCS, the module can also compare the WCS coordinates of 
 * pyephem (<http://rhodesmill.org/pyephem/>)
 * SExtractor (<http://www.astromatic.net/software/sextractor>)
 * astrometry.net solver (<http://astrometry.net>)
-
-* matplotlib (Should be bundled with most python installations)
+* matplotlib
 * subprocess
 
 ## Version History
 
+* **v1.1**
+    * Added ability to solve astrometry using SCAMP and rectify the image using SWarp
+    * Added ability to solve for Zero Point using the SCAMP-solved data
 * **v1.0.5**
     * Bug fixes related to marking up of jpeg files.
 * **v1.0.4**
@@ -55,15 +57,6 @@ If the image contains a WCS, the module can also compare the WCS coordinates of 
     * Reports pointing error and position angle
     * Makes jpegs of image and cropped version with circles overlayed on stars found by SExtractor
     * Makes HTML and text file versions of results with one line per image, usually one night of images per file.
-
-
-## Planned Features
-
-… in no particular order:
-
-* Implement reading of raw DSLR images via dcraw.
-* Refine WCS by adding distortion terms.
-* Determine zero point of image by comparing SExtractor photometry with catalog magnitudes (using UCAC4).
 
 
 ## Code Structure
