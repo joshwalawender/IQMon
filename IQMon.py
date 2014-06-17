@@ -345,6 +345,14 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Make Logger Object
     ##-------------------------------------------------------------------------
+    def GetLogger(self, logger):
+        '''
+        If calling from another prohram which has its own logger object, pass
+        that logger to IQMon with this method.
+        '''
+        self.logger = logger
+
+
     def MakeLogger(self, IQMonLogFileName, verbose):
         '''
         Create the logger object to use when processing.  Takes as input the
@@ -1364,7 +1372,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Make JPEG of Image
     ##-------------------------------------------------------------------------
-    def MakeJPEG(self, jpegFileName, binning=1, markCatalogStars=False, markDetectedStars=False, markPointing=False, backgroundSubtracted=False):
+    def MakeJPEG(self, jpegFileName, binning=1, markCatalogStars=False, markDetectedStars=False, markPointing=False, backgroundSubtracted=False, p1=0.2, p2=1.0):
         '''
         Make jpegs of image.
         '''
@@ -1373,7 +1381,8 @@ class Image(object):
         self.logger.info("Making jpeg (binning = {0}): {1}.".format(binning, jpegFileName))
         if os.path.exists(jpegFile): os.remove(jpegFile)
         binningString = str(1./binning*100)+"%"
-        JPEGcommand = ["convert", "-contrast-stretch", "0.2%,1%", "-compress", "JPEG", "-quality", "70", "-resize", binningString]
+        JPEGcommand = ["convert", "-contrast-stretch", "{}%,{}%".format(p1, p2), "-compress", "JPEG", "-quality", "70", "-resize", binningString]
+        self.logger.debug('  Base convert command: {}'.format(' '.join(JPEGcommand)))
         ## Mark Intended Pointing Coordinates as read from header
         if markPointing and self.imageWCS:
             self.logger.debug("  Marking target pointing in jpeg.")
@@ -1453,9 +1462,9 @@ class Image(object):
             JPEGcommand.append("-fill")
             JPEGcommand.append("none")
             if self.FWHM:
-                MarkRadius=max([4, 2*math.ceil(self.FWHM.value)])/binning
+                MarkRadius=max([6, 2*math.ceil(self.FWHM.value)])/binning
             else:
-                MarkRadius = 4
+                MarkRadius = 6
             sortedSExtractorResults = np.sort(self.SExtractorResults, order=['MAG_AUTO'])
             for star in sortedSExtractorResults:
                 nStarsMarked += 1
@@ -1492,9 +1501,9 @@ class Image(object):
             JPEGcommand.append("-fill")
             JPEGcommand.append("none")
             if self.FWHM:
-                MarkRadius=max([4, 2*math.ceil(self.FWHM.value)])/binning
+                MarkRadius=max([6, 2*math.ceil(self.FWHM.value)])/binning
             else:
-                MarkRadius = 4
+                MarkRadius = 6
             sorted_catalog = np.sort(self.catalog, order=['mag1'])
             for star in sorted_catalog:
                 nStarsMarked += 1
