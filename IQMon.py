@@ -36,6 +36,11 @@ from astropy.io import ascii
 ## Function to Determine Orientation from WCS
 ##-----------------------------------------------------------------------------
 def image_orientation(WCS):
+    '''
+    Given an astropy.wcs.WCS object, return a tuple containing the pixel scale,
+    position angle (in degrees), and the flipped state (a boolean) of the image
+    calculated from the CDn_m or PCn_m matrix (no distortions considered).
+    '''
     assert type(WCS) == astropy.wcs.WCS
     header = WCS.to_header()
     PC = np.array([ [float(header['PC11']), float(header['PC12'])],\
@@ -160,33 +165,10 @@ class Telescope(object):
     Contains information about the telescope that can be passed to methods and
     functions.  The concept for operation is that the user will write a simple
     script which creates a telescope object and assigned values to all it's
-    properties (or sets them to None).  The processing is then just a sequence
-    of calls to the IQMon.Image object and it's methods.
-
-    Properties:
-      name:          A short name for the telescope
-      long_name:      A long name for the telescope
-      focal_length:   The focal length of the telescope
-      pixel_size:     The size of the pixels in the CCD camera
-      pixel_scale:    The estimated pixel scale of the telescope in arcsec per
-                     pixel.  This should be an astropy Unit object with a value
-                     and units.
-      fRatio:        The F/ratio of the telescope.
-      aperture:      The aperture of the telescope.
-      gain:          The gain (in electrons per ADU) of the CCD.
-      nXPix:         The number of pixels in the X direction of the CCD.
-      nYPix:         The number of pixels in the Y direction of the CCD.
-      site:          A pyephem site object defining the site of the telescope
-      units_for_FWHM:  A quantity with the units for the FWHM output.  The units
-                     should be reducible to either pixels or arcseconds.
-      ROI:           The "region of interest" to crop the image to.  Format
-                     should be '[x1:x2,y1:y2]' or 'x1:x2,y1:y2'.
-      threshold_FWHM: The FWHM above which the image should be flagged in the
-                     HTML output log.
-      threshold_pointing_err:   
-      threshold_ellipticity:   
-      SExtractorPhotAperture: 
-      SExtractorSeeing:       The initial seeing estimate for SExtractor.
+    properties (or sets them to None).
+    
+    This is different from config as that is system wide and a user may want to
+    process multiple telescope and imager configurations.
     '''
     _singletons = dict()
 
@@ -288,6 +270,9 @@ class Telescope(object):
     ## Define astropy.units Equivalency for Arcseconds and Pixels
     ##-------------------------------------------------------------------------
     def define_pixel_scale(self):
+        '''
+        Equivalency for astropy.units to convert from pixels to arcseconds.
+        '''
         self.pixel_scale_equivalency = [(u.pix, u.arcsec,
              lambda pix: (pix*u.radian.to(u.arcsec) * self.pixel_size / self.focal_length).decompose().value,
              lambda arcsec: (arcsec/u.radian.to(u.arcsec) * self.focal_length / self.pixel_size).decompose().value
@@ -299,15 +284,10 @@ class Telescope(object):
 ##-----------------------------------------------------------------------------
 class Image(object):
     '''
-    The IQMon.Image object represents a single input image to the IQMon
-    process.
+    The Image object represents a single input image to the IQMon process.
 
     When defined, the image objects requires both a filename to a valid fits
     file and an IQMon.Config object.
-
-    Properties:
-
-    Methods:
     '''
     def __init__(self, input, tel=None, config=None):
         self.start_process_time = datetime.datetime.now()
@@ -372,7 +352,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     def get_logger(self, logger):
         '''
-        If calling from another prohram which has its own logger object, pass
+        If calling from another program which has its own logger object, pass
         that logger to IQMon with this method.
         '''
         self.logger = logger
@@ -571,7 +551,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     def edit_header(self, keyword, value):
         '''
-        Edit information in the image fits header.
+        Edit a single keyword in the image fits header.
         '''
         self.logger.info('Editing image header: {} = {}'.format(keyword, value))
         hdulist = fits.open(self.working_file,\
@@ -633,8 +613,9 @@ class Image(object):
         '''
         Create master dark and subtract from image.
         
-        Input the filename of the appropriate master dark.  May want to write
-        own function to make the master dark given input file data.
+        Input the filename of the appropriate master dark or a list of filenames
+        which will be median combined to make the master dark.
+        
         '''
         self.logger.info("Dark subtracting image.")
         self.logger.debug("  Opening image data.")
@@ -805,7 +786,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     def determine_pointing_error(self):
         '''
-        Determine pointing error (difference between objects coordinates and
+        Determine pointing error (difference between object's coordinates and
         solved WCS).
         '''
         self.logger.info("Detemining pointing error based on WCS solution")
@@ -1060,8 +1041,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     def make_PSF_plot(self, filename=None):
         '''
-        Plot ellipticity vectors of stars in image.
-        Plot histogram of theta - image_angle values.
+        Make various plots for analysis of image quality.
         '''
         self.logger.info('Calculating histogram of PSF angles.')
         if filename:
@@ -1332,8 +1312,7 @@ class Image(object):
                       local_UCAC_command="/Volumes/Data/UCAC4/access/u4test",\
                       local_UCAC_data="/Volumes/Data/UCAC4/u4b"):
         '''
-        Determine zero point by comparing measured magnitudes with catalog
-        magnitudes.
+        Get a list of stars which are in the image from a local UCAC catalog.
         '''
         assert type(self.coordinate_of_center_pixel) == coords.builtin_systems.ICRS
 
@@ -1390,6 +1369,11 @@ class Image(object):
     ##-------------------------------------------------------------------------
     def measure_zero_point(self, plot=False):
         '''
+        Estimate the zero point of the image by comparing the instrumental
+        magnitudes as determined by SExtractor to the catalog magnitues.
+        
+        Currently this only uses the UCAC4 catalog as extracted by the
+        get_local_UCAC4() method.
         '''
         assert 'VECTOR_ASSOC' in self.SExtractor_results.keys()
         assert 'MagDiff' in self.SExtractor_results.keys()
@@ -2065,8 +2049,12 @@ class Image(object):
     ## Calcualte Process Time
     ##-------------------------------------------------------------------------
     def calculate_process_time(self):
+        '''
+        Determine how long it took for IQMon to process this image.  Determined
+        by subtracting the starting time (determined on the initialization of 
+        the image object) to the ending time (determined by this method).
+        '''
         self.end_process_time = datetime.datetime.now()
         self.total_process_time = self.end_process_time - self.start_process_time
         self.logger.info("IQMon processing time = {0:.1f} seconds".format(self.total_process_time))
 
-    
