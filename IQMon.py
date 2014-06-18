@@ -537,8 +537,20 @@ class Image(object):
           location to the IQMon tmp directory.
         - Later implement file format conversion from CRW, CR2, DNG, etc to
           fits using dcraw.
+          
+        Notes on reading raw files:
+        * dcraw converts to ppm file, then pamtofits converts to fits (pamtofits 
+          sends output to STDOUT, so must redirect to a fits file).
+        * pamtofits is part of netpbm, but need to install netpbm-bin on fink
+          to get the command line programs
+        
+        dcraw options:
+        * -4 makes linear file
+        * -D makes totally raw file (Without -D option, color interpolation is
+             done.  Without -D option, get raw pixel values).
         '''
-        if os.path.exists(self.working_file): os.remove(self.working_file)
+        if self.working_file:
+            if os.path.exists(self.working_file): os.remove(self.working_file)
         if self.file_ext == '.fts':
             self.logger.info('Making working copy of raw image: {}'.format(\
                                                             self.working_file))
@@ -558,9 +570,31 @@ class Image(object):
             self.temp_files.append(self.working_file)
             self.file_ext = '.fits'
         elif self.file_ext in ['.dng', '.DNG', '.cr2', '.CR2']:
-            self.logger.info('Converting {} to fits format'.format(\
-                                                            self.working_file))
-            sys.exit(1)
+#             self.logger.info('Converting {} to fits format'.format(\
+#                                                             self.working_file))
+            ## Make copy of raw file
+            self.working_file = os.path.join(self.config.pathTemp, self.raw_file_name)
+            shutil.copy2(self.raw_file, self.working_file)
+            os.chmod(self.working_file, 0666)
+            self.temp_files.append(self.working_file)
+            ## Use dcraw to convert to ppm file
+            command = ['dcraw', '-t', '2', '-4', self.working_file]
+            subprocess.call(command)
+            ppm_file = os.path.join(self.config.pathTemp, self.raw_file_basename+'.ppm')
+            if os.path.exists(ppm_file):
+                self.working_file = ppm_file
+                self.temp_files.append(self.working_file)
+            else:
+                self.logger.critical('dcraw failed.  Could not find ppm file.')
+            ## Use pamtofits to convert to fits file
+            fits_file = os.path.join(self.config.pathTemp, self.raw_file_basename+'.fits')
+            command = 'pamtofits {} > {}'.format(self.working_file, fits_file)
+            subprocess.call(command, shell=True)
+            if os.path.exists(fits_file):
+                self.working_file = fits_file
+                self.temp_files.append(self.working_file)
+            else:
+                self.logger.critical('pamtofits failed.  Could not find fits file.')
         else:
             self.logger.warning('Unrecognixed file extension: {}'.format(\
                                                                 self.file_ext))
