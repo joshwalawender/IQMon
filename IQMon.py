@@ -370,7 +370,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Make Logger Object
     ##-------------------------------------------------------------------------
-    def GetLogger(self, logger):
+    def get_logger(self, logger):
         '''
         If calling from another prohram which has its own logger object, pass
         that logger to IQMon with this method.
@@ -378,7 +378,7 @@ class Image(object):
         self.logger = logger
 
 
-    def MakeLogger(self, IQMonLogFileName, verbose):
+    def make_logger(self, IQMonLogFileName, verbose):
         '''
         Create the logger object to use when processing.  Takes as input the
         full path to the file to write the log to and verboase, a boolean value
@@ -404,7 +404,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Read Header
     ##-------------------------------------------------------------------------
-    def ReadHeader(self):
+    def read_header(self):
         '''
         Read information from the image fits header.
         '''
@@ -567,9 +567,9 @@ class Image(object):
 
 
     ##-------------------------------------------------------------------------
-    ## Add To Header
+    ## Edit Header
     ##-------------------------------------------------------------------------
-    def EditHeader(self, keyword, value):
+    def edit_header(self, keyword, value):
         '''
         Edit information in the image fits header.
         '''
@@ -583,7 +583,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Read Image
     ##-------------------------------------------------------------------------
-    def ReadImage(self):
+    def read_image(self):
         '''
         Read the raw image and write out a working image in the IQMon temporary
         directory.
@@ -629,7 +629,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Dark Subtract Image
     ##-------------------------------------------------------------------------
-    def DarkSubtract(self, Darks):
+    def dark_subtract(self, Darks):
         '''
         Create master dark and subtract from image.
         
@@ -693,7 +693,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Crop Image
     ##-------------------------------------------------------------------------
-    def Crop(self):
+    def crop(self):
         '''
         Crop working image to region of interest.
         '''
@@ -727,7 +727,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Solve Astrometry Using astrometry.net
     ##-------------------------------------------------------------------------
-    def SolveAstrometry(self):
+    def solve_astrometry(self):
         '''
         Solve astrometry in the working image using the astrometry.net solver.
         '''
@@ -803,7 +803,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Determine Pointing Error
     ##-------------------------------------------------------------------------
-    def DeterminePointingError(self):
+    def determine_pointing_error(self):
         '''
         Determine pointing error (difference between objects coordinates and
         solved WCS).
@@ -832,7 +832,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Run SExtractor
     ##-------------------------------------------------------------------------
-    def RunSExtractor(self, assoc=False):
+    def run_SExtractor(self, assoc=False):
         '''
         Run SExtractor on image.
         '''
@@ -1015,7 +1015,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Determine Image FWHM from SExtractor Catalog
     ##-------------------------------------------------------------------------
-    def DetermineFWHM(self):
+    def determine_FWHM(self):
         '''
         Determine typical FWHM of image from SExtractor results.
         '''
@@ -1058,7 +1058,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Make Ellipticity Plot
     ##-------------------------------------------------------------------------
-    def MakePSFplot(self, filename=None):
+    def make_PSF_plot(self, filename=None):
         '''
         Plot ellipticity vectors of stars in image.
         Plot histogram of theta - image_angle values.
@@ -1197,7 +1197,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Run SCAMP
     ##-------------------------------------------------------------------------
-    def RunSCAMP(self, catalog='USNO-B1', mergedcat_name='scamp.cat', mergedcat_type='ASCII_HEAD'):
+    def run_SCAMP(self, catalog='USNO-B1', mergedcat_name='scamp.cat', mergedcat_type='ASCII_HEAD'):
         '''
         Run SCAMP on SExtractor output catalog.
         '''
@@ -1285,7 +1285,7 @@ class Image(object):
     '''
     Run SWarp on the image (after SCAMP distortion solution) to de-distort it.
     '''
-    def RunSWarp(self):
+    def run_SWarp(self):
         ## Parameters for SWarp
         swarp_file = os.path.join(self.config.pathTemp, 'swarpped.fits')
         if os.path.exists(swarp_file): os.remove(swarp_file)
@@ -1328,7 +1328,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Get UCAC4 Catalog for Image from Local File
     ##-------------------------------------------------------------------------
-    def GetLocalUCAC4(self,\
+    def get_local_UCAC4(self,\
                       local_UCAC_command="/Volumes/Data/UCAC4/access/u4test",\
                       local_UCAC_data="/Volumes/Data/UCAC4/u4b"):
         '''
@@ -1388,7 +1388,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Measure Zero Point
     ##-------------------------------------------------------------------------
-    def MeasureZeroPoint(self, plot=False):
+    def measure_zero_point(self, plot=False):
         '''
         '''
         assert 'VECTOR_ASSOC' in self.SExtractor_results.keys()
@@ -1469,7 +1469,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Make JPEG of Image
     ##-------------------------------------------------------------------------
-    def MakeJPEG(self, jpegFileName, binning=1, markCatalogStars=False,\
+    def make_JPEG(self, jpegFileName, binning=1, markCatalogStars=False,\
                  markDetectedStars=False, markPointing=False,\
                  backgroundSubtracted=False, p1=0.2, p2=1.0):
         '''
@@ -1687,7 +1687,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Clean Up by Deleting Temporary Files
     ##-------------------------------------------------------------------------
-    def CleanUp(self):
+    def clean_up(self):
         '''
         Clean up by deleting temporary files.
         '''
@@ -1701,7 +1701,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Append Line With Image Info to HTML File List
     ##-------------------------------------------------------------------------
-    def AddWebLogEntry(self, htmlImageList, fields=None):
+    def add_web_log_entry(self, htmlImageList, fields=None):
         '''
         This function adds one line to the HTML table of images.  The line
         contains the image info extracted by IQMon.
@@ -1945,7 +1945,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Append Line With Image Info to Summary Text File
     ##-------------------------------------------------------------------------
-    def AddSummaryEntry(self, summaryFile):
+    def add_summary_entry(self, summaryFile):
         self.logger.info("Writing Summary File Entry.")
         self.logger.debug("  Summary File: {0}".format(summaryFile))
         ## Read in previous data
@@ -2064,7 +2064,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Calcualte Process Time
     ##-------------------------------------------------------------------------
-    def Calculatetotal_process_time(self):
+    def calculate_process_time(self):
         self.end_process_time = datetime.datetime.now()
         self.total_process_time = self.end_process_time - self.start_process_time
         self.logger.info("IQMon processing time = {0:.1f} seconds".format(self.total_process_time))
