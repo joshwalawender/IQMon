@@ -165,10 +165,10 @@ class Telescope(object):
 
     Properties:
       name:          A short name for the telescope
-      longName:      A long name for the telescope
-      focalLength:   The focal length of the telescope
-      pixelSize:     The size of the pixels in the CCD camera
-      pixelScale:    The estimated pixel scale of the telescope in arcsec per
+      long_name:      A long name for the telescope
+      focal_length:   The focal length of the telescope
+      pixel_size:     The size of the pixels in the CCD camera
+      pixel_scale:    The estimated pixel scale of the telescope in arcsec per
                      pixel.  This should be an astropy Unit object with a value
                      and units.
       fRatio:        The F/ratio of the telescope.
@@ -177,14 +177,14 @@ class Telescope(object):
       nXPix:         The number of pixels in the X direction of the CCD.
       nYPix:         The number of pixels in the Y direction of the CCD.
       site:          A pyephem site object defining the site of the telescope
-      unitsForFWHM:  A quantity with the units for the FWHM output.  The units
+      units_for_FWHM:  A quantity with the units for the FWHM output.  The units
                      should be reducible to either pixels or arcseconds.
       ROI:           The "region of interest" to crop the image to.  Format
                      should be '[x1:x2,y1:y2]' or 'x1:x2,y1:y2'.
-      thresholdFWHM: The FWHM above which the image should be flagged in the
+      threshold_FWHM: The FWHM above which the image should be flagged in the
                      HTML output log.
-      thresholdPointingErr:   
-      thresholdEllipticity:   
+      threshold_pointing_err:   
+      threshold_ellipticity:   
       SExtractorPhotAperture: 
       SExtractorSeeing:       The initial seeing estimate for SExtractor.
     '''
@@ -197,31 +197,28 @@ class Telescope(object):
 
     def __init__(self):
         self.name = None
-        self.longName = None
-        self.aheader = None
-        self.focalLength = None
-        self.pixelSize = None
+        self.long_name = None
+        self.SCAMP_aheader = None
+        self.focal_length = None
+        self.pixel_size = None
         self.aperture = None
         self.gain = None
         self.nXPix = None
         self.nYPix = None
-        self.unitsForFWHM = None
+        self.units_for_FWHM = None
         self.ROI = None
-        self.thresholdFWHM = None
-        self.thresholdPointingErr = None
-        self.thresholdEllipticity = None
-        self.pixelScale = None
+        self.threshold_FWHM = None
+        self.threshold_pointing_err = None
+        self.threshold_ellipticity = None
+        self.pixel_scale = None
         self.fRatio = None
-        self.SExtractorParams = None
+        self.SExtractor_params = None
         self.distortionOrder = 1
-#         self.SExtractorPhotAperture = None
-#         self.SExtractorSeeing = None
-#         self.SExtractorSaturation = None
         self.site = None
-        self.pointingMarkerSize = 1*u.arcmin
-        self.measurement_radius = None
+        self.pointing_marker_size = 1*u.arcmin
+        self.PSF_measurement_radius = None
         
-    def CheckUnits(self):
+    def check_units(self):
         '''
         Checks whether the telescope properties have the right type.  If a unit
         is expected, checks whether the input has units and whether it is
@@ -230,18 +227,18 @@ class Telescope(object):
         '''
         ## name is a string
         assert type(self.name) == str
-        ## longName is a string
-        assert type(self.longName) == str
-        ## Default focalLength units to mm
-        if type(self.focalLength) == u.quantity.Quantity:
-            assert self.focalLength.to(u.mm)
+        ## long_name is a string
+        assert type(self.long_name) == str
+        ## Default focal_length units to mm
+        if type(self.focal_length) == u.quantity.Quantity:
+            assert self.focal_length.to(u.mm)
         else:
-            self.focalLength *= u.mm
-        ## Default pixelSize units to microns
-        if type(self.pixelSize) == u.quantity.Quantity:
-            assert self.pixelSize.to(u.micron)
+            self.focal_length *= u.mm
+        ## Default pixel_size units to microns
+        if type(self.pixel_size) == u.quantity.Quantity:
+            assert self.pixel_size.to(u.micron)
         else:
-            self.pixelSize *= u.micron
+            self.pixel_size *= u.micron
         ## Default aperture to units of mm
         if type(self.aperture) == u.quantity.Quantity:
             assert self.aperture.to(u.mm)
@@ -252,33 +249,33 @@ class Telescope(object):
             assert self.gain.to(1/u.adu)
         else:
             self.gain *= 1./u.adu
-        ## Default unitsForFWHM to units of arcsec
-        if type(self.unitsForFWHM) == u.quantity.Quantity:
-            assert self.unitsForFWHM.unit in [u.arcsec, u.pix]
+        ## Default units_for_FWHM to units of arcsec
+        if type(self.units_for_FWHM) == u.quantity.Quantity:
+            assert self.units_for_FWHM.unit in [u.arcsec, u.pix]
         else:
-            self.unitsForFWHM *= u.pix
+            self.units_for_FWHM *= u.pix
         ## ROI is string
         assert type(self.ROI) == str
-        ## Default thresholdFWHM to same units as unitsForFWHM
-        if type(self.thresholdFWHM) == u.quantity.Quantity:
-            assert self.thresholdFWHM.unit in [u.arcsec, u.pix]
+        ## Default threshold_FWHM to same units as units_for_FWHM
+        if type(self.threshold_FWHM) == u.quantity.Quantity:
+            assert self.threshold_FWHM.unit in [u.arcsec, u.pix]
         else:
-            self.thresholdFWHM *= u.pix
-        ## Default thresholdPointingErr to units of arcmin
-        if type(self.thresholdPointingErr) == u.quantity.Quantity:
-            assert self.thresholdPointingErr.to(u.arcmin)
+            self.threshold_FWHM *= u.pix
+        ## Default threshold_pointing_err to units of arcmin
+        if type(self.threshold_pointing_err) == u.quantity.Quantity:
+            assert self.threshold_pointing_err.to(u.arcmin)
         else:
-            self.thresholdPointingErr *= u.arcmin
-        ## Default thresholdEllipticity to dimensionless
-        if type(self.thresholdEllipticity) == u.quantity.Quantity:
-            assert self.thresholdEllipticity.to(u.dimensionless_unscaled)
+            self.threshold_pointing_err *= u.arcmin
+        ## Default threshold_ellipticity to dimensionless
+        if type(self.threshold_ellipticity) == u.quantity.Quantity:
+            assert self.threshold_ellipticity.to(u.dimensionless_unscaled)
         else:
-            assert float(self.thresholdEllipticity) >=0 and float(self.thresholdEllipticity) <= 1.
-        ## Default pixelScale to units of arcsec per pixel
-        if type(self.pixelScale) == u.quantity.Quantity:
-            assert self.pixelScale.to(u.arcsec / u.pix)
+            assert float(self.threshold_ellipticity) >=0 and float(self.threshold_ellipticity) <= 1.
+        ## Default pixel_scale to units of arcsec per pixel
+        if type(self.pixel_scale) == u.quantity.Quantity:
+            assert self.pixel_scale.to(u.arcsec / u.pix)
         else:
-            self.pixelScale *= u.arcsec / u.pix
+            self.pixel_scale *= u.arcsec / u.pix
         ## Default fRatio to dimensionless
         if type(self.fRatio) == u.quantity.Quantity:
             assert self.fRatio.to(u.dimensionless_unscaled)
@@ -289,10 +286,10 @@ class Telescope(object):
     ##-------------------------------------------------------------------------
     ## Define astropy.units Equivalency for Arcseconds and Pixels
     ##-------------------------------------------------------------------------
-    def DefinePixelScale(self):
-        self.pixelScaleEquivalency = [(u.pix, u.arcsec,
-                       lambda pix: (pix*u.radian.to(u.arcsec)*self.pixelSize/self.focalLength).decompose().value,
-                       lambda arcsec: (arcsec/u.radian.to(u.arcsec)*self.focalLength/self.pixelSize).decompose().value
+    def define_pixel_scale(self):
+        self.pixel_scale_equivalency = [(u.pix, u.arcsec,
+                       lambda pix: (pix*u.radian.to(u.arcsec)*self.pixel_size/self.focal_length).decompose().value,
+                       lambda arcsec: (arcsec/u.radian.to(u.arcsec)*self.focal_length/self.pixel_size).decompose().value
                        )]
 
 
@@ -342,13 +339,12 @@ class Image(object):
         self.astrometry_solved = None
         self.coordinate_of_center_pixel = None
         self.coordinate_from_header = None
-        self.nSExtracted = None
-        self.SExBackground = None
-        self.SExBRMS = None
-        self.tempFiles = []
-        self.SExtractorCatalog = None
-        self.SExtractorResults = None
-        self.nStarsSEx = None
+        self.n_stars_SExtracted = None
+        self.SExtractor_background = None
+        self.SExtractor_background_RMS = None
+        self.temp_files = []
+        self.SExtractor_catalog = None
+        self.SExtractor_results = None
         self.position_angle = None
         self.zeroPoint = None
         self.zeroPoint_plotfile = None
@@ -356,10 +352,10 @@ class Image(object):
         self.FWHM = None
         self.ellipticity = None
         self.PSF_plotfile = None
-        self.pointingError = None
+        self.pointing_error = None
         self.image_flipped = None
-        self.jpegFileNames = []
-        self.CheckImageFile = None
+        self.jpeg_file_names = []
+        self.check_image_file = None
         self.cropped = False
         self.crop_x1 = None
         self.crop_x2 = None
@@ -405,11 +401,11 @@ class Image(object):
 
 
     ##-------------------------------------------------------------------------
-    ## Get Header
+    ## Read Header
     ##-------------------------------------------------------------------------
-    def GetHeader(self):
+    def ReadHeader(self):
         '''
-        Get information from the image fits header.
+        Read information from the image fits header.
         '''
         hdulist = fits.open(self.working_file, ignore_missing_end=True)
         self.header = hdulist[0].header
@@ -579,14 +575,14 @@ class Image(object):
             self.working_file = os.path.join(self.config.pathTemp, self.raw_file_basename+'.fits')
             shutil.copy2(self.raw_file, self.working_file)
             os.chmod(self.working_file, 0666)
-            self.tempFiles.append(self.working_file)
+            self.temp_files.append(self.working_file)
             self.file_ext = '.fits'
         elif self.file_ext == '.fits':
             self.logger.info('Making working copy of raw image: {}'.format(self.working_file))
             self.working_file = os.path.join(self.config.pathTemp, self.raw_file_name)
             shutil.copy2(self.raw_file, self.working_file)
             os.chmod(self.working_file, 0666)
-            self.tempFiles.append(self.working_file)
+            self.temp_files.append(self.working_file)
             self.file_ext = '.fits'
         elif self.file_ext in ['.dng', '.DNG', '.cr2', '.CR2']:
             self.logger.info('Converting {} to fits format'.format(self.working_file))
@@ -690,8 +686,8 @@ class Image(object):
         '''
         self.logger.info("Attempting to create WCS using Astrometry.net solver.")
         AstrometryCommand = ["solve-field", "-l", "5", "-O", "-p", "-T",
-                             "-L", str(self.tel.pixelScale.value*0.90),
-                             "-H", str(self.tel.pixelScale.value*1.10),
+                             "-L", str(self.tel.pixel_scale.value*0.90),
+                             "-H", str(self.tel.pixel_scale.value*1.10),
                              "-u", "arcsecperpix", "-z", "4", self.working_file]
         AstrometrySTDOUT = ""
 
@@ -735,15 +731,15 @@ class Image(object):
             else:
                 self.logger.warning("No new file created by astrometry.net")
                 self.astrometry_solved = False
-            ## Add files created by astrometry.net to tempFiles list
-            self.tempFiles.append(os.path.join(self.config.pathTemp, self.raw_file_basename+".axy"))
-            self.tempFiles.append(os.path.join(self.config.pathTemp, self.raw_file_basename+".wcs"))
-            self.tempFiles.append(os.path.join(self.config.pathTemp, self.raw_file_basename+".solved"))
-            self.tempFiles.append(os.path.join(self.config.pathTemp, self.raw_file_basename+".rdls"))
-            self.tempFiles.append(os.path.join(self.config.pathTemp, self.raw_file_basename+".match"))
-            self.tempFiles.append(os.path.join(self.config.pathTemp, self.raw_file_basename+".corr"))
-            self.tempFiles.append(os.path.join(self.config.pathTemp, self.raw_file_basename+".new.fits"))
-            self.tempFiles.append(os.path.join(self.config.pathTemp, self.raw_file_basename+"-indx.xyls"))
+            ## Add files created by astrometry.net to temp_files list
+            self.temp_files.append(os.path.join(self.config.pathTemp, self.raw_file_basename+".axy"))
+            self.temp_files.append(os.path.join(self.config.pathTemp, self.raw_file_basename+".wcs"))
+            self.temp_files.append(os.path.join(self.config.pathTemp, self.raw_file_basename+".solved"))
+            self.temp_files.append(os.path.join(self.config.pathTemp, self.raw_file_basename+".rdls"))
+            self.temp_files.append(os.path.join(self.config.pathTemp, self.raw_file_basename+".match"))
+            self.temp_files.append(os.path.join(self.config.pathTemp, self.raw_file_basename+".corr"))
+            self.temp_files.append(os.path.join(self.config.pathTemp, self.raw_file_basename+".new.fits"))
+            self.temp_files.append(os.path.join(self.config.pathTemp, self.raw_file_basename+"-indx.xyls"))
 
 
     ##-------------------------------------------------------------------------
@@ -759,12 +755,12 @@ class Image(object):
             center_from_WCS = self.image_WCS.wcs_pix2world([[self.nXPix/2, self.nYPix/2]], 1)
             self.logger.debug("  Using coordinates of center point: {0} {1}".format(center_from_WCS[0][0], center_from_WCS[0][1]))
             self.coordinate_of_center_pixel = coords.ICRS(ra=center_from_WCS[0][0], dec=center_from_WCS[0][1], unit=(u.degree, u.degree))
-            self.pointingError = self.coordinate_of_center_pixel.separation(self.coordinate_from_header)
+            self.pointing_error = self.coordinate_of_center_pixel.separation(self.coordinate_from_header)
             self.logger.debug("  Target Coordinates are:  {}".format(
                               self.coordinate_from_header.to_string(sep=":", precision=1, alwayssign=True))),
             self.logger.debug("  WCS of Central Pixel is: {}".format(
                               self.coordinate_of_center_pixel.to_string(sep=":", precision=1, alwayssign=True)))
-            self.logger.info("  Pointing Error is %.2f arcmin", self.pointingError.arcminute)
+            self.logger.info("  Pointing Error is %.2f arcmin", self.pointing_error.arcminute)
         else:
             self.logger.warning("Pointing error not calculated.")
 
@@ -777,7 +773,7 @@ class Image(object):
         Run SExtractor on image.
         '''
         assert type(self.tel.gain) == u.quantity.Quantity
-        assert type(self.tel.pixelScale) == u.quantity.Quantity
+        assert type(self.tel.pixel_scale) == u.quantity.Quantity
         
         if assoc:
             if self.header['FILTER']:
@@ -793,8 +789,8 @@ class Image(object):
                 self.catalog_filter = 'r'
 
         ## Set up file names
-        self.SExtractorCatalog = os.path.join(self.config.pathTemp, self.raw_file_basename+".cat")
-        self.tempFiles.append(self.SExtractorCatalog)
+        self.SExtractor_catalog = os.path.join(self.config.pathTemp, self.raw_file_basename+".cat")
+        self.temp_files.append(self.SExtractor_catalog)
 
         sextractor_output_param_file = os.path.join(self.config.pathTemp, 'default.param')
         if os.path.exists(sextractor_output_param_file): os.remove(sextractor_output_param_file)
@@ -811,29 +807,29 @@ class Image(object):
         for param in params:
             defaultparamsFO.write(param+'\n')
         defaultparamsFO.close()
-        self.tempFiles.append(sextractor_output_param_file)
+        self.temp_files.append(sextractor_output_param_file)
 
-        self.CheckImageFile = os.path.join(self.config.pathTemp, self.raw_file_basename+"_bksub.fits")
-        self.tempFiles.append(self.CheckImageFile)
+        self.check_image_file = os.path.join(self.config.pathTemp, self.raw_file_basename+"_bksub.fits")
+        self.temp_files.append(self.check_image_file)
         ## Compare input parameters dict to default
         SExtractor_default = {
-                             'CATALOG_NAME': self.SExtractorCatalog,
+                             'CATALOG_NAME': self.SExtractor_catalog,
                              'CATALOG_TYPE': 'FITS_LDAC',
                              'PARAMETERS_NAME': sextractor_output_param_file,
                              'GAIN': self.tel.gain.value,
                              'GAIN_KEY': 'GAIN',
-                             'PIXEL_SCALE': '{:.3f}'.format(self.tel.pixelScale.value),
+                             'PIXEL_SCALE': '{:.3f}'.format(self.tel.pixel_scale.value),
                              'CHECKIMAGE_TYPE': '-BACKGROUND',
-                             'CHECKIMAGE_NAME': self.CheckImageFile,
+                             'CHECKIMAGE_NAME': self.check_image_file,
                             }
 
         ## Use command line sextractor params
-        if not self.tel.SExtractorParams:
+        if not self.tel.SExtractor_params:
             SExtractor_params = SExtractor_default
         else:
-            SExtractor_params = self.tel.SExtractorParams
+            SExtractor_params = self.tel.SExtractor_params
             for key in SExtractor_default.keys():
-                if not key in self.tel.SExtractorParams.keys():
+                if not key in self.tel.SExtractor_params.keys():
                     SExtractor_params[key] = SExtractor_default[key]
 
         if assoc:
@@ -843,7 +839,7 @@ class Image(object):
 
             ## Create Assoc file with pixel coordinates of catalog stars
             assoc_file = os.path.join(self.config.pathTemp, 'assoc.txt')
-            self.tempFiles.append(assoc_file)
+            self.temp_files.append(assoc_file)
             if os.path.exists(assoc_file): os.remove(assoc_file)
             assocFO = open(assoc_file, 'w')
             for star in self.catalog:
@@ -855,13 +851,13 @@ class Image(object):
             assocFO.close()
 
             ## Add ASSOC parameters
-            original_params = self.tel.SExtractorParams
-            self.tel.SExtractorParams['ASSOC_NAME'] = assoc_file
-            self.tel.SExtractorParams['ASSOC_DATA'] = '0'
-            self.tel.SExtractorParams['ASSOC_PARAMS'] = '1,2,3'
-            self.tel.SExtractorParams['ASSOC_RADIUS'] = '2.0'
-            self.tel.SExtractorParams['ASSOC_TYPE'] = 'NEAREST'
-            self.tel.SExtractorParams['ASSOCSELEC_TYPE'] = 'MATCHED'
+            original_params = self.tel.SExtractor_params
+            self.tel.SExtractor_params['ASSOC_NAME'] = assoc_file
+            self.tel.SExtractor_params['ASSOC_DATA'] = '0'
+            self.tel.SExtractor_params['ASSOC_PARAMS'] = '1,2,3'
+            self.tel.SExtractor_params['ASSOC_RADIUS'] = '2.0'
+            self.tel.SExtractor_params['ASSOC_TYPE'] = 'NEAREST'
+            self.tel.SExtractor_params['ASSOCSELEC_TYPE'] = 'MATCHED'
 
         ## Run SExtractor
         SExtractorCommand = ["sex", self.working_file]
@@ -888,50 +884,48 @@ class Image(object):
             pos = SExSTDOUT.find("sextracted ")
             IsSExCount = re.match("\s*([0-9]+)\s+", SExSTDOUT[pos+11:pos+21])
             if IsSExCount:
-                self.nSExtracted = int(IsSExCount.group(1))
-                self.logger.info("  SExtractor found {0} sources.".format(self.nSExtracted))
-            else:
-                self.nSExtracted = None
+                nSExtracted = int(IsSExCount.group(1))
+                self.logger.info("  SExtractor found {0} sources.".format(nSExtracted))
             ## Extract Background Level from SExtractor Output
             pos = SExSTDOUT.find("Background: ")
             IsSExBkgnd = re.match("\s*([0-9\.]+)\s*", SExSTDOUT[pos+11:pos+21])
             if IsSExBkgnd:
-                self.SExBackground = float(IsSExBkgnd.group(1))
-                self.logger.info("  SExtractor background is {0:.1f}".format(self.SExBackground))
+                self.SExtractor_background = float(IsSExBkgnd.group(1))
+                self.logger.info("  SExtractor background is {0:.1f}".format(self.SExtractor_background))
             else:
-                self.SExBackground = None
+                self.SExtractor_background = None
             ## Extract Background RMS from SExtractor Output
-            IsSExBRMS = re.match("\s*RMS:\s([0-9\.]+)\s*", SExSTDOUT[pos+21:pos+37])
-            if IsSExBRMS:
-                self.SExBRMS = float(IsSExBRMS.group(1))
-                self.logger.info("  SExtractor background RMS is {0:.1f}".format(self.SExBRMS))
+            IsSExtractor_background_RMS = re.match("\s*RMS:\s([0-9\.]+)\s*", SExSTDOUT[pos+21:pos+37])
+            if IsSExtractor_background_RMS:
+                self.SExtractor_background_RMS = float(IsSExtractor_background_RMS.group(1))
+                self.logger.info("  SExtractor background RMS is {0:.1f}".format(self.SExtractor_background_RMS))
             else:
-                self.SExBRMS = None
+                self.SExtractor_background_RMS = None
 
             ## If No Output Catalog Created ...
-            if not os.path.exists(self.SExtractorCatalog):
+            if not os.path.exists(self.SExtractor_catalog):
                 self.logger.warning("SExtractor failed to create catalog.")
-                self.SExtractorCatalog = None
+                self.SExtractor_catalog = None
 
             ## Read FITS_LDAC SExtractor Catalog
             self.logger.debug("  Reading SExtractor output catalog.")
-            hdu = fits.open(self.SExtractorCatalog)
-            self.SExtractorResults = table.Table(hdu[2].data)
+            hdu = fits.open(self.SExtractor_catalog)
+            self.SExtractor_results = table.Table(hdu[2].data)
             SExImageRadius = []
             SExAngleInImage = []
             zp_diff = []
-            for star in self.SExtractorResults:
+            for star in self.SExtractor_results:
                 SExImageRadius.append(math.sqrt((self.nXPix/2-star['XWIN_IMAGE'])**2 + (self.nYPix/2-star['YWIN_IMAGE'])**2))
                 SExAngleInImage.append(math.atan((star['XWIN_IMAGE']-self.nXPix/2)/(self.nYPix/2-star['YWIN_IMAGE']))*180.0/math.pi)
                 if assoc:
                     zp_diff.append(star['VECTOR_ASSOC'][2] - star['MAG_AUTO'])
-            self.SExtractorResults.add_column(table.Column(data=SExImageRadius, name='ImageRadius'))
-            self.SExtractorResults.add_column(table.Column(data=SExAngleInImage, name='AngleInImage'))
-            self.nStarsSEx = len(self.SExtractorResults)
-            self.logger.info("  Read in {0} stars from SExtractor catalog.".format(self.nStarsSEx))
+            self.SExtractor_results.add_column(table.Column(data=SExImageRadius, name='ImageRadius'))
+            self.SExtractor_results.add_column(table.Column(data=SExAngleInImage, name='AngleInImage'))
+            self.n_stars_SExtracted = len(self.SExtractor_results)
+            self.logger.info("  Read in {0} stars from SExtractor catalog.".format(self.n_stars_SExtracted))
         if assoc:
-            self.SExtractorResults.add_column(table.Column(data=zp_diff, name='MagDiff'))
-            self.tel.SExtractorParams = original_params
+            self.SExtractor_results.add_column(table.Column(data=zp_diff, name='MagDiff'))
+            self.tel.SExtractor_params = original_params
 
 
     ##-------------------------------------------------------------------------
@@ -941,19 +935,19 @@ class Image(object):
         '''
         Determine typical FWHM of image from SExtractor results.
         '''
-        if self.nStarsSEx > 1:
+        if self.n_stars_SExtracted > 1:
             self.logger.info('Analyzing SExtractor results to determine typical image quality.')
-            if self.tel.measurement_radius:
-                self.logger.info('  Using stars in the inner {} pixels.'.format(self.tel.measurement_radius))
-                IQRadius = self.tel.measurement_radius
+            if self.tel.PSF_measurement_radius:
+                self.logger.info('  Using stars in the inner {} pixels.'.format(self.tel.PSF_measurement_radius))
+                IQRadius = self.tel.PSF_measurement_radius
             else:
                 IQRadiusFactor = 1.0
                 DiagonalRadius = math.sqrt((self.nXPix/2)**2+(self.nYPix/2)**2)
                 IQRadius = DiagonalRadius*IQRadiusFactor
-            CentralFWHMs = [star['FWHM_IMAGE'] for star in self.SExtractorResults if star['ImageRadius'] <= IQRadius]
-            CentralEllipticities = [star['ELLIPTICITY'] for star in self.SExtractorResults if star['ImageRadius'] <= IQRadius]
-            CentralAs = [star['AWIN_IMAGE'] for star in self.SExtractorResults if star['ImageRadius'] <= IQRadius]
-            CentralBs = [star['BWIN_IMAGE'] for star in self.SExtractorResults if star['ImageRadius'] <= IQRadius]
+            CentralFWHMs = [star['FWHM_IMAGE'] for star in self.SExtractor_results if star['ImageRadius'] <= IQRadius]
+            CentralEllipticities = [star['ELLIPTICITY'] for star in self.SExtractor_results if star['ImageRadius'] <= IQRadius]
+            CentralAs = [star['AWIN_IMAGE'] for star in self.SExtractor_results if star['ImageRadius'] <= IQRadius]
+            CentralBs = [star['BWIN_IMAGE'] for star in self.SExtractor_results if star['ImageRadius'] <= IQRadius]
             if len(CentralFWHMs) > 3:
                 self.FWHM = np.median(CentralFWHMs) * u.pix
                 self.ellipticity = np.median(CentralEllipticities)
@@ -974,24 +968,24 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Make Ellipticity Plot
     ##-------------------------------------------------------------------------
-    def MakePSFplot(self, plotFileName=None):
+    def MakePSFplot(self, filename=None):
         '''
         Plot ellipticity vectors of stars in image.
         Plot histogram of theta - image_angle values.
         '''
         self.logger.info('Calculating histogram of PSF angles.')
-        if plotFileName:
-            self.PSF_plotfilename = plotFileName
+        if filename:
+            self.PSF_plot_filename = filename
         else:
-            self.PSF_plotfilename = self.raw_file_basename+'_PSFinfo.png'
-        self.PSF_plotfile = os.path.join(self.config.pathPlots, self.PSF_plotfilename)
+            self.PSF_plot_filename = self.raw_file_basename+'_PSFinfo.png'
+        self.PSF_plotfile = os.path.join(self.config.pathPlots, self.PSF_plot_filename)
 
         ellip_threshold = 0.15
-        star_angles = [star['THETAWIN_IMAGE'] for star in self.SExtractorResults if star['ELLIPTICITY'] >= ellip_threshold]
-        image_angles = [star['AngleInImage'] for star in self.SExtractorResults if star['ELLIPTICITY'] >= ellip_threshold]
-        star_x = [star['XWIN_IMAGE'] for star in self.SExtractorResults if star['ELLIPTICITY'] >= ellip_threshold]
-        star_y = [star['YWIN_IMAGE'] for star in self.SExtractorResults if star['ELLIPTICITY'] >= ellip_threshold]
-        uncorrected_diffs = [star['THETAWIN_IMAGE']-star['AngleInImage'] for star in self.SExtractorResults if star['ELLIPTICITY'] >= ellip_threshold]
+        star_angles = [star['THETAWIN_IMAGE'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
+        image_angles = [star['AngleInImage'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
+        star_x = [star['XWIN_IMAGE'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
+        star_y = [star['YWIN_IMAGE'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
+        uncorrected_diffs = [star['THETAWIN_IMAGE']-star['AngleInImage'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
         
         nstars = len(star_angles)
         self.logger.debug('  Found {} stars with ellipticity greater than {:.2f}.'.format(nstars, ellip_threshold))
@@ -1010,11 +1004,11 @@ class Image(object):
         angle_centers = (diff_bins[:-1] + diff_bins[1:]) / 2
 
         ellip_binsize = 0.05
-        ellip_hist, ellip_bins = np.histogram(self.SExtractorResults['ELLIPTICITY'], bins=ellip_binsize*np.arange(21))
+        ellip_hist, ellip_bins = np.histogram(self.SExtractor_results['ELLIPTICITY'], bins=ellip_binsize*np.arange(21))
         ellip_centers = (ellip_bins[:-1] + ellip_bins[1:]) / 2
 
         fwhm_binsize = 0.1
-        fwhm_hist, fwhm_bins = np.histogram(self.SExtractorResults['FWHM_IMAGE'], bins=fwhm_binsize*np.arange(91))
+        fwhm_hist, fwhm_bins = np.histogram(self.SExtractor_results['FWHM_IMAGE'], bins=fwhm_binsize*np.arange(91))
         fwhm_centers = (fwhm_bins[:-1] + fwhm_bins[1:]) / 2
 
         star_angle_mean = np.mean(star_angles)
@@ -1052,7 +1046,7 @@ class Image(object):
             pyplot.yticks(size=10)
 
             Left3 = pyplot.axes([0.000, 0.0, 0.465, 0.400])
-            pyplot.plot(self.SExtractorResults['ImageRadius'], self.SExtractorResults['ELLIPTICITY'], 'k,')
+            pyplot.plot(self.SExtractor_results['ImageRadius'], self.SExtractor_results['ELLIPTICITY'], 'k,')
             pyplot.title('Correlation of Ellipticity with Image Radius')
             pyplot.xlabel('r (pixels)', size=10)
             pyplot.ylabel('Ellipticity', size=10)
@@ -1064,7 +1058,7 @@ class Image(object):
 #             Left3 = pyplot.axes([0.000, 0.0, 0.465, 0.400])
 #             Left3.set_aspect('equal')
 #             pyplot.plot(star_x, star_y, 'k,')
-#             pyplot.title('Positions of {:d}/{:d} stars with ellipticity > {:.2f}'.format(nstars, self.nStarsSEx, ellip_threshold), size=10)
+#             pyplot.title('Positions of {:d}/{:d} stars with ellipticity > {:.2f}'.format(nstars, self.n_stars_SExtracted, ellip_threshold), size=10)
 #             pyplot.xlabel('X (pixels)', size=10)
 #             pyplot.ylabel('Y (pixels)', size=10)
 #             pyplot.xlim(0, self.nXPix)
@@ -1073,7 +1067,7 @@ class Image(object):
 #             pyplot.yticks(size=10)
 
             Right1 = pyplot.axes([0.535, 0.750, 0.465, 0.240])
-            pyplot.title('PSF Angles for {:d}/{:d} stars with ellipticity > {:.2f}'.format(nstars, self.nStarsSEx, ellip_threshold), size=10)
+            pyplot.title('PSF Angles for {:d}/{:d} stars with ellipticity > {:.2f}'.format(nstars, self.n_stars_SExtracted, ellip_threshold), size=10)
             pyplot.bar(angle_centers, angle_hist, align='center', width=0.7*angle_binsize)
             pyplot.xlabel('Stellar PSF PA', size=10)
             pyplot.ylabel('N Stars', size=10)
@@ -1111,13 +1105,13 @@ class Image(object):
         Run SCAMP on SExtractor output catalog.
         '''
         ## Parameters for SCAMP
-        if self.tel.aheader:
-            aheader = self.tel.aheader
+        if self.tel.SCAMP_aheader:
+            SCAMP_aheader = self.tel.SCAMP_aheader
         else:
-            aheader = 'scamp.ahead'
+            SCAMP_aheader = 'scamp.ahead'
         SCAMP_params = {
                         'DISTORT_DEGREES': self.tel.distortionOrder,
-                        'AHEADER_GLOBAL': aheader,
+                        'SCAMP_aheader_GLOBAL': SCAMP_aheader,
                         'ASTREF_CATALOG': catalog,
                         'SAVE_REFCATALOG': 'N',
                         'REFOUT_CATPATH': self.config.pathTemp,
@@ -1132,17 +1126,17 @@ class Image(object):
                         'WRITE_XML': 'Y',
                         'XML_NAME': os.path.join(self.config.pathTemp, 'scamp.xml'),
                         }
-        SCAMPCommand = ["scamp", self.SExtractorCatalog]
+        SCAMPCommand = ["scamp", self.SExtractor_catalog]
         for key in SCAMP_params.keys():
             SCAMPCommand.append('-{}'.format(key))
             SCAMPCommand.append('{}'.format(SCAMP_params[key]))
         self.logger.info("Running SCAMP using {} catalog with distortion polynomial of order {}.".format(catalog, self.tel.distortionOrder))
-        if aheader:
-            self.logger.info("  Using aheader file: {}".format(aheader))
+        if SCAMP_aheader:
+            self.logger.info("  Using SCAMP_aheader file: {}".format(SCAMP_aheader))
         self.logger.debug("  SCAMP command: {}".format(SCAMPCommand))
         try:
             SCAMP_STDOUT = subprocess.check_output(SCAMPCommand, stderr=subprocess.STDOUT, universal_newlines=True)
-            self.tempFiles.append(os.path.join(self.config.pathTemp, 'scamp.xml'))
+            self.temp_files.append(os.path.join(self.config.pathTemp, 'scamp.xml'))
         except subprocess.CalledProcessError as e:
             self.logger.error("SCAMP failed.  Command: {}".format(e.cmd))
             self.logger.error("SCAMP failed.  Returncode: {}".format(e.returncode))
@@ -1170,7 +1164,7 @@ class Image(object):
         ## Populate FITS header with SCAMP derived header values in .head file
         head_file = os.path.splitext(self.working_file)[0]+'.head'
         if os.path.exists(head_file):
-            self.tempFiles.append(head_file)
+            self.temp_files.append(head_file)
             self.logger.info('  Writing SCAMP .head file back in to fits header on {}'.format(self.working_file))
             missfits_cmd = 'missfits -SAVE_TYPE REPLACE -WRITE_XML N {}'.format(self.working_file)
             self.logger.debug('  Running: {}'.format(missfits_cmd))
@@ -1219,7 +1213,7 @@ class Image(object):
                 self.logger.debug("  SWarp Output: "+line)
         ## Replace working_file with SWarp output file
         if os.path.exists(swarp_file):
-            self.tempFiles.append(os.path.join(self.config.pathTemp, 'swarp.xml'))
+            self.temp_files.append(os.path.join(self.config.pathTemp, 'swarp.xml'))
             self.logger.debug('  SWarp process succeeded.')
             self.logger.debug('  Moving SWarpped file to working file.')
             if os.path.exists(self.working_file): os.remove(self.working_file)
@@ -1258,7 +1252,7 @@ class Image(object):
             if os.path.exists('ucac4.txt'):
                 self.catalog_file_path = os.path.join(self.config.pathTemp, 'ucac4.txt')
                 shutil.move('ucac4.txt', self.catalog_file_path)
-                self.tempFiles.append(self.catalog_file_path)
+                self.temp_files.append(self.catalog_file_path)
 
             ## Read in UCAC catalog
             self.catalog = ascii.read(self.catalog_file_path, Reader=ascii.FixedWidthNoHeader,
@@ -1277,10 +1271,10 @@ class Image(object):
     def MeasureZeroPoint(self, plot=False):
         '''
         '''
-        assert 'VECTOR_ASSOC' in self.SExtractorResults.keys()
-        assert 'MagDiff' in self.SExtractorResults.keys()
-        ZeroPoint_mean = np.mean(self.SExtractorResults['MagDiff'])
-        ZeroPoint_median = np.median(self.SExtractorResults['MagDiff'])
+        assert 'VECTOR_ASSOC' in self.SExtractor_results.keys()
+        assert 'MagDiff' in self.SExtractor_results.keys()
+        ZeroPoint_mean = np.mean(self.SExtractor_results['MagDiff'])
+        ZeroPoint_median = np.median(self.SExtractor_results['MagDiff'])
         self.logger.debug('Mean Zero Point = {:.2f}'.format(ZeroPoint_mean))
         self.logger.info('Median Zero Point = {:.2f}'.format(ZeroPoint_median))
         self.zeroPoint = ZeroPoint_median
@@ -1292,18 +1286,18 @@ class Image(object):
 
             Fig1 = pyplot.axes([0.0, 0.5, 1.0, 0.4])
             pyplot.title('Instrumental Magnitudes vs. Calalog Magnitudes (Zero Point = {:.2f})'.format(self.zeroPoint))
-            pyplot.plot(self.SExtractorResults['VECTOR_ASSOC'].data[:,2], self.SExtractorResults['MAG_AUTO'],\
+            pyplot.plot(self.SExtractor_results['VECTOR_ASSOC'].data[:,2], self.SExtractor_results['MAG_AUTO'],\
                         'bo', markersize=4, markeredgewidth=0)
             pyplot.xlabel('UCAC4 {} Magnitude'.format(self.catalog_filter))
             pyplot.ylabel('Instrumental Magnitude')
             pyplot.grid()
             reject_fraction = 0.01
             ## Set Limits to XXth percentile of magnitudes in Y axis
-            sorted_inst_mag = sorted(self.SExtractorResults['MAG_AUTO'])
+            sorted_inst_mag = sorted(self.SExtractor_results['MAG_AUTO'])
             minmax_idx_inst_mag = [int(reject_fraction*len(sorted_inst_mag)), int((1.0-reject_fraction)*len(sorted_inst_mag))]
             pyplot.ylim(math.floor(sorted_inst_mag[minmax_idx_inst_mag[0]]), math.ceil(sorted_inst_mag[minmax_idx_inst_mag[1]]))
             ## Set Limits to XXth percentile of magnitudes in X axis
-            sorted_cat_mag = sorted(self.SExtractorResults['VECTOR_ASSOC'].data[:,2])
+            sorted_cat_mag = sorted(self.SExtractor_results['VECTOR_ASSOC'].data[:,2])
             minmax_idx_cat_mag = [int(reject_fraction*len(sorted_cat_mag)), int((1.0-reject_fraction)*len(sorted_cat_mag))]
             pyplot.xlim(math.floor(sorted_cat_mag[minmax_idx_cat_mag[0]]), math.ceil(sorted_cat_mag[minmax_idx_cat_mag[1]]))
             ## Plot Fitted Line
@@ -1313,15 +1307,15 @@ class Image(object):
 
             Fig2 = pyplot.axes([0.0, 0.0, 1.0, 0.4])
             pyplot.title('Magnitude Residuals (Zero Point = {:.2f})'.format(self.zeroPoint))
-            residuals = (self.SExtractorResults['MAG_AUTO'].data + self.zeroPoint) - self.SExtractorResults['VECTOR_ASSOC'].data[:,2]
-            pyplot.plot(self.SExtractorResults['VECTOR_ASSOC'].data[:,2], residuals, \
+            residuals = (self.SExtractor_results['MAG_AUTO'].data + self.zeroPoint) - self.SExtractor_results['VECTOR_ASSOC'].data[:,2]
+            pyplot.plot(self.SExtractor_results['VECTOR_ASSOC'].data[:,2], residuals, \
                         'bo', markersize=4, markeredgewidth=0)
             pyplot.xlabel('UCAC4 {} Magnitude'.format(self.catalog_filter))
             pyplot.ylabel('Magnitude Residual')
             pyplot.grid()
             ## Set Limits to XXth percentile of magnitudes in X axis
             reject_fraction = 0.01
-            sorted_cat_mag = sorted(self.SExtractorResults['VECTOR_ASSOC'].data[:,2])
+            sorted_cat_mag = sorted(self.SExtractor_results['VECTOR_ASSOC'].data[:,2])
             minmax_idx_cat_mag = [int(reject_fraction*len(sorted_cat_mag)), int((1.0-reject_fraction)*len(sorted_cat_mag))]
             pyplot.xlim(math.floor(sorted_cat_mag[minmax_idx_cat_mag[0]]), math.ceil(sorted_cat_mag[minmax_idx_cat_mag[1]]))
             ## Set Limits to XXth percentile of magnitudes in Y axis
@@ -1351,7 +1345,7 @@ class Image(object):
         ## Mark Intended Pointing Coordinates as read from header
         if markPointing and self.image_WCS:
             self.logger.debug("  Marking target pointing in jpeg.")
-            markSize = (self.tel.pointingMarkerSize.to(u.arcsec)/self.tel.pixelScale).value/binning
+            markSize = (self.tel.pointing_marker_size.to(u.arcsec)/self.tel.pixel_scale).value/binning
             ## Mark Central Pixel with a White Cross
             JPEGcommand.append("-stroke")
             JPEGcommand.append("white")
@@ -1413,11 +1407,11 @@ class Image(object):
             JPEGcommand.append('-font')
             JPEGcommand.append('fixed')
             JPEGcommand.append('-draw')
-            JPEGcommand.append("text 200,40 'Blue circle centered on target is {:.1f} arcmin diameter.'".format(self.tel.pointingMarkerSize.to(u.arcmin).value))
+            JPEGcommand.append("text 200,40 'Blue circle centered on target is {:.1f} arcmin diameter.'".format(self.tel.pointing_marker_size.to(u.arcmin).value))
 
 
         ## Mark Stars Detected by SExtractor
-        if markDetectedStars and self.SExtractorResults:
+        if markDetectedStars and self.SExtractor_results:
             nStarsMarked = 0
             self.logger.debug("  Marking stars found by SExtractor in jpeg.")
             JPEGcommand.append("-stroke")
@@ -1430,8 +1424,8 @@ class Image(object):
                 MarkRadius=max([6, 2*math.ceil(self.FWHM.value)])/binning
             else:
                 MarkRadius = 6
-            sortedSExtractorResults = np.sort(self.SExtractorResults, order=['MAG_AUTO'])
-            for star in sortedSExtractorResults:
+            sortedSExtractor_results = np.sort(self.SExtractor_results, order=['MAG_AUTO'])
+            for star in sortedSExtractor_results:
                 nStarsMarked += 1
                 if nStarsMarked <= nStarsLimit:
                     MarkXPos = star['XWIN_IMAGE']/binning
@@ -1451,9 +1445,9 @@ class Image(object):
             JPEGcommand.append('fixed')
             JPEGcommand.append('-draw')
             if nStarsMarked > nStarsLimit:
-                JPEGcommand.append("text 200,80 'Red circles indicate SExtractor detected stars.  Marked {} brightest stars out of {} detected.'".format(nStarsLimit, self.nSExtracted))
+                JPEGcommand.append("text 200,80 'Red circles indicate SExtractor detected stars.  Marked {} brightest stars out of {} detected.'".format(nStarsLimit, self.n_stars_SExtracted))
             else:
-                JPEGcommand.append("text 200,80 'Red circles indicate SExtractor detected stars.  Marked {} detected stars.'".format(self.nSExtracted))
+                JPEGcommand.append("text 200,80 'Red circles indicate SExtractor detected stars.  Marked {} detected stars.'".format(self.n_stars_SExtracted))
         ## Mark Catalog Stars
         if markCatalogStars and self.image_WCS:
             ## Need to check if header includes distortion terms
@@ -1493,7 +1487,7 @@ class Image(object):
             if nStarsMarked > nStarsLimit:
                 JPEGcommand.append("text 200,120 'Green circles indicate catalog stars.  Marked {} brightest stars out of {} in catalog.'".format(nStarsLimit, len(self.catalog)))
             else:
-                JPEGcommand.append("text 200,120 'Green circles indicate catalog stars.  Marked {} catalog stars.'".format(self.nSExtracted))
+                JPEGcommand.append("text 200,120 'Green circles indicate catalog stars.  Marked {} catalog stars.'".format(self.n_stars_SExtracted))
         ## Use background subtracted image generated by SExtractor
         if not backgroundSubtracted:
             JPEGcommand.append(self.working_file)
@@ -1508,7 +1502,7 @@ class Image(object):
             JPEGcommand.append('fixed')
             JPEGcommand.append('-draw')
             JPEGcommand.append("text 200,120 'Background Subtracted Image'")
-            JPEGcommand.append(self.CheckImageFile)
+            JPEGcommand.append(self.check_image_file)
         JPEGcommand.append(jpegFile)
         self.logger.debug("  Issuing convert command to create jpeg from {}.".format(self.working_file))
         try:
@@ -1527,7 +1521,7 @@ class Image(object):
             for line in ConvertSTDOUT.split("\n"):
                 if len(line) > 0:
                     self.logger.debug(line)
-            self.jpegFileNames.append(jpegFileName)
+            self.jpeg_file_names.append(jpegFileName)
 
 
     ##-------------------------------------------------------------------------
@@ -1547,7 +1541,7 @@ class Image(object):
         ## Mark Target Coordinates as read from header
         if markPointing and self.image_WCS and self.coordinate_from_header:
             self.logger.debug("Marking target pointing in jpeg.")
-            markSize = (self.tel.pointingMarkerSize.to(u.arcsec)/self.tel.pixelScale).value/binning
+            markSize = (self.tel.pointing_marker_size.to(u.arcsec)/self.tel.pixel_scale).value/binning
             ## Mark Central Pixel with a White Cross
             JPEGcommand.append("-stroke")
             JPEGcommand.append("white")
@@ -1600,7 +1594,7 @@ class Image(object):
             JPEGcommand.append("circle %d,%d %d,%d" % (TargetXPos, TargetYPos,
                                TargetXPos+markSize/2, TargetYPos))
         ## Mark Stars Detected by SExtractor
-        if markDetectedStars and self.SExtractorResults:
+        if markDetectedStars and self.SExtractor_results:
             self.logger.debug("Marking stars found by SExtractor in jpeg.")
             JPEGcommand.append("-stroke")
             JPEGcommand.append("red")
@@ -1612,8 +1606,8 @@ class Image(object):
                 MarkRadius=max([4, 2*math.ceil(self.FWHM.value)])
             else:
                 MarkRadius = 4
-            sortedSExtractorResults = np.sort(self.SExtractorResults, order=['MAG_AUTO'])
-            for star in sortedSExtractorResults:
+            sortedSExtractor_results = np.sort(self.SExtractor_results, order=['MAG_AUTO'])
+            for star in sortedSExtractor_results:
                 nStarsMarked += 1
                 if nStarsMarked <= nStarsLimit:
                     MarkXPos = star['XWIN_IMAGE']
@@ -1644,7 +1638,7 @@ class Image(object):
             JPEGcommand.append('-font')
             JPEGcommand.append('fixed')
             JPEGcommand.append('-draw')
-            JPEGcommand.append("text 200,40 'Blue circle centered on target is {:.1f} arcmin diameter.'".format(self.tel.pointingMarkerSize.to(u.arcmin).value))
+            JPEGcommand.append("text 200,40 'Blue circle centered on target is {:.1f} arcmin diameter.'".format(self.tel.pointing_marker_size.to(u.arcmin).value))
         ## Use background subtracted image generated by SExtractor
         if not backgroundSubtracted:
             JPEGcommand.append(self.working_file)
@@ -1659,7 +1653,7 @@ class Image(object):
             JPEGcommand.append('fixed')
             JPEGcommand.append('-draw')
             JPEGcommand.append("text 200,120 'Background Subtracted Image'")
-            JPEGcommand.append(self.CheckImageFile)
+            JPEGcommand.append(self.check_image_file)
         if markDetectedStars and nStarsMarked > nStarsLimit:
             JPEGcommand.append("-stroke")
             JPEGcommand.append("none")
@@ -1670,7 +1664,7 @@ class Image(object):
             JPEGcommand.append('-font')
             JPEGcommand.append('fixed')
             JPEGcommand.append('-draw')
-            JPEGcommand.append("text 200,80 'Marked {} brightest stars out of {}.'".format(nStarsLimit, self.nSExtracted))
+            JPEGcommand.append("text 200,80 'Marked {} brightest stars out of {}.'".format(nStarsLimit, self.n_stars_SExtracted))
         JPEGcommand.append(jpegFile)
         self.logger.debug("Issuing convert command to create jpeg.")
         try:
@@ -1689,7 +1683,7 @@ class Image(object):
             for line in ConvertSTDOUT.split("\n"):
                 if len(line) > 0:
                     self.logger.debug(line)
-            self.jpegFileNames.append(jpegFileName)
+            self.jpeg_file_names.append(jpegFileName)
 
 
     ##-------------------------------------------------------------------------
@@ -1700,7 +1694,7 @@ class Image(object):
         Clean up by deleting temporary files.
         '''
         self.logger.info("Cleaning Up Temporary Files.")
-        for item in self.tempFiles:
+        for item in self.temp_files:
             if os.path.exists(item):
                 self.logger.debug("  Deleting {0}".format(item))
                 os.remove(item)
@@ -1739,7 +1733,7 @@ class Image(object):
                       '    </style>',
                       '</head>',
                       '<body>',
-                      '    <h2>IQMon Results for {}</h2>'.format(self.tel.longName),
+                      '    <h2>IQMon Results for {}</h2>'.format(self.tel.long_name),
                       '    <table>',
                       '        <tr>']
             if "Date and Time" in fields:
@@ -1761,7 +1755,7 @@ class Image(object):
             if "MoonIllum" in fields:
                 header.append('        <th style="width:50px">Moon Illum. (%)</th>')
             if "FWHM" in fields:
-                header.append('        <th style="width:60px">FWHM ({})</th>'.format(str(self.tel.unitsForFWHM.unit)))
+                header.append('        <th style="width:60px">FWHM ({})</th>'.format(str(self.tel.units_for_FWHM.unit)))
             if "ellipticity" in fields:
                 header.append('        <th style="width:50px">Ellip.</th>')
             if "Background" in fields:
@@ -1804,24 +1798,24 @@ class Image(object):
             HTML.write("      <td style='color:black;text-align:left'>{0}</td>\n".format(self.dateObs))
         ## Write Filename (and links to jpegs)
         if "Filename" in fields:
-            if len(self.jpegFileNames) == 0:
+            if len(self.jpeg_file_names) == 0:
                 JPEG1_html = ""
                 JPEG2_html = ""
                 JPEG3_html = ""
-            elif len(self.jpegFileNames) == 1:
-                JPEG1_html = "<a href='{}'>".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]))
+            elif len(self.jpeg_file_names) == 1:
+                JPEG1_html = "<a href='{}'>".format(os.path.join("..", "..", "Plots", self.jpeg_file_names[0]))
                 JPEG2_html = ""
                 JPEG3_html = ""
-            elif len(self.jpegFileNames) == 2:
-                JPEG1_html = "<a href='{}'>".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]))
-                JPEG2_html = " (<a href='{}'>JPEG2</a>)".format(os.path.join("..", "..", "Plots", self.jpegFileNames[1]))
+            elif len(self.jpeg_file_names) == 2:
+                JPEG1_html = "<a href='{}'>".format(os.path.join("..", "..", "Plots", self.jpeg_file_names[0]))
+                JPEG2_html = " (<a href='{}'>JPEG2</a>)".format(os.path.join("..", "..", "Plots", self.jpeg_file_names[1]))
                 JPEG3_html = ""
-            elif len(self.jpegFileNames) >= 3:
-                JPEG1_html = "<a href='{}'>".format(os.path.join("..", "..", "Plots", self.jpegFileNames[0]))
-                JPEG2_html = " (<a href='{}'>JPEG2</a>)".format(os.path.join("..", "..", "Plots", self.jpegFileNames[1]))
-                JPEG3_html = " (<a href='{}'>JPEG3</a>)".format(os.path.join("..", "..", "Plots", self.jpegFileNames[2]))
+            elif len(self.jpeg_file_names) >= 3:
+                JPEG1_html = "<a href='{}'>".format(os.path.join("..", "..", "Plots", self.jpeg_file_names[0]))
+                JPEG2_html = " (<a href='{}'>JPEG2</a>)".format(os.path.join("..", "..", "Plots", self.jpeg_file_names[1]))
+                JPEG3_html = " (<a href='{}'>JPEG3</a>)".format(os.path.join("..", "..", "Plots", self.jpeg_file_names[2]))
             if self.PSF_plotfile:
-                PSFplot_html = " (<a href='{}'>PSF</a>)".format(os.path.join("..", "..", "Plots", self.PSF_plotfilename))
+                PSFplot_html = " (<a href='{}'>PSF</a>)".format(os.path.join("..", "..", "Plots", self.PSF_plot_filename))
             else:
                 PSFplot_html = ""
             if self.zeroPoint_plotfile:
@@ -1875,13 +1869,13 @@ class Image(object):
         if "FWHM" in fields:
             if self.FWHM:
                 ## Decide whether to flag FWHM value with red color
-                if self.FWHM > self.tel.thresholdFWHM.to(u.pix, equivalencies=self.tel.pixelScaleEquivalency):
+                if self.FWHM > self.tel.threshold_FWHM.to(u.pix, equivalencies=self.tel.pixel_scale_equivalency):
                     colorFWHM = "#FF5C33"
                 else:
                     colorFWHM = "#70DB70"
                 ## Convert FWHM value to appropriate units for HTML output
-                if self.tel.unitsForFWHM.unit == u.arcsec:
-                    FWHM_for_HTML = (self.FWHM * u.radian.to(u.arcsec)*self.tel.pixelSize.to(u.mm)/self.tel.focalLength.to(u.mm)).value
+                if self.tel.units_for_FWHM.unit == u.arcsec:
+                    FWHM_for_HTML = (self.FWHM * u.radian.to(u.arcsec)*self.tel.pixel_size.to(u.mm)/self.tel.focal_length.to(u.mm)).value
                 else:
                     FWHM_for_HTML = self.FWHM.value
                 HTML.write("      <td style='background-color:{0}'>{1:.2f}</td>\n".format(colorFWHM, FWHM_for_HTML))
@@ -1890,7 +1884,7 @@ class Image(object):
         if "ellipticity" in fields:
             if self.ellipticity:
                 ## Decide whether to flag ellipticity value with red color
-                if self.ellipticity > self.tel.thresholdEllipticity:
+                if self.ellipticity > self.tel.threshold_ellipticity:
                     colorEllipticity = "#FF5C33"
                 else:
                     colorEllipticity = "#70DB70"
@@ -1899,20 +1893,20 @@ class Image(object):
                 HTML.write("      <td style='color:{0}'>{1}</td>\n".format("#FF5C33", ""))
         ## Write SExtractor background and background RMS
         if "Background" in fields:
-            if self.SExBackground and self.SExBRMS:
-                HTML.write("      <td style='color:{0}'>{1:.0f} [{2:.0f}]</td>\n".format("black", self.SExBackground, self.SExBRMS))
+            if self.SExtractor_background and self.SExtractor_background_RMS:
+                HTML.write("      <td style='color:{0}'>{1:.0f} [{2:.0f}]</td>\n".format("black", self.SExtractor_background, self.SExtractor_background_RMS))
             else:
                 HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
         ## Write pointing error
         if "PErr" in fields:
-            if self.pointingError:
+            if self.pointing_error:
                 ## Decide whether to flag pointing error value with red color
-                if self.pointingError.arcminute > self.tel.thresholdPointingErr.to(u.arcmin).value:
-                    colorPointingError = "#FF5C33"
+                if self.pointing_error.arcminute > self.tel.threshold_pointing_err.to(u.arcmin).value:
+                    colorpointing_error = "#FF5C33"
                 else:
-                    colorPointingError = "#70DB70"
+                    colorpointing_error = "#70DB70"
                 ## Write HTML
-                HTML.write("      <td style='background-color:{0}'>{1:.1f}</td>\n".format(colorPointingError, self.pointingError.arcminute))
+                HTML.write("      <td style='background-color:{0}'>{1:.1f}</td>\n".format(colorpointing_error, self.pointing_error.arcminute))
             else:
                 HTML.write("      <td style='color:{0}'>{1}</td>\n".format("#FF5C33", ""))
         ## Write WCS position angle
@@ -1929,8 +1923,8 @@ class Image(object):
                 HTML.write("      <td style='color:{}'>{}</td>\n".format("black", ""))
         ## Write number of stars detected by SExtractor
         if "nStars" in fields:
-            if self.nStarsSEx:
-                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", self.nStarsSEx))
+            if self.n_stars_SExtracted:
+                HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", self.n_stars_SExtracted))
             else:
                 HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
         ## Write process time
@@ -1957,7 +1951,7 @@ class Image(object):
         if not os.path.exists(summaryFile):
             self.logger.info("  Making new astropy table object")
             SummaryTable = table.Table(names=("ExpStart", "File", "FWHM (pix)", "Ellipticity", 
-                                       "Alt (deg)", "Az (deg)", "Airmass", "PointingError (arcmin)", 
+                                       "Alt (deg)", "Az (deg)", "Airmass", "pointing_error (arcmin)", 
                                        "ZeroPoint", "nStars", "Background", "Background RMS"),
                                  dtype=('S22', 'S100', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'i4', 'f4', 'f4'),
                                  masked=True)
@@ -1977,7 +1971,7 @@ class Image(object):
                                           'Alt (deg)': [ascii.convert_numpy('f4')],
                                           'Az (deg)': [ascii.convert_numpy('f4')],
                                           'Airmass': [ascii.convert_numpy('f4')],
-                                          'PointingError (arcmin)': [ascii.convert_numpy('f4')],
+                                          'pointing_error (arcmin)': [ascii.convert_numpy('f4')],
                                           'ZeroPoint': [ascii.convert_numpy('f4')],
                                           'nStars': [ascii.convert_numpy('i4')],
                                           'Background': [ascii.convert_numpy('f4')],
@@ -2024,38 +2018,38 @@ class Image(object):
             airmass = 0.
             tableMask[6] = True
         ## Pointing Error
-        if self.pointingError: pointingError = self.pointingError.arcminute
+        if self.pointing_error: pointing_error = self.pointing_error.arcminute
         else:
-            pointingError = 0.
+            pointing_error = 0.
             tableMask[7] = True
         ## Zero Point
         if self.zeroPoint: zeroPoint = self.zeroPoint
         else:
             zeroPoint = 0.
             tableMask[8] = True
-        ## nStarsSEx
-        if self.nStarsSEx: nStarsSEx = self.nStarsSEx
+        ## n_stars_SExtracted
+        if self.n_stars_SExtracted: n_stars_SExtracted = self.n_stars_SExtracted
         else: 
-            nStarsSEx = 0.
+            n_stars_SExtracted = 0.
             tableMask[9] = True
         ## SExtractor Background
-        if self.SExBackground: SExBackground = self.SExBackground
+        if self.SExtractor_background: SExtractor_background = self.SExtractor_background
         else:
-            SExBackground = 0.
+            SExtractor_background = 0.
             tableMask[10] = True
         ## SExtractor Background RMS
-        if self.SExBRMS: SExBRMS = self.SExBRMS
+        if self.SExtractor_background_RMS: SExtractor_background_RMS = self.SExtractor_background_RMS
         else:
-            SExBRMS = 0.
+            SExtractor_background_RMS = 0.
             tableMask[11] = True
         ## Add row to table
         self.logger.debug("  Writing new row to log table.  Filename: {0}".format(raw_file_name))
         SummaryTable.add_row((dateObs, raw_file_name,
                               FWHM, ellipticity,
                               target_alt, target_az,
-                              airmass, pointingError,
-                              zeroPoint, nStarsSEx,
-                              SExBackground, SExBRMS),
+                              airmass, pointing_error,
+                              zeroPoint, n_stars_SExtracted,
+                              SExtractor_background, SExtractor_background_RMS),
                               mask=tableMask)
         ## Write Table to File
         self.logger.info("  Writing new summary file.")
