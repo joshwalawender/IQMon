@@ -33,97 +33,6 @@ from astropy.io import ascii
 
 
 ##-----------------------------------------------------------------------------
-## Define Config object to hold IQMon configuration information
-##-----------------------------------------------------------------------------
-class Config(object):
-    '''
-    Contains configuration information for IQMon package that can be passed to
-    methods and functions.
-
-    Properties:
-    - pathIQMonExec: path to the IQMon folder where sextractor default files
-                     are stored.  Typically this is the directory where IQMon
-                     is installed.
-    - pathLog:       path where IQMon's log files should be written
-                     (i.e. ~/IQMon/Logs/)
-    - pathPlots:     path where plots and jpegs should be written
-                     (i.e. ~/IQMon/Plots/)
-    - pathTemp:      path where temporary files should be written
-                     (i.e. ~/IQMon/tmp/)
-    - pathConfig:    path for config files.  Typically the base path for the
-                     above paths
-    '''
-    _singletons = dict()
-
-    def __new__(cls):
-        if not cls in cls._singletons:
-            cls._singletons[cls] = object.__new__(cls)
-        return cls._singletons[cls]
-
-    def __init__(self):
-        '''
-        Read and parse configuration file.
-        - Assumes that file is .IQMonConfig in the user's home directory.
-        - No defaults set, if config file not read, then values default to
-          None.
-        '''
-
-        ## Look for configuration file
-        HomePath = os.path.expandvars("$HOME")
-        ConfigFilePath = os.path.join(HomePath, ".IQMonConfig")
-        if os.path.exists(ConfigFilePath):
-            ConfigFile = open(ConfigFilePath, 'r')
-            ConfigFileLines = ConfigFile.readlines()
-            ConfigFile.close()
-        else:
-            ConfigFileLines = None
-
-        ## read configuration file
-        for line in ConfigFileLines:
-            IsIQMonExecPath = re.match("IQMONPATH\s=\s([\w/\-\.]+)", line)
-            if IsIQMonExecPath:
-                self.pathIQMonExec = os.path.abspath(IsIQMonExecPath.group(1))
-            IsLogPath = re.match("IQMONLOGS\s=\s([\w/\-\.]+)", line)
-            if IsLogPath:
-                self.pathLog = os.path.abspath(IsLogPath.group(1))
-            IsPlotsPath = re.match("IQMONPLOTS\s=\s([\w/\-\.]+)", line)
-            if IsPlotsPath:
-                self.pathPlots = os.path.abspath(IsPlotsPath.group(1))
-            IstmpPath = re.match("IQMONTMP\s=\s([\w/\-\.]+)", line)
-            if IstmpPath:
-                self.pathTemp = os.path.abspath(IstmpPath.group(1))
-            IsConfigPath = re.match("CONFIGPATH\s=\s([\w/\-\.]+)", line)
-            if IsConfigPath:
-                self.pathConfig = os.path.abspath(IsConfigPath.group(1))
-
-        ## Create Log Path if it doesn't exist
-        SplitPath = [self.pathLog]
-        CreatePaths = []
-        while not os.path.exists(SplitPath[0]):
-            CreatePaths.append(SplitPath[0])
-            SplitPath = os.path.split(SplitPath[0])
-        while len(CreatePaths) > 0:
-            os.mkdir(CreatePaths.pop())
-        ## Create Plots Path if it doesn't exist
-        SplitPath = [self.pathPlots]
-        CreatePaths = []
-        while not os.path.exists(SplitPath[0]):
-            CreatePaths.append(SplitPath[0])
-            SplitPath = os.path.split(SplitPath[0])
-        while len(CreatePaths) > 0:
-            os.mkdir(CreatePaths.pop())
-        ## Create temp Path if it doesn't exist
-        SplitPath = [self.pathTemp]
-        CreatePaths = []
-        while not os.path.exists(SplitPath[0]):
-            CreatePaths.append(SplitPath[0])
-            SplitPath = os.path.split(SplitPath[0])
-        while len(CreatePaths) > 0:
-            os.mkdir(CreatePaths.pop())
-
-
-
-##-----------------------------------------------------------------------------
 ## Define Telescope object to hold telescope information
 ##-----------------------------------------------------------------------------
 class Telescope(object):
@@ -132,9 +41,6 @@ class Telescope(object):
     functions.  The concept for operation is that the user will write a simple
     script which creates a telescope object and assigned values to all it's
     properties (or sets them to None).
-    
-    This is different from config as that is system wide and a user may want to
-    process multiple telescope and imager configurations.
     '''
     _singletons = dict()
 
@@ -143,7 +49,18 @@ class Telescope(object):
             cls._singletons[cls] = object.__new__(cls)
         return cls._singletons[cls]
 
-    def __init__(self):
+    def __init__(self, path_temp, path_plots):
+        self.temp_file_path = path_temp
+        self.plot_file_path = path_plots
+        paths_to_check = [self.temp_file_path, self.plot_file_path]
+        paths_to_create = []
+        for path in paths_to_check:
+            while not os.path.exists(path):
+                paths_to_create.append(path)
+                path = os.path.split(path)[0]
+        while len(paths_to_create) > 0:
+            os.mkdir(paths_to_create.pop())
+
         self.name = None
         self.long_name = None
         self.SCAMP_aheader = None
@@ -252,10 +169,9 @@ class Image(object):
     '''
     The Image object represents a single input image to the IQMon process.
 
-    When defined, the image objects requires both a filename to a valid fits
-    file and an IQMon.Config object.
+    When defined, the image objects requires a filename to a valid fits file.
     '''
-    def __init__(self, input, tel=None, config=None):
+    def __init__(self, input, tel=None):
         self.start_process_time = datetime.datetime.now()
         if os.path.exists(input):
             fits_file_directory, fits_filename = os.path.split(input)
@@ -272,10 +188,6 @@ class Image(object):
         if tel:
             assert type(tel) == Telescope
             self.tel = tel
-        ## Confirm that input config is an IQMon.Config object
-        if config:
-            assert type(config) == Config
-            self.config = config
         ## Initialize values to None
         self.logger = None
         self.working_file = None
@@ -554,7 +466,7 @@ class Image(object):
         if self.file_ext == '.fts':
             self.logger.info('Making working copy of raw image: {}'.format(\
                                                             self.working_file))
-            self.working_file = os.path.join(self.config.pathTemp,\
+            self.working_file = os.path.join(self.tel.temp_file_path,\
                                              self.raw_file_basename+'.fits')
             shutil.copy2(self.raw_file, self.working_file)
             os.chmod(self.working_file, 0666)
@@ -563,32 +475,35 @@ class Image(object):
         elif self.file_ext == '.fits':
             self.logger.info('Making working copy of raw image: {}'.format(\
                                                             self.working_file))
-            self.working_file = os.path.join(self.config.pathTemp,\
+            self.working_file = os.path.join(self.tel.temp_file_path,\
                                              self.raw_file_name)
             shutil.copy2(self.raw_file, self.working_file)
             os.chmod(self.working_file, 0666)
             self.temp_files.append(self.working_file)
             self.file_ext = '.fits'
         elif self.file_ext in ['.dng', '.DNG', '.cr2', '.CR2']:
-#             self.logger.info('Converting {} to fits format'.format(\
-#                                                             self.working_file))
+            self.logger.info('Converting {} to fits format'.format(\
+                                                            self.working_file))
             ## Make copy of raw file
-            self.working_file = os.path.join(self.config.pathTemp, self.raw_file_name)
+            self.working_file = os.path.join(self.tel.temp_file_path, self.raw_file_name)
+            self.logger.debug('Copying {} to {}'.format(self.raw_file, self.working_file))
             shutil.copy2(self.raw_file, self.working_file)
             os.chmod(self.working_file, 0666)
             self.temp_files.append(self.working_file)
             ## Use dcraw to convert to ppm file
             command = ['dcraw', '-t', '2', '-4', self.working_file]
+            self.logger.debug('Executing dcraw: {}'.format(repr(command)))
             subprocess.call(command)
-            ppm_file = os.path.join(self.config.pathTemp, self.raw_file_basename+'.ppm')
+            ppm_file = os.path.join(self.tel.temp_file_path, self.raw_file_basename+'.ppm')
             if os.path.exists(ppm_file):
                 self.working_file = ppm_file
                 self.temp_files.append(self.working_file)
             else:
                 self.logger.critical('dcraw failed.  Could not find ppm file.')
             ## Use pamtofits to convert to fits file
-            fits_file = os.path.join(self.config.pathTemp, self.raw_file_basename+'.fits')
+            fits_file = os.path.join(self.tel.temp_file_path, self.raw_file_basename+'.fits')
             command = 'pamtofits {} > {}'.format(self.working_file, fits_file)
+            self.logger.debug('Executing pamtofits: {}'.format(command))
             subprocess.call(command, shell=True)
             if os.path.exists(fits_file):
                 self.working_file = fits_file
@@ -598,7 +513,7 @@ class Image(object):
         else:
             self.logger.warning('Unrecognixed file extension: {}'.format(\
                                                                 self.file_ext))
-            self.working_file = os.path.join(self.config.pathTemp,\
+            self.working_file = os.path.join(self.tel.temp_file_path,\
                                              self.raw_file_name)
             sys.exit(1)
 
@@ -643,7 +558,7 @@ class Image(object):
                                       DataNightString,\
                                       str(int(math.floor(self.exptime.to(u.s).value)))
                                       )
-            MasterDarkFile  = os.path.join(self.config.pathTemp,\
+            MasterDarkFile  = os.path.join(self.tel.temp_file_path,\
                                            MasterDarkFilename)
             hdu_MasterDark = fits.PrimaryHDU(MasterDarkData)
             hdulist_MasterDark = fits.HDUList([hdu_MasterDark])
@@ -762,21 +677,21 @@ class Image(object):
                 self.logger.warning("No new file created by astrometry.net")
                 self.astrometry_solved = False
             ## Add files created by astrometry.net to temp_files list
-            self.temp_files.append(os.path.join(self.config.pathTemp,\
+            self.temp_files.append(os.path.join(self.tel.temp_file_path,\
                                       self.raw_file_basename+".axy"))
-            self.temp_files.append(os.path.join(self.config.pathTemp,\
+            self.temp_files.append(os.path.join(self.tel.temp_file_path,\
                                       self.raw_file_basename+".wcs"))
-            self.temp_files.append(os.path.join(self.config.pathTemp,\
+            self.temp_files.append(os.path.join(self.tel.temp_file_path,\
                                       self.raw_file_basename+".solved"))
-            self.temp_files.append(os.path.join(self.config.pathTemp,\
+            self.temp_files.append(os.path.join(self.tel.temp_file_path,\
                                       self.raw_file_basename+".rdls"))
-            self.temp_files.append(os.path.join(self.config.pathTemp,\
+            self.temp_files.append(os.path.join(self.tel.temp_file_path,\
                                       self.raw_file_basename+".match"))
-            self.temp_files.append(os.path.join(self.config.pathTemp,
+            self.temp_files.append(os.path.join(self.tel.temp_file_path,
                                       self.raw_file_basename+".corr"))
-            self.temp_files.append(os.path.join(self.config.pathTemp,\
+            self.temp_files.append(os.path.join(self.tel.temp_file_path,\
                                       self.raw_file_basename+".new.fits"))
-            self.temp_files.append(os.path.join(self.config.pathTemp,\
+            self.temp_files.append(os.path.join(self.tel.temp_file_path,\
                                       self.raw_file_basename+"-indx.xyls"))
 
 
@@ -871,11 +786,11 @@ class Image(object):
                 self.catalog_filter = 'r'
 
         ## Set up file names
-        self.SExtractor_catalog = os.path.join(self.config.pathTemp,\
+        self.SExtractor_catalog = os.path.join(self.tel.temp_file_path,\
                                                self.raw_file_basename+".cat")
         self.temp_files.append(self.SExtractor_catalog)
 
-        sextractor_output_param_file = os.path.join(self.config.pathTemp,\
+        sextractor_output_param_file = os.path.join(self.tel.temp_file_path,\
                                                    'default.param')
         if os.path.exists(sextractor_output_param_file):
             os.remove(sextractor_output_param_file)
@@ -894,7 +809,7 @@ class Image(object):
         defaultparamsFO.close()
         self.temp_files.append(sextractor_output_param_file)
 
-        self.check_image_file = os.path.join(self.config.pathTemp,\
+        self.check_image_file = os.path.join(self.tel.temp_file_path,\
                                         self.raw_file_basename+"_bksub.fits")
         self.temp_files.append(self.check_image_file)
         ## Compare input parameters dict to default
@@ -920,11 +835,11 @@ class Image(object):
 
         if assoc:
             assert os.path.exists(self.catalog_file_path)
-            assert os.path.exists(os.path.join(self.config.pathTemp, 'scamp.xml'))
+            assert os.path.exists(os.path.join(self.tel.temp_file_path, 'scamp.xml'))
             assert self.catalog_filter in self.catalog.keys()
 
             ## Create Assoc file with pixel coordinates of catalog stars
-            assoc_file = os.path.join(self.config.pathTemp, 'assoc.txt')
+            assoc_file = os.path.join(self.tel.temp_file_path, 'assoc.txt')
             self.temp_files.append(assoc_file)
             if os.path.exists(assoc_file): os.remove(assoc_file)
             assocFO = open(assoc_file, 'w')
@@ -1083,7 +998,7 @@ class Image(object):
             self.PSF_plot_filename = filename
         else:
             self.PSF_plot_filename = self.raw_file_basename+'_PSFinfo.png'
-        self.PSF_plotfile = os.path.join(self.config.pathPlots, self.PSF_plot_filename)
+        self.PSF_plotfile = os.path.join(self.tel.plot_file_path, self.PSF_plot_filename)
 
         ellip_threshold = 0.15
         star_angles = [star['THETAWIN_IMAGE'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
@@ -1226,7 +1141,7 @@ class Image(object):
                         'SCAMP_aheader_GLOBAL': SCAMP_aheader,
                         'ASTREF_CATALOG': catalog,
                         'SAVE_REFCATALOG': 'N',
-                        'REFOUT_CATPATH': self.config.pathTemp,
+                        'REFOUT_CATPATH': self.tel.temp_file_path,
                         'MERGEDOUTCAT_NAME': mergedcat_name,
                         'MERGEDOUTCAT_TYPE': mergedcat_type,
                         'CHECKPLOT_RES': '1200,1200',
@@ -1236,7 +1151,7 @@ class Image(object):
                         'SOLVE_PHOTOM': 'Y',
                         'ASTRINSTRU_KEY': 'QRUNID',
                         'WRITE_XML': 'Y',
-                        'XML_NAME': os.path.join(self.config.pathTemp, 'scamp.xml'),
+                        'XML_NAME': os.path.join(self.tel.temp_file_path, 'scamp.xml'),
                         }
         SCAMPCommand = ["scamp", self.SExtractor_catalog]
         for key in SCAMP_params.keys():
@@ -1250,7 +1165,7 @@ class Image(object):
         try:
             SCAMP_STDOUT = subprocess.check_output(SCAMPCommand,\
                              stderr=subprocess.STDOUT, universal_newlines=True)
-            self.temp_files.append(os.path.join(self.config.pathTemp, 'scamp.xml'))
+            self.temp_files.append(os.path.join(self.tel.temp_file_path, 'scamp.xml'))
         except subprocess.CalledProcessError as e:
             self.logger.error("SCAMP failed.  Command: {}".format(e.cmd))
             self.logger.error("SCAMP failed.  Returncode: {}".format(e.returncode))
@@ -1302,12 +1217,12 @@ class Image(object):
     '''
     def run_SWarp(self):
         ## Parameters for SWarp
-        swarp_file = os.path.join(self.config.pathTemp, 'swarpped.fits')
+        swarp_file = os.path.join(self.tel.temp_file_path, 'swarpped.fits')
         if os.path.exists(swarp_file): os.remove(swarp_file)
         SWarp_params = {'IMAGEOUT_NAME': swarp_file,
                         'COPY_KEYWORDS': 'FILTER,OBJECT,AIRMASS,DATE-OBS,LAT-OBS,LONG-OBS,ALT-OBS,RA,DEC',
                         'WRITE_XML': 'Y',
-                        'XML_NAME': os.path.join(self.config.pathTemp, 'swarp.xml'),
+                        'XML_NAME': os.path.join(self.tel.temp_file_path, 'swarp.xml'),
                        }
         SWarpCommand = ["swarp", self.working_file]
         for key in SWarp_params.keys():
@@ -1332,7 +1247,7 @@ class Image(object):
                 self.logger.debug("  SWarp Output: "+line)
         ## Replace working_file with SWarp output file
         if os.path.exists(swarp_file):
-            self.temp_files.append(os.path.join(self.config.pathTemp, 'swarp.xml'))
+            self.temp_files.append(os.path.join(self.tel.temp_file_path, 'swarp.xml'))
             self.logger.debug('  SWarp process succeeded.')
             self.logger.debug('  Moving SWarpped file to working file.')
             if os.path.exists(self.working_file): os.remove(self.working_file)
@@ -1372,7 +1287,7 @@ class Image(object):
             if os.path.exists("ucac4.txt"): os.remove("ucac4.txt")
             result = subprocess.call(UCACcommand)
             if os.path.exists('ucac4.txt'):
-                self.catalog_file_path = os.path.join(self.config.pathTemp,\
+                self.catalog_file_path = os.path.join(self.tel.temp_file_path,\
                                                       'ucac4.txt')
                 shutil.move('ucac4.txt', self.catalog_file_path)
                 self.temp_files.append(self.catalog_file_path)
@@ -1420,7 +1335,7 @@ class Image(object):
         ## Make Plot if Requested
         if plot:
             self.logger.info('Making ZeroPoint Plot')
-            self.zeroPoint_plotfile = os.path.join(self.config.pathPlots,\
+            self.zeroPoint_plotfile = os.path.join(self.tel.plot_file_path,\
                                        self.raw_file_basename+'_ZeroPoint.png')
             pyplot.figure(figsize=(9,11), dpi=100)
 
@@ -1495,7 +1410,7 @@ class Image(object):
         Make jpegs of image.
         '''
         nStarsLimit = 5000
-        jpegFile = os.path.join(self.config.pathPlots, jpegFileName)
+        jpegFile = os.path.join(self.tel.plot_file_path, jpegFileName)
         self.logger.info("Making jpeg (binning = {0}): {1}.".format(binning, jpegFileName))
         if os.path.exists(jpegFile): os.remove(jpegFile)
         binningString = str(1./binning*100)+"%"
