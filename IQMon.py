@@ -42,12 +42,12 @@ class Telescope(object):
     script which creates a telescope object and assigned values to all it's
     properties (or sets them to None).
     '''
-    _singletons = dict()
-
-    def __new__(cls):
-        if not cls in cls._singletons:
-            cls._singletons[cls] = object.__new__(cls)
-        return cls._singletons[cls]
+#     _singletons = dict()
+# 
+#     def __new__(cls):
+#         if not cls in cls._singletons:
+#             cls._singletons[cls] = object.__new__(cls)
+#         return cls._singletons[cls]
 
     def __init__(self, path_temp, path_plots):
         self.temp_file_path = path_temp
@@ -387,7 +387,9 @@ class Image(object):
             if self.altitude:
                 self.tel.site.elevation = self.altitude.to(u.meter).value
             ## Do calculations using ephem
-            TargetObject = ephem.readdb("Target,f|M|F7,"+ImageRA+","+ImageDEC+",2.02,2000")
+            RAstring = self.coordinate_from_header.ra.to_string(sep=":", precision=1, alwayssign=True)
+            DECstring = self.coordinate_from_header.dec.to_string(sep=":", precision=1, alwayssign=True)
+            TargetObject = ephem.readdb("Target,f|M|F7,"+RAstring+","+DECstring+",2.02,2000")
             TargetObject.compute(self.tel.site)
             self.target_alt = TargetObject.alt * 180./ephem.pi * u.deg
             self.target_az = TargetObject.az * 180./ephem.pi * u.deg
@@ -465,7 +467,7 @@ class Image(object):
             if os.path.exists(self.working_file): os.remove(self.working_file)
         if self.file_ext == '.fts':
             self.logger.info('Making working copy of raw image: {}'.format(\
-                                                            self.working_file))
+                                                            self.raw_file))
             self.working_file = os.path.join(self.tel.temp_file_path,\
                                              self.raw_file_basename+'.fits')
             shutil.copy2(self.raw_file, self.working_file)
@@ -474,7 +476,7 @@ class Image(object):
             self.file_ext = '.fits'
         elif self.file_ext == '.fits':
             self.logger.info('Making working copy of raw image: {}'.format(\
-                                                            self.working_file))
+                                                            self.raw_file))
             self.working_file = os.path.join(self.tel.temp_file_path,\
                                              self.raw_file_name)
             shutil.copy2(self.raw_file, self.working_file)
@@ -483,7 +485,7 @@ class Image(object):
             self.file_ext = '.fits'
         elif self.file_ext in ['.dng', '.DNG', '.cr2', '.CR2']:
             self.logger.info('Converting {} to fits format'.format(\
-                                                            self.working_file))
+                                                            self.raw_file))
             ## Make copy of raw file
             self.working_file = os.path.join(self.tel.temp_file_path, self.raw_file_name)
             self.logger.debug('Copying {} to {}'.format(self.raw_file, self.working_file))
@@ -705,10 +707,10 @@ class Image(object):
         calculated from the CDn_m or PCn_m matrix (no distortions considered).
         '''
         assert self.image_WCS
-        assert type(self.image_WCS) == astropy.wcs.WCS
+        assert type(self.image_WCS) == wcs.WCS
         header = self.image_WCS.to_header()
-        PC = np.array([ [float(header['PC11']), float(header['PC12'])],\
-                        [float(header['PC21']), float(header['PC22'])] ])
+        PC = np.array([ [float(header['PC1_1']), float(header['PC1_2'])],\
+                        [float(header['PC2_1']), float(header['PC2_2'])] ])
 
         ## Determine Pixel Scale
         result1 = PC.dot(np.array([[0], [1]]))
@@ -1641,9 +1643,9 @@ class Image(object):
         contains the image info extracted by IQMon.
         '''
         if not fields: fields=["Date and Time", "Filename", "Alt", "Az",\
-                               "Airmass", "moon_sep", "MoonIllum", "FWHM",\
+                               "Airmass", "MoonSep", "MoonIllum", "FWHM",\
                                "ellipticity", "Background", "PErr", "PosAng",\
-                               "ZeroPoint", "nStars", "total_process_time"]
+                               "ZeroPoint", "nStars", "ProcessTime"]
         ## If HTML file does not yet exist, create it and insert header
         ## from template file.
         self.logger.info('Adding results to HTML table.')
@@ -1685,7 +1687,7 @@ class Image(object):
                 header.append('        <th style="width:50px">Az (deg)</th>')
             if "Airmass" in fields:
                 header.append('        <th style="width:50px">Airmass</th>')
-            if "moon_sep" in fields:
+            if "MoonSep" in fields:
                 header.append('        <th style="width:50px">Moon Sep (deg)</th>')
             if "MoonIllum" in fields:
                 header.append('        <th style="width:50px">Moon Illum. (%)</th>')
@@ -1703,7 +1705,7 @@ class Image(object):
                 header.append('        <th style="width:50px">Zero Point (mag)</th>')
             if "nStars" in fields:
                 header.append('        <th style="width:50px">N Stars</th>')
-            if "total_process_time" in fields:
+            if "ProcessTime" in fields:
                 header.append('        <th style="width:50px">Process Time (sec)</th>')
             header.append('        </tr>')
             header.append('    </body>')
@@ -1787,7 +1789,7 @@ class Image(object):
                 HTML.write("      <td style='color:{0}'>{1:.2f}</td>\n".format("black", self.airmass))
             else:
                 HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
-        if "moon_sep" in fields:
+        if "MoonSep" in fields:
             if self.moon_sep:
                 if self.moon_alt > 0:
                     HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format("black", self.moon_sep.to(u.deg).value))
@@ -1863,7 +1865,7 @@ class Image(object):
             else:
                 HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
         ## Write process time
-        if "total_process_time" in fields:
+        if "ProcessTime" in fields:
             if self.total_process_time:
                 HTML.write("      <td style='color:{0}'>{1:.1f}</td>\n".format("black", self.total_process_time))
             else:
@@ -2005,6 +2007,6 @@ class Image(object):
         the image object) to the ending time (determined by this method).
         '''
         self.end_process_time = datetime.datetime.now()
-        self.total_process_time = self.end_process_time - self.start_process_time
+        self.total_process_time = (self.end_process_time - self.start_process_time).total_seconds()
         self.logger.info("IQMon processing time = {0:.1f} seconds".format(self.total_process_time))
 
