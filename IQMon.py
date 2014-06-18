@@ -33,40 +33,6 @@ from astropy.io import ascii
 
 
 ##-----------------------------------------------------------------------------
-## Function to Determine Orientation from WCS
-##-----------------------------------------------------------------------------
-def image_orientation(WCS):
-    '''
-    Given an astropy.wcs.WCS object, return a tuple containing the pixel scale,
-    position angle (in degrees), and the flipped state (a boolean) of the image
-    calculated from the CDn_m or PCn_m matrix (no distortions considered).
-    '''
-    assert type(WCS) == astropy.wcs.WCS
-    header = WCS.to_header()
-    PC = np.array([ [float(header['PC11']), float(header['PC12'])],\
-                    [float(header['PC21']), float(header['PC22'])] ])
-
-    ## Determine Pixel Scale
-    result1 = PC.dot(np.array([[0], [1]]))
-    pixel_scale1 = (math.sqrt(result1[0][0]**2 + result1[1][0]**2))*3600.
-    result2 = PC.dot(np.array([[1], [0]]))
-    pixel_scale2 = (math.sqrt(result2[0][0]**2 + result2[1][0]**2))*3600.
-    pixel_scale = np.mean([pixel_scale1, pixel_scale2]) * u.arcsec/u.pix
-
-    ## Determine Position Angle
-    ang1 = math.acos(PC[0][0])
-    ang2 = math.acos(PC[0][1])
-    ang3 = math.acos(PC[1][0])
-    ang4 = math.acos(PC[1][1])
-    PA = (270 - np.mean([ang1, ang2, ang3, ang4])*180/math.pi) * u.deg
-
-    ## Determine Flip State
-    flipped = np.linalg.det(PC) > 0
-
-    return pixel_scale, PA, flipped
-
-
-##-----------------------------------------------------------------------------
 ## Define Config object to hold IQMon configuration information
 ##-----------------------------------------------------------------------------
 class Config(object):
@@ -491,8 +457,7 @@ class Image(object):
 
         ## Determine PA of Image
         if self.image_WCS:
-            self.wcs_pixel_scale, self.position_angle, self.image_flipped = \
-                                              image_orientation(self.image_WCS)
+            self.orientation_from_wcs()
             self.logger.debug("  Position angle of WCS is {0:.1f} deg".format(\
                                           self.position_angle.to(u.deg).value))
             if self.image_flipped:
@@ -779,6 +744,42 @@ class Image(object):
                                       self.raw_file_basename+".new.fits"))
             self.temp_files.append(os.path.join(self.config.pathTemp,\
                                       self.raw_file_basename+"-indx.xyls"))
+
+
+    ##-----------------------------------------------------------------------------
+    ## Determine Orientation from WCS
+    ##-----------------------------------------------------------------------------
+    def orientation_from_wcs(self):
+        '''
+        Given an astropy.wcs.WCS object, return a tuple containing the pixel scale,
+        position angle (in degrees), and the flipped state (a boolean) of the image
+        calculated from the CDn_m or PCn_m matrix (no distortions considered).
+        '''
+        assert self.image_WCS
+        assert type(self.image_WCS) == astropy.wcs.WCS
+        header = self.image_WCS.to_header()
+        PC = np.array([ [float(header['PC11']), float(header['PC12'])],\
+                        [float(header['PC21']), float(header['PC22'])] ])
+
+        ## Determine Pixel Scale
+        result1 = PC.dot(np.array([[0], [1]]))
+        pixel_scale1 = (math.sqrt(result1[0][0]**2 + result1[1][0]**2))*3600.
+        result2 = PC.dot(np.array([[1], [0]]))
+        pixel_scale2 = (math.sqrt(result2[0][0]**2 + result2[1][0]**2))*3600.
+        pixel_scale = np.mean([pixel_scale1, pixel_scale2]) * u.arcsec/u.pix
+        self.wcs_pixel_scale = pixel_scale
+
+        ## Determine Position Angle
+        ang1 = math.acos(PC[0][0])
+        ang2 = math.acos(PC[0][1])
+        ang3 = math.acos(PC[1][0])
+        ang4 = math.acos(PC[1][1])
+        PA = (270 - np.mean([ang1, ang2, ang3, ang4])*180/math.pi) * u.deg
+        self.position_angle = PA
+
+        ## Determine Flip State
+        flipped = np.linalg.det(PC) > 0
+        self.image_flipped = flipped
 
 
     ##-------------------------------------------------------------------------
