@@ -1343,30 +1343,43 @@ class Image(object):
         elif not os.path.exists(local_UCAC_data):
             self.logger.warning('Cannot find local UCAC data: {}'.format(local_UCAC_data))
         else:
-            corners = self.image_WCS.wcs_pix2world([[0, 0], [self.nXPix, 0], [0, self.nYPix], [self.nXPix, self.nYPix]], 1)
+            corners = self.image_WCS.wcs_pix2world([[0, 0], [self.nXPix, 0],\
+                                 [0, self.nYPix], [self.nXPix, self.nYPix]], 1)
             field_size_RA = max(corners[:,0]) - min(corners[:,0])
             field_size_DEC = max(corners[:,1]) - min(corners[:,1])
             self.logger.info("Getting stars from local UCAC4 catalog.")
-            UCACcommand = [local_UCAC_command,
-                           "{:.4f}".format(self.coordinate_of_center_pixel.ra.degree),
-                           "{:.4f}".format(self.coordinate_of_center_pixel.dec.degree),
-                           "{:.2f}".format(field_size_RA),
-                           "{:.2f}".format(field_size_DEC),
+            UCACcommand = [local_UCAC_command,\
+                           "{:.4f}".format(self.coordinate_of_center_pixel.ra.degree),\
+                           "{:.4f}".format(self.coordinate_of_center_pixel.dec.degree),\
+                           "{:.2f}".format(field_size_RA),\
+                           "{:.2f}".format(field_size_DEC),\
                            local_UCAC_data]
             self.logger.debug("  Using command: {}".format(UCACcommand))
             if os.path.exists("ucac4.txt"): os.remove("ucac4.txt")
             result = subprocess.call(UCACcommand)
             if os.path.exists('ucac4.txt'):
-                self.catalog_file_path = os.path.join(self.config.pathTemp, 'ucac4.txt')
+                self.catalog_file_path = os.path.join(self.config.pathTemp,\
+                                                      'ucac4.txt')
                 shutil.move('ucac4.txt', self.catalog_file_path)
                 self.temp_files.append(self.catalog_file_path)
 
             ## Read in UCAC catalog
-            self.catalog = ascii.read(self.catalog_file_path, Reader=ascii.FixedWidthNoHeader,
-                                      data_start=1, guess=False,
-                                      names=('id', 'RA', 'Dec', 'mag1', 'mag2', 'smag', 'ot', 'dsf', 'RAepoch', 'Decepoch', 'dRA', 'dde', 'nt', 'nu', 'nc', 'pmRA', 'pmDec', 'sRA', 'sDec', '2mass', 'j', 'h', 'k', 'e2mphos', 'icq_flag', 'B', 'V', 'g', 'r', 'i'),
-                                      col_starts=(0, 10, 24, 36, 43, 50, 54, 57, 60, 68, 76, 80, 84, 87, 90, 93, 100, 107, 111, 115, 126, 133, 140, 147, 159, 168, 175, 182, 189, 196),
-                                      col_ends=(  9, 22, 35, 42, 49, 53, 56, 59, 67, 75, 79, 83, 86, 89, 92, 99, 106, 110, 114, 125, 132, 139, 146, 158, 167, 174, 181, 188, 195, 202),
+            colnames = ('id', 'RA', 'Dec', 'mag1', 'mag2', 'smag', 'ot', 'dsf',\
+                        'RAepoch', 'Decepoch', 'dRA', 'dde', 'nt', 'nu', 'nc',\
+                        'pmRA', 'pmDec', 'sRA', 'sDec', '2mass', 'j', 'h', 'k',\
+                        'e2mphos', 'icq_flag', 'B', 'V', 'g', 'r', 'i')
+            colstarts = (0, 10, 24, 36, 43, 50, 54, 57, 60, 68, 76, 80, 84, 87,\
+                         90, 93, 100, 107, 111, 115, 126, 133, 140, 147, 159,\
+                         168, 175, 182, 189, 196)
+            colends =   (9, 22, 35, 42, 49, 53, 56, 59, 67, 75, 79, 83, 86, 89,\
+                         92, 99, 106, 110, 114, 125, 132, 139, 146, 158, 167,\
+                         174, 181, 188, 195, 202)
+            self.catalog = ascii.read(self.catalog_file_path,\
+                                      Reader=ascii.FixedWidthNoHeader,\
+                                      data_start=1, guess=False,\
+                                      names=colnames,\
+                                      col_starts=colstarts,\
+                                      col_ends=colends,\
                                      )
             nUCACStars = len(self.catalog)
             self.logger.info("  Retrieved {} lines from UCAC catalog.".format(nUCACStars))
@@ -1388,12 +1401,15 @@ class Image(object):
         ## Make Plot if Requested
         if plot:
             self.logger.info('Making ZeroPoint Plot')
-            self.zeroPoint_plotfile = os.path.join(self.config.pathPlots, self.raw_file_basename+'_ZeroPoint.png')
+            self.zeroPoint_plotfile = os.path.join(self.config.pathPlots,\
+                                       self.raw_file_basename+'_ZeroPoint.png')
             pyplot.figure(figsize=(9,11), dpi=100)
 
             Fig1 = pyplot.axes([0.0, 0.5, 1.0, 0.4])
-            pyplot.title('Instrumental Magnitudes vs. Calalog Magnitudes (Zero Point = {:.2f})'.format(self.zeroPoint))
-            pyplot.plot(self.SExtractor_results['VECTOR_ASSOC'].data[:,2], self.SExtractor_results['MAG_AUTO'],\
+            pyplot.title('Instrumental Magnitudes vs. Calalog Magnitudes (Zero Point = {:.2f})'.format(\
+                                                               self.zeroPoint))
+            pyplot.plot(self.SExtractor_results['VECTOR_ASSOC'].data[:,2],\
+                        self.SExtractor_results['MAG_AUTO'],\
                         'bo', markersize=4, markeredgewidth=0)
             pyplot.xlabel('UCAC4 {} Magnitude'.format(self.catalog_filter))
             pyplot.ylabel('Instrumental Magnitude')
@@ -1401,21 +1417,30 @@ class Image(object):
             reject_fraction = 0.01
             ## Set Limits to XXth percentile of magnitudes in Y axis
             sorted_inst_mag = sorted(self.SExtractor_results['MAG_AUTO'])
-            minmax_idx_inst_mag = [int(reject_fraction*len(sorted_inst_mag)), int((1.0-reject_fraction)*len(sorted_inst_mag))]
-            pyplot.ylim(math.floor(sorted_inst_mag[minmax_idx_inst_mag[0]]), math.ceil(sorted_inst_mag[minmax_idx_inst_mag[1]]))
+            minmax_idx_inst_mag = [int(reject_fraction*len(sorted_inst_mag)),\
+                                   int((1.0-reject_fraction)*len(sorted_inst_mag))]
+            pyplot.ylim(math.floor(sorted_inst_mag[minmax_idx_inst_mag[0]]),\
+                        math.ceil(sorted_inst_mag[minmax_idx_inst_mag[1]]))
             ## Set Limits to XXth percentile of magnitudes in X axis
             sorted_cat_mag = sorted(self.SExtractor_results['VECTOR_ASSOC'].data[:,2])
-            minmax_idx_cat_mag = [int(reject_fraction*len(sorted_cat_mag)), int((1.0-reject_fraction)*len(sorted_cat_mag))]
-            pyplot.xlim(math.floor(sorted_cat_mag[minmax_idx_cat_mag[0]]), math.ceil(sorted_cat_mag[minmax_idx_cat_mag[1]]))
+            minmax_idx_cat_mag = [int(reject_fraction*len(sorted_cat_mag)),\
+                                  int((1.0-reject_fraction)*len(sorted_cat_mag))]
+            pyplot.xlim(math.floor(sorted_cat_mag[minmax_idx_cat_mag[0]]),\
+                        math.ceil(sorted_cat_mag[minmax_idx_cat_mag[1]]))
             ## Plot Fitted Line
-            fit_mags_cat = [math.floor(sorted_cat_mag[minmax_idx_cat_mag[0]]), math.ceil(sorted_cat_mag[minmax_idx_cat_mag[1]])]
+            fit_mags_cat = [math.floor(sorted_cat_mag[minmax_idx_cat_mag[0]]),\
+                            math.ceil(sorted_cat_mag[minmax_idx_cat_mag[1]])]
             fit_mags_inst = fit_mags_cat - self.zeroPoint
-            pyplot.plot(fit_mags_cat, fit_mags_inst, 'k-', alpha=0.5, label='Zero Point = {:.2f}'.format(self.zeroPoint))
+            pyplot.plot(fit_mags_cat, fit_mags_inst, 'k-', alpha=0.5,\
+                        label='Zero Point = {:.2f}'.format(self.zeroPoint))
 
             Fig2 = pyplot.axes([0.0, 0.0, 1.0, 0.4])
-            pyplot.title('Magnitude Residuals (Zero Point = {:.2f})'.format(self.zeroPoint))
-            residuals = (self.SExtractor_results['MAG_AUTO'].data + self.zeroPoint) - self.SExtractor_results['VECTOR_ASSOC'].data[:,2]
-            pyplot.plot(self.SExtractor_results['VECTOR_ASSOC'].data[:,2], residuals, \
+            pyplot.title('Magnitude Residuals (Zero Point = {:.2f})'.format(\
+                                                               self.zeroPoint))
+            residuals = (self.SExtractor_results['MAG_AUTO'].data + self.zeroPoint)\
+                         - self.SExtractor_results['VECTOR_ASSOC'].data[:,2]
+            pyplot.plot(self.SExtractor_results['VECTOR_ASSOC'].data[:,2],\
+                        residuals, \
                         'bo', markersize=4, markeredgewidth=0)
             pyplot.xlabel('UCAC4 {} Magnitude'.format(self.catalog_filter))
             pyplot.ylabel('Magnitude Residual')
@@ -1423,22 +1448,30 @@ class Image(object):
             ## Set Limits to XXth percentile of magnitudes in X axis
             reject_fraction = 0.01
             sorted_cat_mag = sorted(self.SExtractor_results['VECTOR_ASSOC'].data[:,2])
-            minmax_idx_cat_mag = [int(reject_fraction*len(sorted_cat_mag)), int((1.0-reject_fraction)*len(sorted_cat_mag))]
-            pyplot.xlim(math.floor(sorted_cat_mag[minmax_idx_cat_mag[0]]), math.ceil(sorted_cat_mag[minmax_idx_cat_mag[1]]))
+            minmax_idx_cat_mag = [int(reject_fraction*len(sorted_cat_mag)),\
+                                  int((1.0-reject_fraction)*len(sorted_cat_mag))]
+            pyplot.xlim(math.floor(sorted_cat_mag[minmax_idx_cat_mag[0]]),\
+                        math.ceil(sorted_cat_mag[minmax_idx_cat_mag[1]]))
             ## Set Limits to XXth percentile of magnitudes in Y axis
             sorted_residuals = sorted(residuals)
-            minmax_idx_residuals = [int(reject_fraction*len(sorted_residuals)), int((1.0-reject_fraction)*len(sorted_residuals))]
-            pyplot.ylim(sorted_residuals[minmax_idx_residuals[0]]-0.1, sorted_residuals[minmax_idx_residuals[1]]+0.1)
+            minmax_idx_residuals = [int(reject_fraction*len(sorted_residuals)),\
+                                    int((1.0-reject_fraction)*len(sorted_residuals))]
+            pyplot.ylim(sorted_residuals[minmax_idx_residuals[0]]-0.1,\
+                        sorted_residuals[minmax_idx_residuals[1]]+0.1)
             ## Plot Zero Line
-            pyplot.plot(fit_mags_cat, [0, 0], 'k-', alpha=0.5, label='Zero Point = {:.2f}'.format(self.zeroPoint))
+            pyplot.plot(fit_mags_cat, [0, 0], 'k-', alpha=0.5,\
+                        label='Zero Point = {:.2f}'.format(self.zeroPoint))
 
-            pyplot.savefig(self.zeroPoint_plotfile, dpi=100, bbox_inches='tight', pad_inches=0.10)
+            pyplot.savefig(self.zeroPoint_plotfile, dpi=100,\
+                           bbox_inches='tight', pad_inches=0.10)
 
 
     ##-------------------------------------------------------------------------
     ## Make JPEG of Image
     ##-------------------------------------------------------------------------
-    def MakeJPEG(self, jpegFileName, binning=1, markCatalogStars=False, markDetectedStars=False, markPointing=False, backgroundSubtracted=False, p1=0.2, p2=1.0):
+    def MakeJPEG(self, jpegFileName, binning=1, markCatalogStars=False,\
+                 markDetectedStars=False, markPointing=False,\
+                 backgroundSubtracted=False, p1=0.2, p2=1.0):
         '''
         Make jpegs of image.
         '''
@@ -1447,7 +1480,9 @@ class Image(object):
         self.logger.info("Making jpeg (binning = {0}): {1}.".format(binning, jpegFileName))
         if os.path.exists(jpegFile): os.remove(jpegFile)
         binningString = str(1./binning*100)+"%"
-        JPEGcommand = ["convert", "-contrast-stretch", "{}%,{}%".format(p1, p2), "-compress", "JPEG", "-quality", "70", "-resize", binningString]
+        JPEGcommand = ["convert", "-contrast-stretch", "{}%,{}%".format(p1, p2),\
+                       "-compress", "JPEG", "-quality", "70", "-resize",
+                       binningString]
         self.logger.debug('  Base convert command: {}'.format(' '.join(JPEGcommand)))
         ## Mark Intended Pointing Coordinates as read from header
         if markPointing and self.image_WCS:
@@ -1461,7 +1496,8 @@ class Image(object):
             JPEGcommand.append("-fill")
             JPEGcommand.append("none")
             pixelCenter = [self.nXPix/2/binning, self.nYPix/2/binning]
-            self.logger.debug("  Marking central pixel of JPEG: {:.1f},{:.1f}".format(pixelCenter[0], pixelCenter[1]))
+            self.logger.debug("  Marking central pixel of JPEG: {:.1f},{:.1f}".format(\
+                                                pixelCenter[0], pixelCenter[1]))
             JPEGcommand.append('-draw')
             JPEGcommand.append("line %d,%d %d,%d" % (pixelCenter[0], pixelCenter[1]+markSize,
                                pixelCenter[0], pixelCenter[1]+markSize*0.3))
@@ -1483,10 +1519,13 @@ class Image(object):
             JPEGcommand.append("none")
             ## This next block of code seems to make the call to wcs_world2pix
             ## happy, but I'm not sure I understand why.
-            foo = np.array([[self.coordinate_from_header.ra.hour*15., self.coordinate_from_header.dec.radian*180./math.pi], 
-                            [self.coordinate_from_header.ra.hour*15., self.coordinate_from_header.dec.radian*180./math.pi]])
+            foo = np.array([[self.coordinate_from_header.ra.hour*15.,\
+                             self.coordinate_from_header.dec.radian*180./math.pi],\
+                            [self.coordinate_from_header.ra.hour*15.,\
+                             self.coordinate_from_header.dec.radian*180./math.pi]])
             targetPixel = (self.image_WCS.wcs_world2pix(foo, 1)[0])
-            self.logger.debug("  Pixel of target on raw image: {:.1f},{:.1f}".format(targetPixel[0], targetPixel[1]))
+            self.logger.debug("  Pixel of target on raw image: {:.1f},{:.1f}".format(\
+                                               targetPixel[0], targetPixel[1]))
             ## Adjust target pixel value for different origin in ImageMagick
             TargetXPos = targetPixel[0]
             if not self.cropped:
@@ -1500,7 +1539,8 @@ class Image(object):
             ## Adjust target pixel value for binning
             TargetXPos = TargetXPos/binning
             TargetYPos = TargetYPos/binning
-            self.logger.debug("  Marking pixel of target on JPEG: {:.1f},{:.1f}".format(TargetXPos, TargetYPos))
+            self.logger.debug("  Marking pixel of target on JPEG: {:.1f},{:.1f}".format(\
+                                                       TargetXPos, TargetYPos))
             JPEGcommand.append('-draw')
             JPEGcommand.append("circle %d,%d %d,%d" % (TargetXPos, TargetYPos,
                                TargetXPos+markSize/2, TargetYPos))
@@ -1531,16 +1571,19 @@ class Image(object):
                 MarkRadius=max([6, 2*math.ceil(self.FWHM.value)])/binning
             else:
                 MarkRadius = 6
-            sortedSExtractor_results = np.sort(self.SExtractor_results, order=['MAG_AUTO'])
+            sortedSExtractor_results = np.sort(self.SExtractor_results,\
+                                               order=['MAG_AUTO'])
             for star in sortedSExtractor_results:
                 nStarsMarked += 1
                 if nStarsMarked <= nStarsLimit:
                     MarkXPos = star['XWIN_IMAGE']/binning
                     MarkYPos = (self.nYPix - star['YWIN_IMAGE'])/binning
                     JPEGcommand.append('-draw')
-                    JPEGcommand.append("circle %d,%d %d,%d" % (MarkXPos, MarkYPos, MarkXPos+MarkRadius, MarkYPos))
+                    JPEGcommand.append("circle %d,%d %d,%d" % (MarkXPos, MarkYPos,\
+                                       MarkXPos+MarkRadius, MarkYPos))
                 else:
-                    self.logger.info("  Only marked brightest {} stars found in image.".format(nStarsLimit))
+                    self.logger.info("  Only marked brightest {} stars found in image.".format(\
+                                                                  nStarsLimit))
                     break
             JPEGcommand.append("-stroke")
             JPEGcommand.append("none")
@@ -1552,9 +1595,11 @@ class Image(object):
             JPEGcommand.append('fixed')
             JPEGcommand.append('-draw')
             if nStarsMarked > nStarsLimit:
-                JPEGcommand.append("text 200,80 'Red circles indicate SExtractor detected stars.  Marked {} brightest stars out of {} detected.'".format(nStarsLimit, self.n_stars_SExtracted))
+                JPEGcommand.append("text 200,80 'Red circles mark {} detected stars out of {}.'".format(\
+                                   nStarsLimit, self.n_stars_SExtracted))
             else:
-                JPEGcommand.append("text 200,80 'Red circles indicate SExtractor detected stars.  Marked {} detected stars.'".format(self.n_stars_SExtracted))
+                JPEGcommand.append("text 200,80 'Red circles mark {} detected stars.'".format(\
+                                   self.n_stars_SExtracted))
         ## Mark Catalog Stars
         if markCatalogStars and self.image_WCS:
             ## Need to check if header includes distortion terms
@@ -1578,9 +1623,11 @@ class Image(object):
                     MarkXPos = pix[0][0]/binning
                     MarkYPos = (self.nYPix - pix[0][1])/binning
                     JPEGcommand.append('-draw')
-                    JPEGcommand.append("circle %d,%d %d,%d" % (MarkXPos, MarkYPos, MarkXPos+MarkRadius, MarkYPos))
+                    JPEGcommand.append("circle %d,%d %d,%d" % (MarkXPos, MarkYPos,\
+                                       MarkXPos+MarkRadius, MarkYPos))
                 else:
-                    self.logger.info("  Only marked brightest {} stars found in image.".format(nStarsLimit))
+                    self.logger.info("  Only marked brightest {} stars found in image.".format(\
+                                     nStarsLimit))
                     break
             JPEGcommand.append("-stroke")
             JPEGcommand.append("none")
@@ -1592,9 +1639,11 @@ class Image(object):
             JPEGcommand.append('fixed')
             JPEGcommand.append('-draw')
             if nStarsMarked > nStarsLimit:
-                JPEGcommand.append("text 200,120 'Green circles indicate catalog stars.  Marked {} brightest stars out of {} in catalog.'".format(nStarsLimit, len(self.catalog)))
+                JPEGcommand.append("text 200,120 'Green circles mark {} catalog stars out of {}.'".format(\
+                                   nStarsLimit, len(self.catalog)))
             else:
-                JPEGcommand.append("text 200,120 'Green circles indicate catalog stars.  Marked {} catalog stars.'".format(self.n_stars_SExtracted))
+                JPEGcommand.append("text 200,120 'Green circles mark {} catalog stars.'".format(\
+                                   self.n_stars_SExtracted))
         ## Use background subtracted image generated by SExtractor
         if not backgroundSubtracted:
             JPEGcommand.append(self.working_file)
@@ -1611,9 +1660,12 @@ class Image(object):
             JPEGcommand.append("text 200,120 'Background Subtracted Image'")
             JPEGcommand.append(self.check_image_file)
         JPEGcommand.append(jpegFile)
-        self.logger.debug("  Issuing convert command to create jpeg from {}.".format(self.working_file))
+        self.logger.debug("  Issuing command to create jpeg from {}.".format(\
+                                                            self.working_file))
         try:
-            ConvertSTDOUT = subprocess.check_output(JPEGcommand, stderr=subprocess.STDOUT, universal_newlines=True)
+            ConvertSTDOUT = subprocess.check_output(JPEGcommand,\
+                                                    stderr=subprocess.STDOUT,\
+                                                    universal_newlines=True)
         except subprocess.CalledProcessError as e:
             self.logger.error("Failed to create jpeg.")
             for line in e.output.split("\n"):
@@ -1623,169 +1675,8 @@ class Image(object):
             for line in e.strerror.split("\n"):
                 self.logger.error(line)
         except:
-            self.logger.error("Convert process failed: {0} {1} {2}".format(sys.exc_info()[0], sys.exc_info()[1], sys.exc_info()[2]))
-        else:
-            for line in ConvertSTDOUT.split("\n"):
-                if len(line) > 0:
-                    self.logger.debug(line)
-            self.jpeg_file_names.append(jpegFileName)
-
-
-    ##-------------------------------------------------------------------------
-    ## Make JPEG of Image
-    ##-------------------------------------------------------------------------
-    def old_MakeJPEG(self, jpegFileName, markDetectedStars=False, markPointing=False, rotate=False, binning=1, backgroundSubtracted=False):
-        '''
-        Make jpegs of image.
-        '''
-        nStarsMarked = 0
-        nStarsLimit = 5000
-        jpegFile = os.path.join(self.config.pathPlots, jpegFileName)
-        self.logger.info("Making jpeg (binning = {0}): {1}.".format(binning, jpegFileName))
-        if os.path.exists(jpegFile): os.remove(jpegFile)
-        binningString = str(1./binning*100)+"%"
-        JPEGcommand = ["convert", "-contrast-stretch", "0.9%,1%", "-compress", "JPEG", "-quality", "70", "-resize", binningString]
-        ## Mark Target Coordinates as read from header
-        if markPointing and self.image_WCS and self.coordinate_from_header:
-            self.logger.debug("Marking target pointing in jpeg.")
-            markSize = (self.tel.pointing_marker_size.to(u.arcsec)/self.tel.pixel_scale).value/binning
-            ## Mark Central Pixel with a White Cross
-            JPEGcommand.append("-stroke")
-            JPEGcommand.append("white")
-            JPEGcommand.append("-strokewidth")
-            JPEGcommand.append("3")
-            JPEGcommand.append("-fill")
-            JPEGcommand.append("none")
-            pixelCenter = [self.nXPix/2/binning, self.nYPix/2/binning]
-            self.logger.debug("Marking central pixel of JPEG: {:.1f},{:.1f}".format(pixelCenter[0], pixelCenter[1]))
-            JPEGcommand.append('-draw')
-            JPEGcommand.append("line %d,%d %d,%d" % (pixelCenter[0], pixelCenter[1]+markSize,
-                               pixelCenter[0], pixelCenter[1]+markSize*0.3))
-            JPEGcommand.append('-draw')
-            JPEGcommand.append("line %d,%d %d,%d" % (pixelCenter[0]+markSize, pixelCenter[1],
-                               pixelCenter[0]+markSize*0.3, pixelCenter[1]))
-            JPEGcommand.append('-draw')
-            JPEGcommand.append("line %d,%d %d,%d" % (pixelCenter[0], pixelCenter[1]-markSize,
-                               pixelCenter[0], pixelCenter[1]-markSize*0.3))
-            JPEGcommand.append('-draw')
-            JPEGcommand.append("line %d,%d %d,%d" % (pixelCenter[0]-markSize, pixelCenter[1],
-                               pixelCenter[0]-markSize*0.3, pixelCenter[1]))
-            ## Mark Coordinates of Target with a blue Circle
-            JPEGcommand.append("-stroke")
-            JPEGcommand.append("blue")
-            JPEGcommand.append("-strokewidth")
-            JPEGcommand.append("3")
-            JPEGcommand.append("-fill")
-            JPEGcommand.append("none")
-            ## This next block of code seems to make the call to wcs_world2pix
-            ## happy, but I'm not sure I understand why.
-            foo = np.array([[self.coordinate_from_header.ra.hour*15., self.coordinate_from_header.dec.radian*180./math.pi], 
-                            [self.coordinate_from_header.ra.hour*15., self.coordinate_from_header.dec.radian*180./math.pi]])
-            targetPixel = (self.image_WCS.wcs_world2pix(foo, 1)[0])
-            self.logger.debug("Pixel of target on raw image: {:.1f},{:.1f}".format(targetPixel[0], targetPixel[1]))
-            ## Adjust target pixel value for different origin in ImageMagick
-            TargetXPos = targetPixel[0]
-            if not self.cropped:
-                TargetYPos = self.nYPix - targetPixel[1]
-            else:
-                TargetYPos = self.original_nYPix - targetPixel[1]
-            ## Adjust target pixel value for cropping
-            if self.cropped:
-                TargetXPos = TargetXPos - self.crop_x1
-                TargetYPos = TargetYPos - self.crop_y1
-            ## Adjust target pixel value for binning
-            TargetXPos = TargetXPos/binning
-            TargetYPos = TargetYPos/binning
-            self.logger.debug("Marking pixel of target on JPEG: {:.1f},{:.1f}".format(TargetXPos, TargetYPos))
-            JPEGcommand.append('-draw')
-            JPEGcommand.append("circle %d,%d %d,%d" % (TargetXPos, TargetYPos,
-                               TargetXPos+markSize/2, TargetYPos))
-        ## Mark Stars Detected by SExtractor
-        if markDetectedStars and self.SExtractor_results:
-            self.logger.debug("Marking stars found by SExtractor in jpeg.")
-            JPEGcommand.append("-stroke")
-            JPEGcommand.append("red")
-            JPEGcommand.append("-strokewidth")
-            JPEGcommand.append("1")
-            JPEGcommand.append("-fill")
-            JPEGcommand.append("none")
-            if self.FWHM:
-                MarkRadius=max([4, 2*math.ceil(self.FWHM.value)])
-            else:
-                MarkRadius = 4
-            sortedSExtractor_results = np.sort(self.SExtractor_results, order=['MAG_AUTO'])
-            for star in sortedSExtractor_results:
-                nStarsMarked += 1
-                if nStarsMarked <= nStarsLimit:
-                    MarkXPos = star['XWIN_IMAGE']
-                    MarkYPos = self.nYPix - star['YWIN_IMAGE']
-                    JPEGcommand.append('-draw')
-                    JPEGcommand.append("circle %d,%d %d,%d" % (MarkXPos, MarkYPos, MarkXPos+MarkRadius, MarkYPos))
-                else:
-                    self.logger.info("  Only marked brightest {} stars found in image.".format(nStarsLimit))
-                    break
-        ## Rotate jpeg according to WCS (for images which have not had SWarp applied)
-        if rotate and self.position_angle:
-            self.logger.debug("Rotating jpeg by {0:.1f} deg".format(self.position_angle.to(u.deg).value))
-            if self.position_angle:
-                JPEGcommand.append("-rotate")
-                JPEGcommand.append(str(self.position_angle.to(u.deg).value))
-                if self.image_flipped:
-                    JPEGcommand.append("-flop")
-            else:
-                self.logger.warning("No position angle value found.  Not rotating JPEG.")
-        ## Write label describing marking of pointing
-        if markPointing and self.image_WCS and self.coordinate_from_header:
-            JPEGcommand.append("-stroke")
-            JPEGcommand.append("none")
-            JPEGcommand.append("-fill")
-            JPEGcommand.append("white")
-            JPEGcommand.append("-pointsize")
-            JPEGcommand.append("28")
-            JPEGcommand.append('-font')
-            JPEGcommand.append('fixed')
-            JPEGcommand.append('-draw')
-            JPEGcommand.append("text 200,40 'Blue circle centered on target is {:.1f} arcmin diameter.'".format(self.tel.pointing_marker_size.to(u.arcmin).value))
-        ## Use background subtracted image generated by SExtractor
-        if not backgroundSubtracted:
-            JPEGcommand.append(self.working_file)
-        else:
-            JPEGcommand.append("-stroke")
-            JPEGcommand.append("none")
-            JPEGcommand.append("-fill")
-            JPEGcommand.append("white")
-            JPEGcommand.append("-pointsize")
-            JPEGcommand.append("28")
-            JPEGcommand.append('-font')
-            JPEGcommand.append('fixed')
-            JPEGcommand.append('-draw')
-            JPEGcommand.append("text 200,120 'Background Subtracted Image'")
-            JPEGcommand.append(self.check_image_file)
-        if markDetectedStars and nStarsMarked > nStarsLimit:
-            JPEGcommand.append("-stroke")
-            JPEGcommand.append("none")
-            JPEGcommand.append("-fill")
-            JPEGcommand.append("white")
-            JPEGcommand.append("-pointsize")
-            JPEGcommand.append("28")
-            JPEGcommand.append('-font')
-            JPEGcommand.append('fixed')
-            JPEGcommand.append('-draw')
-            JPEGcommand.append("text 200,80 'Marked {} brightest stars out of {}.'".format(nStarsLimit, self.n_stars_SExtracted))
-        JPEGcommand.append(jpegFile)
-        self.logger.debug("Issuing convert command to create jpeg.")
-        try:
-            ConvertSTDOUT = subprocess.check_output(JPEGcommand, stderr=subprocess.STDOUT, universal_newlines=True)
-        except subprocess.CalledProcessError as e:
-            self.logger.error("Failed to create jpeg.")
-            for line in e.output.split("\n"):
-                self.logger.error(line)
-        except OSError as e:
-            self.logger.error("Failed to create jpeg.")
-            for line in e.strerror.split("\n"):
-                self.logger.error(line)
-        except:
-            self.logger.error("Convert process failed: {0} {1} {2}".format(sys.exc_info()[0], sys.exc_info()[1], sys.exc_info()[2]))
+            self.logger.error("Convert process failed: {0} {1} {2}".format(\
+                              sys.exc_info()[0], sys.exc_info()[1], sys.exc_info()[2]))
         else:
             for line in ConvertSTDOUT.split("\n"):
                 if len(line) > 0:
@@ -1815,7 +1706,10 @@ class Image(object):
         This function adds one line to the HTML table of images.  The line
         contains the image info extracted by IQMon.
         '''
-        if not fields: fields=["Date and Time", "Filename", "Alt", "Az", "Airmass", "moon_sep", "MoonIllum", "FWHM", "ellipticity", "Background", "PErr", "PosAng", "ZeroPoint", "nStars", "total_process_time"]
+        if not fields: fields=["Date and Time", "Filename", "Alt", "Az",\
+                               "Airmass", "moon_sep", "MoonIllum", "FWHM",\
+                               "ellipticity", "Background", "PErr", "PosAng",\
+                               "ZeroPoint", "nStars", "total_process_time"]
         ## If HTML file does not yet exist, create it and insert header
         ## from template file.
         self.logger.info('Adding results to HTML table.')
@@ -2057,13 +1951,15 @@ class Image(object):
         ## Read in previous data
         if not os.path.exists(summaryFile):
             self.logger.info("  Making new astropy table object")
-            SummaryTable = table.Table(names=("ExpStart", "File", "FWHM (pix)", "Ellipticity", 
-                                       "Alt (deg)", "Az (deg)", "Airmass", "pointing_error (arcmin)", 
-                                       "ZeroPoint", "nStars", "Background", "Background RMS"),
-                                 dtype=('S22', 'S100', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'i4', 'f4', 'f4'),
+            SummaryTable = table.Table(names=("ExpStart", "File", "FWHM (pix)", "Ellipticity",\
+                                       "Alt (deg)", "Az (deg)", "Airmass", "pointing_error (arcmin)", \
+                                       "ZeroPoint", "nStars", "Background", "Background RMS"),\
+                                 dtype=('S22', 'S100', 'f4', 'f4', 'f4', 'f4',\
+                                        'f4', 'f4', 'f4', 'i4', 'f4', 'f4'),\
                                  masked=True)
         else:
-            self.logger.info("  Reading astropy table object from file: {0}".format(summaryFile))
+            self.logger.info("  Reading astropy table object from file: {0}".format(\
+                                                                  summaryFile))
             try:
                 SummaryTable = ascii.read(summaryFile, guess=False,
                                           header_start=0, data_start=1,
@@ -2085,7 +1981,8 @@ class Image(object):
                                           'Background RMS': [ascii.convert_numpy('f4')]
                                           })
             except:
-                self.logger.critical("Failed to read summary file: {0} {1} {2}".format(sys.exc_info()[0], sys.exc_info()[1], sys.exc_info()[2]))
+                self.logger.critical("Failed to read summary file: {0} {1} {2}".format(\
+                                     sys.exc_info()[0], sys.exc_info()[1], sys.exc_info()[2]))
         ## Astropy table writer can not write None to table initialized
         ## with type.  If any outputs are None, change to some value.
         tableMask = np.zeros(12)
