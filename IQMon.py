@@ -713,23 +713,48 @@ class Image(object):
         '''
         Given an astropy.wcs.WCS object, return a tuple containing the pixel scale,
         position angle (in degrees), and the flipped state (a boolean) of the image
-        calculated from the CDn_m or PCn_m matrix (no distortions considered).
+        calculated from the PCn_m matrix (no distortions considered).
         '''
-        assert self.image_WCS
-        assert type(self.image_WCS) == wcs.WCS
-        header = self.image_WCS.to_header()
-        if ('PC1_1' in header.keys()) and\
-           ('PC1_2' in header.keys()) and\
-           ('PC2_1' in header.keys()) and\
-           ('PC2_2' in header.keys()):
-            PC = np.array([ [float(header['PC1_1']), float(header['PC1_2'])],\
-                            [float(header['PC2_1']), float(header['PC2_2'])] ])
+        ## Check that the WCS exists in the image_WCS object
+        if not self.image_WCS:
+            self.read_header()
+        if not self.image_WCS:
+            self.logger.warning('No WCS found in header.  No orientation calculated.')
+        else:
+            ## Check if the image_WCS is actually an astropy.wcs.WCS object
+            if isinstance(self.image_WCS, wcs.WCS):
+                ## By using the wcs to_header to make a new WCS object, we 
+                ## ensure that the CD matrix, if it exists, is converted to PC
+                header = astropy.wcs.WCS(self.image_WCS.to_header()).to_header()
+                if (header['CTYPE1'][0:4] == 'RA--') or (header['CTYPE1'][0:4] == 'DEC-')) and\
+                   (header['CTYPE2'][0:4] == 'RA--') or (header['CTYPE2'][0:4] == 'DEC-')) and\
+                   (int(header['WCSAXES']) == 2) and\
+                   ('PC1_1' in header.keys()) and\
+                   ('PC1_2' in header.keys()) and\
+                   ('PC2_1' in header.keys()) and\
+                   ('PC2_2' in header.keys()) and\
+                   ('CDELT1' in header.keys()) and\
+                   ('CDELT2' in header.keys()):
+                    ## If the wcs in header format meets all of the above
+                    ## assumptions, do nothing and proceed to header analysis.
+                    pass
+                else:
+                    self.logger.warning('WCS does not match expected contents.')
+                    header = None
+
+
+        if header:
+            ## By using the wcs to_header to make a new WCS object, we convert CD to PC
+            PC = astropy.wcs.WCS(self.image_WCS.to_header()).wcs.pc
+            cdelt1 = float(header['CDELT1'])
+            cdelt2 = float(header['CDELT2'])
 
             ## Determine Pixel Scale
             result1 = PC.dot(np.array([[0], [1]]))
-            pixel_scale1 = (math.sqrt(result1[0][0]**2 + result1[1][0]**2))*3600.
+            pixel_scale1 = cdelt1*(math.sqrt(result1[0][0]**2 + result1[1][0]**2))*3600.
             result2 = PC.dot(np.array([[1], [0]]))
-            pixel_scale2 = (math.sqrt(result2[0][0]**2 + result2[1][0]**2))*3600.
+            pixel_scale2 = cdelt2*(math.sqrt(result2[0][0]**2 + result2[1][0]**2))*3600.
+            ## Just average the pixel scale values for each direction
             pixel_scale = np.mean([pixel_scale1, pixel_scale2]) * u.arcsec/u.pix
             self.wcs_pixel_scale = pixel_scale
 
@@ -738,8 +763,7 @@ class Image(object):
             ang2 = math.acos(PC[0][1])
             ang3 = math.acos(PC[1][0])
             ang4 = math.acos(PC[1][1])
-            PA = (270 - np.mean([ang1, ang2, ang3, ang4])*180/math.pi) * u.deg
-            self.position_angle = PA
+            self.position_angle = (270 - np.mean([ang1, ang2, ang3, ang4])*180/math.pi) * u.deg
 
             ## Determine Flip State
             flipped = np.linalg.det(PC) > 0
