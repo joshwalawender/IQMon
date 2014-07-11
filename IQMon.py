@@ -334,28 +334,29 @@ class Image(object):
                                                        self.nXPix, self.nYPix))
 
         ## Read Header Coordinates in to astropy coordinates object
-        if (len(self.header['RA'].split(":")) != 3) and (len(self.header['DEC'].split(":")) != 3):
-            ## Header RA is : separated
-            self.coordinate_from_header = coords.ICRS('{} {}'.format(\
-                                            self.header['RA'],\
-                                            self.header['DEC']),\
-                                            unit=(u.hour, u.degree))
-        elif (len(self.header['RA'].split(" ")) == 3) and (len(self.header['DEC'].split(" ")) == 3):
-            ## Header RA is space separated
-            self.header['RA'] = ":".join(self.header['RA'].split(" "))
-            self.header['DEC'] = ":".join(self.header['DEC'].split(" "))
-            self.coordinate_from_header = coords.ICRS('{} {}'.format(\
-                                            self.header['RA'],\
-                                            self.header['DEC']),\
-                                            unit=(u.hour, u.degree))
-        elif float(self.header['RA']) and float(self.header['DEC']):
-            ## Header RA is decimal.  Assume degrees.
-            self.coordinate_from_header = coords.ICRS('{} {}'.format(\
-                                            self.header['RA'],\
-                                            self.header['DEC']),\
-                                            unit=(u.degree, u.degree))
-        else:
-            self.logger.info('  Could not parse coordinate strings from header')
+        if ('RA' in self.header.keys()) and ('DEC' in self.header.keys()):
+            if (len(self.header['RA'].split(":")) != 3) and (len(self.header['DEC'].split(":")) != 3):
+                ## Header RA is : separated
+                self.coordinate_from_header = coords.ICRS('{} {}'.format(\
+                                                self.header['RA'],\
+                                                self.header['DEC']),\
+                                                unit=(u.hour, u.degree))
+            elif (len(self.header['RA'].split(" ")) == 3) and (len(self.header['DEC'].split(" ")) == 3):
+                ## Header RA is space separated
+                self.header['RA'] = ":".join(self.header['RA'].split(" "))
+                self.header['DEC'] = ":".join(self.header['DEC'].split(" "))
+                self.coordinate_from_header = coords.ICRS('{} {}'.format(\
+                                                self.header['RA'],\
+                                                self.header['DEC']),\
+                                                unit=(u.hour, u.degree))
+            elif float(self.header['RA']) and float(self.header['DEC']):
+                ## Header RA is decimal.  Assume degrees.
+                self.coordinate_from_header = coords.ICRS('{} {}'.format(\
+                                                self.header['RA'],\
+                                                self.header['DEC']),\
+                                                unit=(u.degree, u.degree))
+            else:
+                self.logger.info('  Could not parse coordinate strings from header')
 
 
         ## Read WCS
@@ -368,12 +369,14 @@ class Image(object):
             self.logger.debug("  Found WCS in image header.")
 
         ## Determine PA of Image
+        print(self.image_WCS.printwcs())
         if self.image_WCS:
             self.orientation_from_wcs()
-            self.logger.debug("  Position angle of WCS is {0:.1f} deg".format(\
-                                          self.position_angle.to(u.deg).value))
-            if self.image_flipped:
-                self.logger.debug("  Image is mirrored.")
+            if self.position_angle:
+                self.logger.debug("  Position angle of WCS is {0:.1f} deg".format(\
+                                              self.position_angle.to(u.deg).value))
+                if self.image_flipped:
+                    self.logger.debug("  Image is mirrored.")
 
 
         ## Determine Alt, Az, Moon Sep, Moon Illum using ephem module
@@ -512,6 +515,12 @@ class Image(object):
                 self.temp_files.append(self.working_file)
             else:
                 self.logger.critical('pamtofits failed.  Could not find fits file.')
+            ## Write new fits file with only green image
+            hdulist = fits.open(self.working_file, 'update')
+            data = hdulist[0].data
+            green_data = data[1]
+            hdulist[0].data = green_data
+            hdulist.flush()
         else:
             self.logger.warning('Unrecognixed file extension: {}'.format(\
                                                                 self.file_ext))
@@ -709,28 +718,36 @@ class Image(object):
         assert self.image_WCS
         assert type(self.image_WCS) == wcs.WCS
         header = self.image_WCS.to_header()
-        PC = np.array([ [float(header['PC1_1']), float(header['PC1_2'])],\
-                        [float(header['PC2_1']), float(header['PC2_2'])] ])
+        if ('PC1_1' in header.keys()) and\
+           ('PC1_2' in header.keys()) and\
+           ('PC2_1' in header.keys()) and\
+           ('PC2_2' in header.keys()):
+            PC = np.array([ [float(header['PC1_1']), float(header['PC1_2'])],\
+                            [float(header['PC2_1']), float(header['PC2_2'])] ])
 
-        ## Determine Pixel Scale
-        result1 = PC.dot(np.array([[0], [1]]))
-        pixel_scale1 = (math.sqrt(result1[0][0]**2 + result1[1][0]**2))*3600.
-        result2 = PC.dot(np.array([[1], [0]]))
-        pixel_scale2 = (math.sqrt(result2[0][0]**2 + result2[1][0]**2))*3600.
-        pixel_scale = np.mean([pixel_scale1, pixel_scale2]) * u.arcsec/u.pix
-        self.wcs_pixel_scale = pixel_scale
+            ## Determine Pixel Scale
+            result1 = PC.dot(np.array([[0], [1]]))
+            pixel_scale1 = (math.sqrt(result1[0][0]**2 + result1[1][0]**2))*3600.
+            result2 = PC.dot(np.array([[1], [0]]))
+            pixel_scale2 = (math.sqrt(result2[0][0]**2 + result2[1][0]**2))*3600.
+            pixel_scale = np.mean([pixel_scale1, pixel_scale2]) * u.arcsec/u.pix
+            self.wcs_pixel_scale = pixel_scale
 
-        ## Determine Position Angle
-        ang1 = math.acos(PC[0][0])
-        ang2 = math.acos(PC[0][1])
-        ang3 = math.acos(PC[1][0])
-        ang4 = math.acos(PC[1][1])
-        PA = (270 - np.mean([ang1, ang2, ang3, ang4])*180/math.pi) * u.deg
-        self.position_angle = PA
+            ## Determine Position Angle
+            ang1 = math.acos(PC[0][0])
+            ang2 = math.acos(PC[0][1])
+            ang3 = math.acos(PC[1][0])
+            ang4 = math.acos(PC[1][1])
+            PA = (270 - np.mean([ang1, ang2, ang3, ang4])*180/math.pi) * u.deg
+            self.position_angle = PA
 
-        ## Determine Flip State
-        flipped = np.linalg.det(PC) > 0
-        self.image_flipped = flipped
+            ## Determine Flip State
+            flipped = np.linalg.det(PC) > 0
+            self.image_flipped = flipped
+        else:
+            self.wcs_pixel_scale = None
+            self.position_angle = None
+            self.image_flipped = None
 
 
     ##-------------------------------------------------------------------------
@@ -742,7 +759,7 @@ class Image(object):
         solved WCS).
         '''
         self.logger.info("Detemining pointing error based on WCS solution")
-        if self.image_WCS:
+        try:
             center_from_WCS = self.image_WCS.wcs_pix2world([[self.nXPix/2, self.nYPix/2]], 1)
             self.logger.debug("  Using coordinates of center point: {0} {1}".format(\
                                  center_from_WCS[0][0], center_from_WCS[0][1]))
@@ -758,7 +775,7 @@ class Image(object):
                               self.coordinate_of_center_pixel.to_string(sep=":", precision=1, alwayssign=True)))
             self.logger.info("  Pointing Error is {:.2f} arcmin".format(\
                                                 self.pointing_error.arcminute))
-        else:
+        except:
             self.logger.warning("Pointing error not calculated.")
 
 
@@ -1421,7 +1438,7 @@ class Image(object):
                        binningString]
         self.logger.debug('  Base convert command: {}'.format(' '.join(JPEGcommand)))
         ## Mark Intended Pointing Coordinates as read from header
-        if markPointing and self.image_WCS:
+        if markPointing and self.coordinate_from_header:
             self.logger.debug("  Marking target pointing in jpeg.")
             markSize = (self.tel.pointing_marker_size.to(u.arcsec)/self.tel.pixel_scale).value/binning
             ## Mark Central Pixel with a White Cross
