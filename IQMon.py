@@ -266,11 +266,11 @@ class Image(object):
         '''
         Read information from the image fits header.
         '''
+        self.logger.info("Reading image header.")
+#         self.header = fits.getheader(self.working_file, ext=0)
         hdulist = fits.open(self.working_file, ignore_missing_end=True)
         self.header = hdulist[0].header
-        self.image = hdulist[0].data
         hdulist.close()
-        self.logger.info("Reading image header.")
         
         ## Get exposure time from header (assumes seconds)
         try:
@@ -329,7 +329,7 @@ class Image(object):
 
 
         ## Determine Image Size in Pixels
-        self.nYPix, self.nXPix = self.image.shape
+        self.nYPix, self.nXPix = hdulist[0].data.shape
         self.logger.debug('  Image size is: {},{}'.format(\
                                                        self.nXPix, self.nYPix))
 
@@ -529,7 +529,11 @@ class Image(object):
             sys.exit(1)
 
 
-
+    ##-------------------------------------------------------------------------
+    ## Flag Saturated Pixels
+    ##-------------------------------------------------------------------------
+    def flag_saturated(self):
+        pass
 
     ##-------------------------------------------------------------------------
     ## Dark Subtract Image
