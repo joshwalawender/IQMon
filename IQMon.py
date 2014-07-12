@@ -337,24 +337,27 @@ class Image(object):
         if ('RA' in self.header.keys()) and ('DEC' in self.header.keys()):
             if (len(self.header['RA'].split(":")) != 3) and (len(self.header['DEC'].split(":")) != 3):
                 ## Header RA is : separated
-                self.coordinate_from_header = coords.ICRS('{} {}'.format(\
+                self.coordinate_from_header = coords.SkyCoord('{} {}'.format(\
                                                 self.header['RA'],\
                                                 self.header['DEC']),\
-                                                unit=(u.hour, u.degree))
+                                                unit=(u.hour, u.degree),\
+                                                frame='icrs')
             elif (len(self.header['RA'].split(" ")) == 3) and (len(self.header['DEC'].split(" ")) == 3):
                 ## Header RA is space separated
                 self.header['RA'] = ":".join(self.header['RA'].split(" "))
                 self.header['DEC'] = ":".join(self.header['DEC'].split(" "))
-                self.coordinate_from_header = coords.ICRS('{} {}'.format(\
+                self.coordinate_from_header = coords.SkyCoord('{} {}'.format(\
                                                 self.header['RA'],\
                                                 self.header['DEC']),\
-                                                unit=(u.hour, u.degree))
+                                                unit=(u.hour, u.degree),\
+                                                frame='icrs')
             elif float(self.header['RA']) and float(self.header['DEC']):
                 ## Header RA is decimal.  Assume degrees.
-                self.coordinate_from_header = coords.ICRS('{} {}'.format(\
+                self.coordinate_from_header = coords.SkyCoord('{} {}'.format(\
                                                 self.header['RA'],\
                                                 self.header['DEC']),\
-                                                unit=(u.degree, u.degree))
+                                                unit=(u.degree, u.degree),\
+                                                frame='icrs')
             else:
                 self.logger.info('  Could not parse coordinate strings from header')
 
@@ -369,7 +372,6 @@ class Image(object):
             self.logger.debug("  Found WCS in image header.")
 
         ## Determine PA of Image
-        print(self.image_WCS.printwcs())
         if self.image_WCS:
             self.orientation_from_wcs()
             if self.position_angle:
@@ -791,10 +793,11 @@ class Image(object):
             center_from_WCS = self.image_WCS.wcs_pix2world([[self.nXPix/2, self.nYPix/2]], 1)
             self.logger.debug("  Using coordinates of center point: {0} {1}".format(\
                                  center_from_WCS[0][0], center_from_WCS[0][1]))
-            self.coordinate_of_center_pixel = coords.ICRS(\
+            self.coordinate_of_center_pixel = coords.SkyCoord(\
                                               ra=center_from_WCS[0][0],\
                                               dec=center_from_WCS[0][1],\
-                                              unit=(u.degree, u.degree))
+                                              unit=(u.degree, u.degree),\
+                                              frame='icrs')
             self.pointing_error = self.coordinate_of_center_pixel.separation(\
                                                    self.coordinate_from_header)
             self.logger.debug("  Target Coordinates are:  {}".format(
