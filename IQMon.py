@@ -196,6 +196,7 @@ class Image(object):
         self.exptime = None
         self.catalog_filter = None
         self.object_name = None
+        self.image_WCS = None
         self.astrometry_solved = None
         self.coordinate_of_center_pixel = None
         self.coordinate_from_header = None
@@ -271,7 +272,6 @@ class Image(object):
 #         self.header = fits.getheader(self.working_file, ext=0)
         hdulist = fits.open(self.working_file, ignore_missing_end=True)
         self.header = hdulist[0].header
-        hdulist.close()
         
         ## Get exposure time from header (assumes seconds)
         try:
@@ -381,6 +381,7 @@ class Image(object):
                 if self.image_flipped:
                     self.logger.debug("  Image is mirrored.")
 
+        hdulist.close()
 
         ## Determine Alt, Az, Moon Sep, Moon Illum using ephem module
         if self.dateObs and self.latitude and self.longitude:
@@ -477,7 +478,7 @@ class Image(object):
             self.working_file = os.path.join(self.tel.temp_file_path,\
                                              self.raw_file_basename+'.fits')
             shutil.copy2(self.raw_file, self.working_file)
-            os.chmod(self.working_file, 555)
+            os.chmod(self.working_file, 0666)
             self.temp_files.append(self.working_file)
             self.file_ext = '.fits'
         elif self.file_ext == '.fits':
@@ -486,7 +487,7 @@ class Image(object):
             self.working_file = os.path.join(self.tel.temp_file_path,\
                                              self.raw_file_name)
             shutil.copy2(self.raw_file, self.working_file)
-            os.chmod(self.working_file, 555)
+            os.chmod(self.working_file, 0666)
             self.temp_files.append(self.working_file)
             self.file_ext = '.fits'
         elif self.file_ext in ['.dng', '.DNG', '.cr2', '.CR2']:
@@ -496,8 +497,8 @@ class Image(object):
             self.working_file = os.path.join(self.tel.temp_file_path, self.raw_file_name)
             self.logger.debug('Copying {} to {}'.format(self.raw_file, self.working_file))
             shutil.copy2(self.raw_file, self.working_file)
-            self.logger.debug('Setting working file permissions')
-            os.chmod(self.working_file, 555)
+            self.logger.debug('Setting working file permissions for {}'.format(self.working_file))
+            os.chmod(self.working_file, 0666)
             self.temp_files.append(self.working_file)
             ## Use dcraw to convert to ppm file
             command = ['dcraw', '-t', '2', '-4', self.working_file]
@@ -733,27 +734,36 @@ class Image(object):
             if isinstance(self.image_WCS, wcs.WCS):
                 ## By using the wcs to_header to make a new WCS object, we 
                 ## ensure that the CD matrix, if it exists, is converted to PC
-                header = astropy.wcs.WCS(self.image_WCS.to_header()).to_header()
-                if (header['CTYPE1'][0:4] == 'RA--') or (header['CTYPE1'][0:4] == 'DEC-') and\
-                   (header['CTYPE2'][0:4] == 'RA--') or (header['CTYPE2'][0:4] == 'DEC-') and\
-                   (int(header['WCSAXES']) == 2) and\
-                   ('PC1_1' in header.keys()) and\
-                   ('PC1_2' in header.keys()) and\
-                   ('PC2_1' in header.keys()) and\
-                   ('PC2_2' in header.keys()) and\
-                   ('CDELT1' in header.keys()) and\
-                   ('CDELT2' in header.keys()):
-                    ## If the wcs in header format meets all of the above
-                    ## assumptions, do nothing and proceed to header analysis.
-                    pass
+                header = wcs.WCS(self.image_WCS.to_header()).to_header()
+                if ('CTYPE1' in header.keys()) and ('CTYPE2' in header.keys()) and\
+                   ('WCSAXES' in header.keys()):
+                    if (header['CTYPE1'][0:4] == 'RA--') or (header['CTYPE1'][0:4] == 'DEC-') and\
+                       (header['CTYPE2'][0:4] == 'RA--') or (header['CTYPE2'][0:4] == 'DEC-') and\
+                       (int(header['WCSAXES']) == 2) and\
+                       ('PC1_1' in header.keys()) and\
+                       ('PC1_2' in header.keys()) and\
+                       ('PC2_1' in header.keys()) and\
+                       ('PC2_2' in header.keys()) and\
+                       ('CDELT1' in header.keys()) and\
+                       ('CDELT2' in header.keys()):
+                        ## If the wcs in header format meets all of the above
+                        ## assumptions, do nothing and proceed to header analysis.
+                        pass
+                    else:
+                        self.logger.warning('WCS does not match expected contents.')
+                        for key in header.keys():
+                            self.logger.debug('  {:8s} = {}'.format(key, header[key]))
+                        header = None
                 else:
-                    self.logger.warning('WCS does not match expected contents.')
+                    self.logger.warning('WCS does not have expected keywords.')
+                    for key in header.keys():
+                        self.logger.debug('  {:8s} = {}'.format(key, header[key]))
                     header = None
 
 
         if header:
             ## By using the wcs to_header to make a new WCS object, we convert CD to PC
-            PC = astropy.wcs.WCS(self.image_WCS.to_header()).wcs.pc
+            PC = wcs.WCS(self.image_WCS.to_header()).wcs.pc
             cdelt1 = float(header['CDELT1'])
             cdelt2 = float(header['CDELT2'])
 
