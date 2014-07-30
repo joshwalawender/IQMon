@@ -120,7 +120,8 @@ class Telescope(object):
         else:
             self.units_for_FWHM *= u.pix
         ## ROI is string
-        assert type(self.ROI) == str
+        if self.ROI:
+            assert type(self.ROI) == str
         ## Default threshold_FWHM to same units as units_for_FWHM
         if type(self.threshold_FWHM) == u.quantity.Quantity:
             assert self.threshold_FWHM.unit in [u.arcsec, u.pix]
@@ -476,7 +477,7 @@ class Image(object):
             self.working_file = os.path.join(self.tel.temp_file_path,\
                                              self.raw_file_basename+'.fits')
             shutil.copy2(self.raw_file, self.working_file)
-            os.chmod(self.working_file, 0666)
+            os.chmod(self.working_file, 555)
             self.temp_files.append(self.working_file)
             self.file_ext = '.fits'
         elif self.file_ext == '.fits':
@@ -485,7 +486,7 @@ class Image(object):
             self.working_file = os.path.join(self.tel.temp_file_path,\
                                              self.raw_file_name)
             shutil.copy2(self.raw_file, self.working_file)
-            os.chmod(self.working_file, 0666)
+            os.chmod(self.working_file, 555)
             self.temp_files.append(self.working_file)
             self.file_ext = '.fits'
         elif self.file_ext in ['.dng', '.DNG', '.cr2', '.CR2']:
@@ -495,7 +496,8 @@ class Image(object):
             self.working_file = os.path.join(self.tel.temp_file_path, self.raw_file_name)
             self.logger.debug('Copying {} to {}'.format(self.raw_file, self.working_file))
             shutil.copy2(self.raw_file, self.working_file)
-            os.chmod(self.working_file, 0666)
+            self.logger.debug('Setting working file permissions')
+            os.chmod(self.working_file, 555)
             self.temp_files.append(self.working_file)
             ## Use dcraw to convert to ppm file
             command = ['dcraw', '-t', '2', '-4', self.working_file]
@@ -732,8 +734,8 @@ class Image(object):
                 ## By using the wcs to_header to make a new WCS object, we 
                 ## ensure that the CD matrix, if it exists, is converted to PC
                 header = astropy.wcs.WCS(self.image_WCS.to_header()).to_header()
-                if (header['CTYPE1'][0:4] == 'RA--') or (header['CTYPE1'][0:4] == 'DEC-')) and\
-                   (header['CTYPE2'][0:4] == 'RA--') or (header['CTYPE2'][0:4] == 'DEC-')) and\
+                if (header['CTYPE1'][0:4] == 'RA--') or (header['CTYPE1'][0:4] == 'DEC-') and\
+                   (header['CTYPE2'][0:4] == 'RA--') or (header['CTYPE2'][0:4] == 'DEC-') and\
                    (int(header['WCSAXES']) == 2) and\
                    ('PC1_1' in header.keys()) and\
                    ('PC1_2' in header.keys()) and\
