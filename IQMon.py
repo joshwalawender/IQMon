@@ -12,6 +12,7 @@ from __future__ import division, print_function
 import sys
 import os
 import re
+import stat
 import shutil
 import datetime
 import subprocess
@@ -335,16 +336,19 @@ class Image(object):
                                                        self.nXPix, self.nYPix))
 
         ## Read Header Coordinates in to astropy coordinates object
+        self.coordinate_from_header = None
         if ('RA' in self.header.keys()) and ('DEC' in self.header.keys()):
-            if (len(self.header['RA'].split(":")) != 3) and (len(self.header['DEC'].split(":")) != 3):
-                ## Header RA is : separated
+            ## Header RA is : separated
+            try:
                 self.coordinate_from_header = coords.SkyCoord('{} {}'.format(\
                                                 self.header['RA'],\
                                                 self.header['DEC']),\
                                                 unit=(u.hour, u.degree),\
                                                 frame='icrs')
-            elif (len(self.header['RA'].split(" ")) == 3) and (len(self.header['DEC'].split(" ")) == 3):
-                ## Header RA is space separated
+            except:
+                pass
+            ## Header RA is space separated
+            try:
                 self.header['RA'] = ":".join(self.header['RA'].split(" "))
                 self.header['DEC'] = ":".join(self.header['DEC'].split(" "))
                 self.coordinate_from_header = coords.SkyCoord('{} {}'.format(\
@@ -352,15 +356,47 @@ class Image(object):
                                                 self.header['DEC']),\
                                                 unit=(u.hour, u.degree),\
                                                 frame='icrs')
-            elif float(self.header['RA']) and float(self.header['DEC']):
-                ## Header RA is decimal.  Assume degrees.
+            except:
+                pass
+            ## Header RA is decimal.  Assume degrees.
+            try:
                 self.coordinate_from_header = coords.SkyCoord('{} {}'.format(\
                                                 self.header['RA'],\
                                                 self.header['DEC']),\
                                                 unit=(u.degree, u.degree),\
                                                 frame='icrs')
-            else:
+            except:
+                pass
+            
+            if not self.coordinate_from_header:
                 self.logger.info('  Could not parse coordinate strings from header')
+
+
+#             if (len(self.header['RA'].split(":")) != 3) and (len(self.header['DEC'].split(":")) != 3):
+#                 ## Header RA is : separated
+#                 self.coordinate_from_header = coords.SkyCoord('{} {}'.format(\
+#                                                 self.header['RA'],\
+#                                                 self.header['DEC']),\
+#                                                 unit=(u.hour, u.degree),\
+#                                                 frame='icrs')
+#             elif (len(self.header['RA'].split(" ")) == 3) and (len(self.header['DEC'].split(" ")) == 3):
+#                 ## Header RA is space separated
+#                 self.header['RA'] = ":".join(self.header['RA'].split(" "))
+#                 self.header['DEC'] = ":".join(self.header['DEC'].split(" "))
+#                 self.coordinate_from_header = coords.SkyCoord('{} {}'.format(\
+#                                                 self.header['RA'],\
+#                                                 self.header['DEC']),\
+#                                                 unit=(u.hour, u.degree),\
+#                                                 frame='icrs')
+#             elif float(self.header['RA']) and float(self.header['DEC']):
+#                 ## Header RA is decimal.  Assume degrees.
+#                 self.coordinate_from_header = coords.SkyCoord('{} {}'.format(\
+#                                                 self.header['RA'],\
+#                                                 self.header['DEC']),\
+#                                                 unit=(u.degree, u.degree),\
+#                                                 frame='icrs')
+#             else:
+#                 self.logger.info('  Could not parse coordinate strings from header')
 
 
         ## Read WCS
@@ -470,6 +506,7 @@ class Image(object):
         * -D makes totally raw file (Without -D option, color interpolation is
              done.  Without -D option, get raw pixel values).
         '''
+        chmod_code = stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH | stat.S_IWOTH
         if self.working_file:
             if os.path.exists(self.working_file): os.remove(self.working_file)
         if self.file_ext == '.fts':
@@ -478,7 +515,7 @@ class Image(object):
             self.working_file = os.path.join(self.tel.temp_file_path,\
                                              self.raw_file_basename+'.fits')
             shutil.copy2(self.raw_file, self.working_file)
-            os.chmod(self.working_file, 0666)
+            os.chmod(self.working_file, chmod_code)
             self.temp_files.append(self.working_file)
             self.file_ext = '.fits'
         elif self.file_ext == '.fits':
@@ -487,7 +524,7 @@ class Image(object):
             self.working_file = os.path.join(self.tel.temp_file_path,\
                                              self.raw_file_name)
             shutil.copy2(self.raw_file, self.working_file)
-            os.chmod(self.working_file, 0666)
+            os.chmod(self.working_file, chmod_code)
             self.temp_files.append(self.working_file)
             self.file_ext = '.fits'
         elif self.file_ext in ['.dng', '.DNG', '.cr2', '.CR2']:
@@ -498,7 +535,7 @@ class Image(object):
             self.logger.debug('Copying {} to {}'.format(self.raw_file, self.working_file))
             shutil.copy2(self.raw_file, self.working_file)
             self.logger.debug('Setting working file permissions for {}'.format(self.working_file))
-            os.chmod(self.working_file, 0666)
+            os.chmod(self.working_file, chmod_code)
             self.temp_files.append(self.working_file)
             ## Use dcraw to convert to ppm file
             command = ['dcraw', '-t', '2', '-4', self.working_file]
@@ -512,14 +549,21 @@ class Image(object):
                 self.logger.critical('dcraw failed.  Could not find ppm file.')
             ## Use pamtofits to convert to fits file
             fits_file = os.path.join(self.tel.temp_file_path, self.raw_file_basename+'.fits')
-            command = 'pamtofits {} > {}'.format(self.working_file, fits_file)
-            self.logger.debug('Executing pamtofits: {}'.format(command))
-            subprocess.call(command, shell=True)
+            if os.path.exists(fits_file): os.remove(fits_file)
+            conversion_tools = ['pamtofits', 'pnmtofits']
+            for conversion_tool in conversion_tools:
+                if not os.path.exists(fits_file):
+                    command = '{} {} > {}'.format(conversion_tool, self.working_file, fits_file)
+                    self.logger.debug('Trying {}: {}'.format(conversion_tool, command))
+                    try:
+                        subprocess.call(command, shell=True)
+                    except:
+                        pass
             if os.path.exists(fits_file):
                 self.working_file = fits_file
                 self.temp_files.append(self.working_file)
             else:
-                self.logger.critical('pamtofits failed.  Could not find fits file.')
+                self.logger.critical('PPM to fits conversion failed.  Could not find fits file.')
             ## Write new fits file with only green image
             hdulist = fits.open(self.working_file, 'update')
             data = hdulist[0].data
@@ -1399,6 +1443,7 @@ class Image(object):
             self.logger.info('Making ZeroPoint Plot')
             self.zeroPoint_plotfile = os.path.join(self.tel.plot_file_path,\
                                        self.raw_file_basename+'_ZeroPoint.png')
+            pyplot.ioff()
             pyplot.figure(figsize=(9,11), dpi=100)
 
             Fig1 = pyplot.axes([0.0, 0.5, 1.0, 0.4])
