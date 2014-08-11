@@ -19,10 +19,12 @@ import subprocess
 import logging
 import math
 import numpy as np
+import matplotlib as mpl
 import matplotlib.pyplot as pyplot
 
 
 ## Import Astronomy Specific Tools
+import img_scale
 import ephem
 import astropy.units as u
 from astropy.io import fits
@@ -509,6 +511,7 @@ class Image(object):
         chmod_code = stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH | stat.S_IWOTH
         if self.working_file:
             if os.path.exists(self.working_file): os.remove(self.working_file)
+        ## fts extension:  make working copy and rename to .fits
         if self.file_ext == '.fts':
             self.logger.info('Making working copy of raw image: {}'.format(\
                                                             self.raw_file))
@@ -518,6 +521,7 @@ class Image(object):
             os.chmod(self.working_file, chmod_code)
             self.temp_files.append(self.working_file)
             self.file_ext = '.fits'
+        ## fits extension:  make working copy
         elif self.file_ext == '.fits':
             self.logger.info('Making working copy of raw image: {}'.format(\
                                                             self.raw_file))
@@ -527,6 +531,7 @@ class Image(object):
             os.chmod(self.working_file, chmod_code)
             self.temp_files.append(self.working_file)
             self.file_ext = '.fits'
+        ## DSLR file:  convert to fits
         elif self.file_ext in ['.dng', '.DNG', '.cr2', '.CR2']:
             self.logger.info('Converting {} to fits format'.format(\
                                                             self.raw_file))
@@ -565,11 +570,13 @@ class Image(object):
             else:
                 self.logger.critical('PPM to fits conversion failed.  Could not find fits file.')
             ## Write new fits file with only green image
+            self.logger.debug('Only keeping green channel for analysis')
             hdulist = fits.open(self.working_file, 'update')
-            data = hdulist[0].data
-            green_data = data[1]
-            hdulist[0].data = green_data
-            hdulist.flush()
+            if len(hdulist) == 1:
+                data = hdulist[0].data
+                green_data = data[1]
+                hdulist[0].data = green_data
+                hdulist.flush()
         else:
             self.logger.warning('Unrecognixed file extension: {}'.format(\
                                                                 self.file_ext))
@@ -798,12 +805,13 @@ class Image(object):
                         for key in header.keys():
                             self.logger.debug('  {:8s} = {}'.format(key, header[key]))
                         header = None
+                        self.image_WCS = None
                 else:
                     self.logger.warning('WCS does not have expected keywords.')
                     for key in header.keys():
                         self.logger.debug('  {:8s} = {}'.format(key, header[key]))
                     header = None
-
+                    self.image_WCS = None
 
         if header:
             ## By using the wcs to_header to make a new WCS object, we convert CD to PC
@@ -1508,7 +1516,91 @@ class Image(object):
 
 
     ##-------------------------------------------------------------------------
-    ## Make JPEG of Image
+    ## Make JPEG of Image (using matplotlib)
+    ##-------------------------------------------------------------------------
+    def new_make_JPEG(self, jpeg_file_name, binning=1, p1=0.25, p2=1.0,\
+                      mark_pointing=False,\
+                      mark_detected_stars=False,\
+                      mark_catalog_stars=False,\
+                      transform=None,
+                     ):
+        '''
+        Make jpegs of image.
+        '''
+        self.logger.info('Making jpeg of image')
+        jpeg_file = os.path.join(self.tel.plot_file_path, jpeg_file_name)
+
+
+        from PIL import Image
+        import skimage.exposure as skiex
+
+        self.logger.debug('  Opening working file')
+        with fits.open(self.working_file, ignore_missing_end=True) as hdulist:
+            data = hdulist[0].data
+
+        ## Make exposure historgram (of unscaled data)
+        self.logger.debug('  Make histogram of unscaled data.')
+        bins = np.arange(0,65536,10)
+        pyplot.figure()
+        pyplot.hist(data.ravel(), bins=bins)
+        pyplot.xlim(0,2500)
+        histogram_plot_file = '/home/joshw/IQMon/Logs/test.png'
+        self.logger.debug('  Saving histogram to {}.'.format(histogram_plot_file))
+        pyplot.savefig(histogram_plot_file)
+
+        ## Rescale data using arcsinh transform for jpeg
+        self.logger.debug('  Rescaling image data using arcsinh')
+        rescaled_data = np.arcsinh(data)
+        rescaled_data = rescaled_data / rescaled_data.max()
+        low = np.percentile(rescaled_data, p1)
+        high = np.percentile(rescaled_data, 100.-p2)
+        self.logger.debug('  Clipping data using {} and {} percentiles.'.format(p1, 100.-p2))
+        self.logger.debug('  Clipping data using {} and {} values.'.format(low, high))
+        opt_img = skiex.exposure.rescale_intensity(rescaled_data, in_range=(low,high))
+        jpegdata = (opt_img * 255.).astype('uint8')
+
+
+
+        im = Image.fromarray(jpegdata)
+
+        ## Flip jpeg
+        if transform:
+            self.logger.debug('  Transforming (flipping/rotating) jpeg: {}'.format(transform))
+            if transform == 'flip_vertical':
+                im = im.transpose(Image.FLIP_TOP_BOTTOM)
+            elif transform == 'flip_horizontal':
+                im = im.transpose(Image.FLIP_LEFT_RIGHT)
+            elif transform == 'rotate90':
+                im = im.transpose(Image.ROTATE_90)
+            elif transform == 'rotate180':
+                im = im.transpose(Image.ROTATE_180)
+            elif transform == 'rotate270':
+                im = im.transpose(Image.ROTATE_270)
+            else:
+                self.logger.warning('  Transform "{}" not understood.'.format(transform))
+                self.logger.warning('  No transform performed.'.format(transform))
+
+        ## If mark_pointing is set
+#         if mark_pointing and self.coordinate_from_header:
+#             print(self.coordinate_from_header)
+#             world_decimal = (self.coordinate_from_header.ra.degree,\
+#                              self.coordinate_from_header.ra.degree)
+#             print(world_decimal)
+#             pointing_xy = wcs.wcs_world2pix(self.coordinate_from_header)
+
+        ## If binning is set create thumbnail
+        if binning > 1:
+            size = (int(data.shape[0]/binning), int(data.shape[1]/binning))
+            im.thumbnail(size, Image.ANTIALIAS)
+        im.save('/home/joshw/IQMon/Logs/test.jpg')
+
+
+
+
+
+
+    ##-------------------------------------------------------------------------
+    ## Make JPEG of Image (usinf convert tool in ImageMagick)
     ##-------------------------------------------------------------------------
     def make_JPEG(self, jpegFileName, binning=1, markCatalogStars=False,\
                  markDetectedStars=False, markPointing=False,\
