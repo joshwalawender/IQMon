@@ -836,8 +836,8 @@ class Image(object):
         '''
         assert type(self.tel.gain) == u.quantity.Quantity
         assert type(self.tel.pixel_scale) == u.quantity.Quantity
-        
-        if assoc:
+
+        if assoc and self.catalog:
             if self.header['FILTER']:
                 if self.header['FILTER'] in self.catalog.keys():
                     self.catalog_filter = self.header['FILTER']
@@ -1290,6 +1290,8 @@ class Image(object):
                         'COPY_KEYWORDS': 'FILTER,OBJECT,AIRMASS,DATE-OBS,LAT-OBS,LONG-OBS,ALT-OBS,RA,DEC',
                         'WRITE_XML': 'Y',
                         'XML_NAME': os.path.join(self.tel.temp_file_path, 'swarp.xml'),
+                        'FSCALASTRO_TYPE': 'NONE',
+                        'SUBTRACT_BACK': 'N',
                        }
         SWarpCommand = ["swarp", self.working_file]
         for key in SWarp_params.keys():
@@ -1331,7 +1333,7 @@ class Image(object):
         '''
         Get a list of stars which are in the image from a local UCAC catalog.
         '''
-        assert type(self.coordinate_of_center_pixel) == coords.builtin_systems.ICRS
+        assert type(self.coordinate_of_center_pixel) == coords.SkyCoord
 
         if not os.path.exists(local_UCAC_command):
             self.logger.warning('Cannot find local UCAC command: {}'.format(\
@@ -1482,7 +1484,6 @@ class Image(object):
         '''
         self.logger.info('Making jpeg of image')
         jpeg_file = os.path.join(self.tel.plot_file_path, jpeg_file_name)
-        histogram_plot_file = os.path.join(self.tel.plot_file_path, '{}.png'.format(self.raw_file_basename))
 
         from PIL import Image, ImageDraw
         import skimage.exposure as skiex
@@ -1490,26 +1491,34 @@ class Image(object):
         self.logger.debug('  Opening working file')
         with fits.open(self.working_file, ignore_missing_end=True) as hdulist:
             data = hdulist[0].data
+        data_masked = np.ma.masked_equal(data, 0)
+        data_nonzero = data_masked[~data_masked.mask]
 
         ## Make exposure historgram (of unscaled data)
         self.logger.debug('  Make histogram of unscaled data.')
-        hist_low = np.percentile(data.ravel(), p1)
-        hist_high = np.percentile(data.ravel(), 100.-p2)
+        histogram_plot_file = os.path.join(self.tel.plot_file_path, '{}_hist.png'.format(self.raw_file_basename))
+        hist_low = np.percentile(data_nonzero.ravel(), p1)
+        hist_high = np.percentile(data_nonzero.ravel(), 100.-p2)
         hist_nbins = 128
-        hist_bins = np.arange(hist_low,hist_high,(hist_high-hist_low)/128)
+        hist_binsize = (hist_high-hist_low)/128
+        hist_bins = np.arange(hist_low,hist_high,hist_binsize)
         self.logger.debug('  Histogram range: {} {}.'.format(hist_low, hist_high))
         pyplot.figure()
-        pyplot.hist(data.ravel(), bins=hist_bins)
+        pyplot.hist(data.ravel(), bins=hist_bins, label='binsize = {:4f}'.format(hist_binsize))
         pyplot.xlim(hist_low,hist_high)
+        pyplot.legend(loc='best')
+        pyplot.xlabel('Pixel value')
+        pyplot.ylabel('Number of Pixels')
         self.logger.debug('  Saving histogram to {}.'.format(histogram_plot_file))
         pyplot.savefig(histogram_plot_file)
 
         ## Rescale data using arcsinh transform for jpeg
         self.logger.debug('  Rescaling image data using arcsinh')
-        rescaled_data = np.arcsinh(data)
+        rescaled_data = np.arcsinh(data_masked)
         rescaled_data = rescaled_data / rescaled_data.max()
-        low = np.percentile(rescaled_data, p1)
-        high = np.percentile(rescaled_data, 100.-p2)
+        rescaled_data_nonzero = rescaled_data[~rescaled_data.mask]
+        low = np.percentile(rescaled_data_nonzero, p1)
+        high = np.percentile(rescaled_data_nonzero, 100.-p2)
         self.logger.debug('  Clipping data using {} and {} percentiles.'.format(p1, 100.-p2))
         self.logger.debug('  Clipping data using {} and {} rescaled values.'.format(low, high))
         opt_img = skiex.exposure.rescale_intensity(rescaled_data, in_range=(low,high))
@@ -1522,23 +1531,61 @@ class Image(object):
         ## If mark_pointing is set
         if mark_pointing and self.coordinate_from_header:
             xy = self.image_WCS.wcs_world2pix([[self.coordinate_from_header.ra.degree,\
-                                                  self.coordinate_from_header.dec.degree]],\
-                                                  1)[0]
+                                                self.coordinate_from_header.dec.degree]], 1)[0]
             x = int(xy[0])
             y = int(xy[1])
-            draw.line((im.size[0]/2-1, 0, im.size[0]/2-1, im.size[1]), fill='green')
-            draw.line((im.size[0]/2+0, 0, im.size[0]/2+0, im.size[1]), fill='green')
-            draw.line((im.size[0]/2+1, 0, im.size[0]/2+1, im.size[1]), fill='green')
-            draw.line((0, im.size[1]/2-1, im.size[0], im.size[1]/2-1), fill='green')
-            draw.line((0, im.size[1]/2+0, im.size[0], im.size[1]/2+0), fill='green')
-            draw.line((0, im.size[1]/2+1, im.size[0], im.size[1]/2+1), fill='green')
+            self.logger.debug('  Marking crosshairs at (x, y) = ({}, {})'.format(im.size[0]/2, im.size[1]/2))
+            line_color = 'yellow'
+            draw.line((im.size[0]/2+0, 0, im.size[0]/2+0, im.size[1]), fill=line_color)
+            draw.line((0, im.size[1]/2+0, im.size[0], im.size[1]/2+0), fill=line_color)
+
+            ## Draw Crosshair Over Pointing Location from Header
             self.logger.debug('  Marking pointing at (x, y) = ({}, {})'.format(x, y))
-            radius = int(1./100. * math.sqrt(im.size[0]**2 + im.size[1]**2))
+            crosshair_color = 'cyan'
+            ms = int(0.7/100. * math.sqrt(im.size[0]**2 + im.size[1]**2))
             thickness = 5
-            radii = np.linspace(radius, radius+thickness, thickness+1)
+            for i in range(-1*int((thickness-1)/2),int((thickness+1)/2),1):
+                draw.line((x-3*ms, y+i, x-1*ms, y+i), fill=crosshair_color)
+                draw.line((x+3*ms, y+i, x+1*ms, y+i), fill=crosshair_color)
+                draw.line((x+i, y-3*ms, x+i, y-1*ms), fill=crosshair_color)
+                draw.line((x+i, y+3*ms, x+i, y+1*ms), fill=crosshair_color)
+            radii = np.linspace(2*ms, 2*ms+thickness, thickness+1)
             for r in radii:
-                print((x-r, y-r, x+r, y+r))
-                draw.ellipse((x-r, y-r, x+r, y+r), outline='blue')
+                draw.ellipse((x-r, y-r, x+r, y+r), outline=crosshair_color)
+
+        ## Mark Detected Stars
+        if mark_detected_stars and self.SExtractor_results:
+            if self.FWHM:
+                ms = max([4, math.ceil(self.FWHM.value)])/binning
+            else:
+                ms = 6
+            circle_color = 'red'
+            self.logger.debug('  Marking detected stars with {} radius {} circles'.format(ms, circle_color))
+            for star in self.SExtractor_results:
+                x = star['XWIN_IMAGE']
+                y = star['YWIN_IMAGE']
+                thickness = 2
+                radii = np.linspace(ms, ms+thickness, thickness+1)
+                for r in radii:
+                    draw.ellipse((x-r, y-r, x+r, y+r), outline=circle_color)
+
+        ## Mark Catalog Stars
+        if mark_catalog_stars and self.catalog:
+            if self.FWHM:
+                ms = max([4, math.ceil(self.FWHM.value)])/binning
+            else:
+                ms = 6
+            circle_color = 'blue'
+            self.logger.debug('  Marking catalog stars with {} radius {} circles'.format(ms, circle_color))
+
+            for star in self.catalog:
+                xy = self.image_WCS.wcs_world2pix([[float(star['RA']), float(star['Dec'])]], 1)[0]
+                x = int(xy[0])
+                y = int(xy[1])
+                thickness = 2
+                radii = np.linspace(2*ms, 2*ms+thickness, thickness+1)
+                for r in radii:
+                    draw.ellipse((x-r, y-r, x+r, y+r), outline=circle_color)
 
         ## Flip jpeg
         if transform:
