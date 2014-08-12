@@ -24,14 +24,13 @@ import matplotlib.pyplot as pyplot
 
 
 ## Import Astronomy Specific Tools
-import img_scale
 import ephem
 import astropy.units as u
-from astropy.io import fits
+import astropy.io.fits as fits
 import astropy.coordinates as coords
-from astropy import table
-from astropy import wcs
-from astropy.io import ascii
+import astropy.table as table
+import astropy.wcs as wcs
+import astropy.io.ascii as ascii
 
 
 
@@ -341,65 +340,19 @@ class Image(object):
         self.coordinate_from_header = None
         if ('RA' in self.header.keys()) and ('DEC' in self.header.keys()):
             ## Header RA is : separated
+            coord_string = '{} {}'.format(self.header['RA'], self.header['DEC'])
+            self.logger.debug('  Parsing: "{}" as hours and degrees'.format(coord_string))
             try:
-                self.coordinate_from_header = coords.SkyCoord('{} {}'.format(\
-                                                self.header['RA'],\
-                                                self.header['DEC']),\
+                self.coordinate_from_header = coords.SkyCoord(coord_string,\
                                                 unit=(u.hour, u.degree),\
                                                 frame='icrs')
             except:
-                pass
-            ## Header RA is space separated
-            try:
-                self.header['RA'] = ":".join(self.header['RA'].split(" "))
-                self.header['DEC'] = ":".join(self.header['DEC'].split(" "))
-                self.coordinate_from_header = coords.SkyCoord('{} {}'.format(\
-                                                self.header['RA'],\
-                                                self.header['DEC']),\
-                                                unit=(u.hour, u.degree),\
-                                                frame='icrs')
-            except:
-                pass
-            ## Header RA is decimal.  Assume degrees.
-            try:
-                self.coordinate_from_header = coords.SkyCoord('{} {}'.format(\
-                                                self.header['RA'],\
-                                                self.header['DEC']),\
-                                                unit=(u.degree, u.degree),\
-                                                frame='icrs')
-            except:
-                pass
+                self.logger.debug('  Parsing: "{}" as hours and degrees failed'.format(coord_string))
             
             if not self.coordinate_from_header:
                 self.logger.info('  Could not parse coordinate strings from header')
-
-
-#             if (len(self.header['RA'].split(":")) != 3) and (len(self.header['DEC'].split(":")) != 3):
-#                 ## Header RA is : separated
-#                 self.coordinate_from_header = coords.SkyCoord('{} {}'.format(\
-#                                                 self.header['RA'],\
-#                                                 self.header['DEC']),\
-#                                                 unit=(u.hour, u.degree),\
-#                                                 frame='icrs')
-#             elif (len(self.header['RA'].split(" ")) == 3) and (len(self.header['DEC'].split(" ")) == 3):
-#                 ## Header RA is space separated
-#                 self.header['RA'] = ":".join(self.header['RA'].split(" "))
-#                 self.header['DEC'] = ":".join(self.header['DEC'].split(" "))
-#                 self.coordinate_from_header = coords.SkyCoord('{} {}'.format(\
-#                                                 self.header['RA'],\
-#                                                 self.header['DEC']),\
-#                                                 unit=(u.hour, u.degree),\
-#                                                 frame='icrs')
-#             elif float(self.header['RA']) and float(self.header['DEC']):
-#                 ## Header RA is decimal.  Assume degrees.
-#                 self.coordinate_from_header = coords.SkyCoord('{} {}'.format(\
-#                                                 self.header['RA'],\
-#                                                 self.header['DEC']),\
-#                                                 unit=(u.degree, u.degree),\
-#                                                 frame='icrs')
-#             else:
-#                 self.logger.info('  Could not parse coordinate strings from header')
-
+                self.logger.info('  RA = {}'.format(self.header['RA']))
+                self.logger.info('  DEC = {}'.format(self.header['DEC']))
 
         ## Read WCS
         try:
@@ -422,7 +375,7 @@ class Image(object):
         hdulist.close()
 
         ## Determine Alt, Az, Moon Sep, Moon Illum using ephem module
-        if self.dateObs and self.latitude and self.longitude:
+        if self.dateObs and self.latitude and self.longitude and self.coordinate_from_header:
             ## Populate site object properties
             SiteDate = "/".join(self.dateObs[0:10].split("-"))
             SiteTime = self.dateObs[11:]        
@@ -1529,9 +1482,9 @@ class Image(object):
         '''
         self.logger.info('Making jpeg of image')
         jpeg_file = os.path.join(self.tel.plot_file_path, jpeg_file_name)
+        histogram_plot_file = os.path.join(self.tel.plot_file_path, '{}.png'.format(self.raw_file_basename))
 
-
-        from PIL import Image
+        from PIL import Image, ImageDraw
         import skimage.exposure as skiex
 
         self.logger.debug('  Opening working file')
@@ -1540,11 +1493,14 @@ class Image(object):
 
         ## Make exposure historgram (of unscaled data)
         self.logger.debug('  Make histogram of unscaled data.')
-        bins = np.arange(0,65536,10)
+        hist_low = np.percentile(data.ravel(), p1)
+        hist_high = np.percentile(data.ravel(), 100.-p2)
+        hist_nbins = 128
+        hist_bins = np.arange(hist_low,hist_high,(hist_high-hist_low)/128)
+        self.logger.debug('  Histogram range: {} {}.'.format(hist_low, hist_high))
         pyplot.figure()
-        pyplot.hist(data.ravel(), bins=bins)
-        pyplot.xlim(0,2500)
-        histogram_plot_file = '/home/joshw/IQMon/Logs/test.png'
+        pyplot.hist(data.ravel(), bins=hist_bins)
+        pyplot.xlim(hist_low,hist_high)
         self.logger.debug('  Saving histogram to {}.'.format(histogram_plot_file))
         pyplot.savefig(histogram_plot_file)
 
@@ -1555,13 +1511,34 @@ class Image(object):
         low = np.percentile(rescaled_data, p1)
         high = np.percentile(rescaled_data, 100.-p2)
         self.logger.debug('  Clipping data using {} and {} percentiles.'.format(p1, 100.-p2))
-        self.logger.debug('  Clipping data using {} and {} values.'.format(low, high))
+        self.logger.debug('  Clipping data using {} and {} rescaled values.'.format(low, high))
         opt_img = skiex.exposure.rescale_intensity(rescaled_data, in_range=(low,high))
         jpegdata = (opt_img * 255.).astype('uint8')
 
+        ## Create PIL Image object
+        im = Image.fromarray(jpegdata).convert('RGB')
+        draw = ImageDraw.Draw(im)
 
-
-        im = Image.fromarray(jpegdata)
+        ## If mark_pointing is set
+        if mark_pointing and self.coordinate_from_header:
+            xy = self.image_WCS.wcs_world2pix([[self.coordinate_from_header.ra.degree,\
+                                                  self.coordinate_from_header.dec.degree]],\
+                                                  1)[0]
+            x = int(xy[0])
+            y = int(xy[1])
+            draw.line((im.size[0]/2-1, 0, im.size[0]/2-1, im.size[1]), fill='green')
+            draw.line((im.size[0]/2+0, 0, im.size[0]/2+0, im.size[1]), fill='green')
+            draw.line((im.size[0]/2+1, 0, im.size[0]/2+1, im.size[1]), fill='green')
+            draw.line((0, im.size[1]/2-1, im.size[0], im.size[1]/2-1), fill='green')
+            draw.line((0, im.size[1]/2+0, im.size[0], im.size[1]/2+0), fill='green')
+            draw.line((0, im.size[1]/2+1, im.size[0], im.size[1]/2+1), fill='green')
+            self.logger.debug('  Marking pointing at (x, y) = ({}, {})'.format(x, y))
+            radius = int(1./100. * math.sqrt(im.size[0]**2 + im.size[1]**2))
+            thickness = 5
+            radii = np.linspace(radius, radius+thickness, thickness+1)
+            for r in radii:
+                print((x-r, y-r, x+r, y+r))
+                draw.ellipse((x-r, y-r, x+r, y+r), outline='blue')
 
         ## Flip jpeg
         if transform:
@@ -1580,19 +1557,15 @@ class Image(object):
                 self.logger.warning('  Transform "{}" not understood.'.format(transform))
                 self.logger.warning('  No transform performed.'.format(transform))
 
-        ## If mark_pointing is set
-#         if mark_pointing and self.coordinate_from_header:
-#             print(self.coordinate_from_header)
-#             world_decimal = (self.coordinate_from_header.ra.degree,\
-#                              self.coordinate_from_header.ra.degree)
-#             print(world_decimal)
-#             pointing_xy = wcs.wcs_world2pix(self.coordinate_from_header)
-
         ## If binning is set create thumbnail
         if binning > 1:
             size = (int(data.shape[0]/binning), int(data.shape[1]/binning))
+            self.logger.debug('  Resizing image by binning factor of {}'.format(binning))
             im.thumbnail(size, Image.ANTIALIAS)
-        im.save('/home/joshw/IQMon/Logs/test.jpg')
+
+        ## Save to JPEG
+        self.logger.debug('  Saving jpeg to: {}'.format(jpeg_file))
+        im.save(jpeg_file, 'JPEG')
 
 
 
@@ -1600,7 +1573,7 @@ class Image(object):
 
 
     ##-------------------------------------------------------------------------
-    ## Make JPEG of Image (usinf convert tool in ImageMagick)
+    ## Make JPEG of Image (using convert tool in ImageMagick)
     ##-------------------------------------------------------------------------
     def make_JPEG(self, jpegFileName, binning=1, markCatalogStars=False,\
                  markDetectedStars=False, markPointing=False,\
