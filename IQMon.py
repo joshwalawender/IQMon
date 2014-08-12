@@ -385,9 +385,8 @@ class Image(object):
             if self.altitude:
                 self.tel.site.elevation = self.altitude.to(u.meter).value
             ## Do calculations using ephem
-            RAstring = self.coordinate_from_header.ra.to_string(sep=":", precision=1, alwayssign=True)
-            DECstring = self.coordinate_from_header.dec.to_string(sep=":", precision=1, alwayssign=True)
-            TargetObject = ephem.readdb("Target,f|M|F7,"+RAstring+","+DECstring+",2.02,2000")
+            RADEC_string = ','.join(self.coordinate_from_header.to_string('hmsdms', sep=':').split())
+            TargetObject = ephem.readdb("Target,f|M|F7,{},2.02,2000".format(RADEC_string))
             TargetObject.compute(self.tel.site)
             self.target_alt = TargetObject.alt * 180./ephem.pi * u.deg
             self.target_az = TargetObject.az * 180./ephem.pi * u.deg
@@ -1473,11 +1472,13 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Make JPEG of Image (using matplotlib)
     ##-------------------------------------------------------------------------
-    def new_make_JPEG(self, jpeg_file_name, binning=1, p1=0.25, p2=1.0,\
+    def new_make_JPEG(self, jpeg_file_name, binning=1, p1=0.15, p2=0.5,\
                       mark_pointing=False,\
                       mark_detected_stars=False,\
                       mark_catalog_stars=False,\
                       transform=None,
+                      crop=None,
+                      quality=70,
                      ):
         '''
         Make jpegs of image.
@@ -1494,23 +1495,23 @@ class Image(object):
         data_masked = np.ma.masked_equal(data, 0)
         data_nonzero = data_masked[~data_masked.mask]
 
-        ## Make exposure historgram (of unscaled data)
-        self.logger.debug('  Make histogram of unscaled data.')
-        histogram_plot_file = os.path.join(self.tel.plot_file_path, '{}_hist.png'.format(self.raw_file_basename))
-        hist_low = np.percentile(data_nonzero.ravel(), p1)
-        hist_high = np.percentile(data_nonzero.ravel(), 100.-p2)
-        hist_nbins = 128
-        hist_binsize = (hist_high-hist_low)/128
-        hist_bins = np.arange(hist_low,hist_high,hist_binsize)
-        self.logger.debug('  Histogram range: {} {}.'.format(hist_low, hist_high))
-        pyplot.figure()
-        pyplot.hist(data.ravel(), bins=hist_bins, label='binsize = {:4f}'.format(hist_binsize))
-        pyplot.xlim(hist_low,hist_high)
-        pyplot.legend(loc='best')
-        pyplot.xlabel('Pixel value')
-        pyplot.ylabel('Number of Pixels')
-        self.logger.debug('  Saving histogram to {}.'.format(histogram_plot_file))
-        pyplot.savefig(histogram_plot_file)
+#         ## Make exposure histogram (of unscaled data)
+#         self.logger.debug('  Make histogram of unscaled data.')
+#         histogram_plot_file = os.path.join(self.tel.plot_file_path, '{}_hist.png'.format(self.raw_file_basename))
+#         hist_low = np.percentile(data_nonzero.ravel(), p1)
+#         hist_high = np.percentile(data_nonzero.ravel(), 100.-p2)
+#         hist_nbins = 128
+#         hist_binsize = (hist_high-hist_low)/128
+#         hist_bins = np.arange(hist_low,hist_high,hist_binsize)
+#         self.logger.debug('  Histogram range: {} {}.'.format(hist_low, hist_high))
+#         pyplot.figure()
+#         pyplot.hist(data.ravel(), bins=hist_bins, label='binsize = {:4f}'.format(hist_binsize))
+#         pyplot.xlim(hist_low,hist_high)
+#         pyplot.legend(loc='best')
+#         pyplot.xlabel('Pixel value')
+#         pyplot.ylabel('Number of Pixels')
+#         self.logger.debug('  Saving histogram to {}.'.format(histogram_plot_file))
+#         pyplot.savefig(histogram_plot_file)
 
         ## Rescale data using arcsinh transform for jpeg
         self.logger.debug('  Rescaling image data using arcsinh')
@@ -1604,6 +1605,12 @@ class Image(object):
                 self.logger.warning('  Transform "{}" not understood.'.format(transform))
                 self.logger.warning('  No transform performed.'.format(transform))
 
+        ## If crop is set
+        if crop:
+            if len(crop) == 4:
+                self.logger.debug('  Cropping image to {}'.format(crop))
+                im = im.crop(crop)
+
         ## If binning is set create thumbnail
         if binning > 1:
             size = (int(data.shape[0]/binning), int(data.shape[1]/binning))
@@ -1611,9 +1618,9 @@ class Image(object):
             im.thumbnail(size, Image.ANTIALIAS)
 
         ## Save to JPEG
-        self.logger.debug('  Saving jpeg to: {}'.format(jpeg_file))
-        im.save(jpeg_file, 'JPEG')
-
+        self.logger.debug('  Saving jpeg (binning={}, quality={:.0f}) to: {}'.format(binning, quality, jpeg_file_name))
+        im.save(jpeg_file, 'JPEG', quality=quality)
+        self.jpeg_file_names.append(jpeg_file_name)
 
 
 
