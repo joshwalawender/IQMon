@@ -674,20 +674,16 @@ class Image(object):
             total_process_time = (EndTime - StartTime).total_seconds()
             self.logger.debug("  Astrometry.net Processing Time: {:.1f} s".format(\
                                                            total_process_time))
-            pos = AstrometrySTDOUT.find("Field center: (RA H:M:S, Dec D:M:S) = ")
-            if pos != -1:
-                IsFieldCenter = re.match("\s*(\d{1,2}:\d{2}:\d{2}\.\d+,\s-?\d{1,2}:\d{2}:\d{2}\.\d+).*", 
-                                         AstrometrySTDOUT[pos+40:pos+75])
-                if IsFieldCenter:
-                    self.logger.info("  Astrometry.net field center is: {}".format(\
-                                                        IsFieldCenter.group(1)))
-                else:
-                    self.logger.warning("Could not parse field center from astrometry.net output.")
-                    for line in AstrometrySTDOUT.split("\n"):
-                        self.logger.warning("  %s" % line)
+
+            IsFieldCenter = re.search("Field center:\s\(RA\sH:M:S,\sDec D:M:S\)\s=\s\((\d{1,2}:\d{2}:\d{2}\.\d+,\s[+-]?\d{1,2}:\d{2}:\d{2}\.\d+)\)", AstrometrySTDOUT)
+            if IsFieldCenter:
+                self.logger.info("  Astrometry.net field center is: {}".format(\
+                                                    IsFieldCenter.group(1)))
             else:
+                self.logger.warning("Could not parse field center from astrometry.net output.")
                 for line in AstrometrySTDOUT.split("\n"):
                     self.logger.warning("  %s" % line)
+
             NewFile = self.working_file.replace(self.file_ext, ".new")
             NewFitsFile = self.working_file.replace(self.file_ext, ".new.fits")
             if os.path.exists(NewFile):
@@ -952,7 +948,7 @@ class Image(object):
                 line.replace("[1M>", "")
                 if not re.match(".*Setting up background map.*", line) and\
                    not re.match(".*Line:\s[0-9]*.*", line):
-                    self.logger.info("  SExtractor Output: {}".format(line))
+                    self.logger.debug("  SExtractor Output: {}".format(line))
             ## Extract Number of Stars from SExtractor Output
             pos = SExSTDOUT.find("sextracted ")
             IsSExCount = re.match("\s*([0-9]+)\s+", SExSTDOUT[pos+11:pos+21])
