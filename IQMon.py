@@ -33,6 +33,17 @@ import astropy.wcs as wcs
 import astropy.io.ascii as ascii
 
 
+##-----------------------------------------------------------------------------
+## Mode Function
+##-----------------------------------------------------------------------------
+def mode(data, binsize):
+    pctile95 = math.ceil(np.percentile(data, 99.0))
+    hist, bins = np.histogram(data, bins=binsize*np.arange(int(pctile95/binsize)+1))
+    centers = (bins[:-1] + bins[1:]) / 2
+    foo = zip(hist, centers)
+    return max(foo)[1]
+
+
 
 ##-----------------------------------------------------------------------------
 ## Define Telescope object to hold telescope information
@@ -1028,7 +1039,9 @@ class Image(object):
             CentralAs = [star['AWIN_IMAGE'] for star in self.SExtractor_results if star['ImageRadius'] <= IQRadius]
             CentralBs = [star['BWIN_IMAGE'] for star in self.SExtractor_results if star['ImageRadius'] <= IQRadius]
             if len(CentralFWHMs) > 3:
-                self.FWHM = np.median(CentralFWHMs) * u.pix
+                self.FWHM_median = np.median(CentralFWHMs) * u.pix
+                self.FWHM_mode = mode(CentralFWHMs, 0.2) * u.pix
+                self.FWHM = self.FWHM_mode
                 self.ellipticity = np.median(CentralEllipticities)
                 self.major_axis = np.median(CentralAs) * u.pix
                 self.minor_axis = np.median(CentralBs) * u.pix
@@ -1037,7 +1050,9 @@ class Image(object):
             self.logger.debug("  Using {0} stars in central region to determine FWHM and ellipticity.".format(\
                                                             len(CentralFWHMs)))
             self.logger.info("  Median FWHM in inner region is {0:.2f} pixels".format(\
-                                                    self.FWHM.to(u.pix).value))
+                                                    self.FWHM_median.to(u.pix).value))
+            self.logger.info("  Mode FWHM in inner region is {0:.2f} pixels".format(\
+                                                    self.FWHM_mode.to(u.pix).value))
             self.logger.info("  Median Minor Axis in inner region is {0:.2f}".format(\
                                         2.355*self.minor_axis.to(u.pix).value))
             self.logger.info("  Median Major Axis in inner region is {0:.2f}".format(\
@@ -1118,7 +1133,10 @@ class Image(object):
             pyplot.title('Histogram of FWHM Values for {}'.format(self.raw_file_name), size=10)
 
             pyplot.bar(fwhm_centers, fwhm_hist, align='center', width=0.7*fwhm_binsize)
-            pyplot.plot([self.FWHM.to(u.pix).value, self.FWHM.to(u.pix).value], [0, max(fwhm_hist)], 'r-', label='Median FWHM')
+            pyplot.plot([self.FWHM_median.to(u.pix).value, self.FWHM_median.to(u.pix).value], [0, 1.1*max(fwhm_hist)],\
+                        'ro-', linewidth=2, label='Median FWHM')
+            pyplot.plot([self.FWHM_mode.to(u.pix).value, self.FWHM_mode.to(u.pix).value], [0, 1.1*max(fwhm_hist)],\
+                        'ro-', linewidth=2, label='Mode FWHM')
             pyplot.xlabel('FWHM (pixels)', size=10)
             pyplot.ylabel('N Stars', size=10)
             pyplot.xlim(0,fwhm_95pctile+1)
