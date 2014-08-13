@@ -1053,18 +1053,19 @@ class Image(object):
 
 
     ##-------------------------------------------------------------------------
-    ## Make Ellipticity Plot
+    ## Make PSF Statistics Plots
     ##-------------------------------------------------------------------------
     def make_PSF_plot(self, filename=None):
         '''
         Make various plots for analysis of image quality.
         '''
-        self.logger.info('Calculating histogram of PSF angles.')
         if filename:
             self.PSF_plot_filename = filename
         else:
             self.PSF_plot_filename = self.raw_file_basename+'_PSFinfo.png'
         self.PSF_plotfile = os.path.join(self.tel.plot_file_path, self.PSF_plot_filename)
+
+        self.logger.info('Generating plots of PSF staistics: {}'.format(self.PSF_plot_filename))
 
         ellip_threshold = 0.15
         star_angles = [star['THETAWIN_IMAGE'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
@@ -1095,9 +1096,10 @@ class Image(object):
                                               bins=ellip_binsize*np.arange(21))
         ellip_centers = (ellip_bins[:-1] + ellip_bins[1:]) / 2
 
-        fwhm_binsize = 0.1
+        fwhm_binsize = 0.2
+        fwhm_95pctile = math.ceil(np.percentile(self.SExtractor_results['FWHM_IMAGE'], 95.0))
         fwhm_hist, fwhm_bins = np.histogram(self.SExtractor_results['FWHM_IMAGE'],\
-                                               bins=fwhm_binsize*np.arange(91))
+                                               bins=fwhm_binsize*np.arange(int(fwhm_95pctile/fwhm_binsize)+11))
         fwhm_centers = (fwhm_bins[:-1] + fwhm_bins[1:]) / 2
 
         star_angle_mean = np.mean(star_angles)
@@ -1113,9 +1115,21 @@ class Image(object):
             self.logger.debug('  Generating figure {}'.format(self.PSF_plotfile))
 
             pyplot.ioff()
-            pyplot.figure(figsize=(12,11), dpi=100)
-            Left1 = pyplot.axes([0.000, 0.750, 0.465, 0.240])
-            pyplot.title('PSF Statistics for {}'.format(self.raw_file_name), size=10)
+            pyplot.figure(figsize=(10,11), dpi=100)
+
+            TopLeft = pyplot.axes([0.000, 0.750, 0.465, 0.235])
+            pyplot.title('Histogram of FWHM Values for {}'.format(self.raw_file_name), size=10)
+
+            pyplot.bar(fwhm_centers, fwhm_hist, align='center', width=0.7*fwhm_binsize)
+            pyplot.plot([self.FWHM.to(u.pix).value, self.FWHM.to(u.pix).value], [0, max(fwhm_hist)], 'r-', label='Median FWHM')
+            pyplot.xlabel('FWHM (pixels)', size=10)
+            pyplot.ylabel('N Stars', size=10)
+            pyplot.xlim(0,fwhm_95pctile+1)
+            pyplot.xticks(size=10)
+            pyplot.yticks(size=10)
+
+            TopRight = pyplot.axes([0.535, 0.750, 0.465, 0.235])
+            pyplot.title('Histogram of Elliptiticty Values for {}'.format(self.raw_file_name), size=10)
             pyplot.bar(ellip_centers, ellip_hist, align='center', width=0.7*ellip_binsize)
             pyplot.xlabel('Ellipticity', size=10)
             pyplot.ylabel('N Stars', size=10)
@@ -1123,23 +1137,39 @@ class Image(object):
             pyplot.xticks(0.1*np.arange(11), size=10)
             pyplot.yticks(size=10)
 
-            Left2 = pyplot.axes([0.000, 0.460, 0.465, 0.240])
-            pyplot.bar(fwhm_centers, fwhm_hist, align='center', width=0.7*fwhm_binsize)
-            pyplot.plot([self.FWHM.to(u.pix).value, self.FWHM.to(u.pix).value], [0, max(fwhm_hist)], 'r-', label='Median FWHM')
-            pyplot.xlabel('FWHM (pixels)', size=10)
-            pyplot.ylabel('N Stars', size=10)
-            if self.FWHM:
-                pyplot.xlim(0,self.FWHM.to(u.pix).value + 3)
-            else:
-                pyplot.xlim(0,6)
-            pyplot.xticks(size=10)
-            pyplot.yticks(size=10)
+            MiddleLeft = pyplot.axes([0.000, 0.375, 0.465, 0.320])
+            MiddleLeft.set_aspect('equal')
+            pyplot.title('Areas of high FWHM in the Image')
+            pyplot.hexbin(self.SExtractor_results['XWIN_IMAGE'],\
+                          self.SExtractor_results['YWIN_IMAGE'],\
+                          self.SExtractor_results['FWHM_IMAGE'],\
+                          gridsize=20,\
+                          mincnt=5,\
+                          cmap='Reds')
+            pyplot.xlabel('X Pixels', size=10)
+            pyplot.ylabel('Y Pixels', size=10)
+            pyplot.xlim(0,self.nXPix)
+            pyplot.ylim(0,self.nYPix)
 
-            Left3 = pyplot.axes([0.000, 0.0, 0.465, 0.400])
-            pyplot.plot(self.SExtractor_results['ImageRadius'],\
-                        self.SExtractor_results['ELLIPTICITY'],\
-                        'k,')
-            pyplot.title('Correlation of Ellipticity with Image Radius')
+            MiddleRight = pyplot.axes([0.535, 0.375, 0.465, 0.320])
+            MiddleRight.set_aspect('equal')
+            pyplot.title('Areas of high Ellipticity in the Image')
+            pyplot.hexbin(self.SExtractor_results['XWIN_IMAGE'],\
+                          self.SExtractor_results['YWIN_IMAGE'],\
+                          self.SExtractor_results['ELLIPTICITY'],\
+                          gridsize=20,\
+                          mincnt=5,\
+                          cmap='Reds')
+            pyplot.xlabel('X Pixels', size=10)
+            pyplot.ylabel('Y Pixels', size=10)
+            pyplot.xlim(0,self.nXPix)
+            pyplot.ylim(0,self.nYPix)
+
+            BottomLeft = pyplot.axes([0.000, 0.0, 0.465, 0.320])
+            pyplot.title('Correlation of Ellipticity with Image Radius', size=10)
+            pyplot.hist2d(self.SExtractor_results['ImageRadius'],\
+                          self.SExtractor_results['ELLIPTICITY'],\
+                          bins=40, cmap='binary')
             pyplot.xlabel('r (pixels)', size=10)
             pyplot.ylabel('Ellipticity', size=10)
             pyplot.xlim(0, math.sqrt(self.nXPix**2 + self.nYPix**2)/2.)
@@ -1147,40 +1177,10 @@ class Image(object):
             pyplot.xticks(size=10)
             pyplot.yticks(size=10)
 
-#             Left3 = pyplot.axes([0.000, 0.0, 0.465, 0.400])
-#             Left3.set_aspect('equal')
-#             pyplot.plot(star_x, star_y, 'k,')
-#             pyplot.title('Positions of {:d}/{:d} stars with ellipticity > {:.2f}'.format(nstars, self.n_stars_SExtracted, ellip_threshold), size=10)
-#             pyplot.xlabel('X (pixels)', size=10)
-#             pyplot.ylabel('Y (pixels)', size=10)
-#             pyplot.xlim(0, self.nXPix)
-#             pyplot.ylim(0, self.nYPix)
-#             pyplot.xticks(size=10)
-#             pyplot.yticks(size=10)
-
-            Right1 = pyplot.axes([0.535, 0.750, 0.465, 0.240])
-            pyplot.title('PSF Angles for {:d}/{:d} stars with ellipticity > {:.2f}'.format(\
-                            nstars, self.n_stars_SExtracted, ellip_threshold),\
-                            size=10)
-            pyplot.bar(angle_centers, angle_hist, align='center', width=0.7*angle_binsize)
-            pyplot.xlabel('Stellar PSF PA', size=10)
-            pyplot.ylabel('N Stars', size=10)
-            pyplot.xlim(-90,90)
-            pyplot.xticks(30*(np.arange(7)-3), size=10)
-            pyplot.yticks(size=10)
-
-            Right2 = pyplot.axes([0.535, 0.460, 0.465, 0.240])
-            pyplot.bar(angle_centers, diff_hist, align='center', width=0.7*angle_binsize)
-            pyplot.xlabel('Stellar PSF PA - Image PA', size=10)
-            pyplot.ylabel('N Stars', size=10)
-            pyplot.xlim(-90,90)
-            pyplot.xticks(30*(np.arange(7)-3), size=10)
-            pyplot.yticks(size=10)
-            
-            Right3 = pyplot.axes([0.535, 0.0, 0.465, 0.400])
-            Right3.set_aspect('equal')
-            pyplot.plot(star_angles, image_angles, 'k.')
+            BottomRight = pyplot.axes([0.535, 0.0, 0.465, 0.320])
+            BottomRight.set_aspect('equal')
             pyplot.title('Correlation Between PSF Angle and Position in Image', size=10)
+            pyplot.hist2d(star_angles, image_angles, bins=36, cmap='binary')
             pyplot.xlabel('Stellar PSF PA', size=10)
             pyplot.ylabel('Image PA', size=10)
             pyplot.xlim(-100,100)
@@ -1484,7 +1484,7 @@ class Image(object):
         '''
         Make jpegs of image.
         '''
-        self.logger.info('Making jpeg of image')
+        self.logger.info('Making jpeg: {}'.format(jpeg_file_name))
         jpeg_file = os.path.join(self.tel.plot_file_path, jpeg_file_name)
 
         from PIL import Image, ImageDraw
