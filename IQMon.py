@@ -671,7 +671,7 @@ class Image(object):
                        sys.exc_info()[0], sys.exc_info()[1], sys.exc_info()[2]))
         else:
             total_process_time = (EndTime - StartTime).total_seconds()
-            self.logger.debug("  Astrometry.net Processing Time: {.1f} s".format(\
+            self.logger.debug("  Astrometry.net Processing Time: {:.1f} s".format(\
                                                            total_process_time))
             pos = AstrometrySTDOUT.find("Field center: (RA H:M:S, Dec D:M:S) = ")
             if pos != -1:
