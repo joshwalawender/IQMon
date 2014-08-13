@@ -518,6 +518,7 @@ class Image(object):
                         pass
             if os.path.exists(fits_file):
                 self.working_file = fits_file
+                self.file_ext = self.file_ext = os.path.splitext(self.working_file)[1]
                 self.temp_files.append(self.working_file)
             else:
                 self.logger.critical('PPM to fits conversion failed.  Could not find fits file.')
