@@ -1042,7 +1042,9 @@ class Image(object):
                 self.FWHM_median = np.median(CentralFWHMs) * u.pix
                 self.FWHM_mode = mode(CentralFWHMs, 0.2) * u.pix
                 self.FWHM = self.FWHM_mode
-                self.ellipticity = np.median(CentralEllipticities)
+                self.ellipticity_median = np.median(CentralEllipticities)
+                self.ellipticity_mode = mode(CentralEllipticities, 0.05) 
+                self.ellipticity = self.ellipticity_mode
                 self.major_axis = np.median(CentralAs) * u.pix
                 self.minor_axis = np.median(CentralBs) * u.pix
             else:
@@ -1058,7 +1060,9 @@ class Image(object):
             self.logger.info("  Median Major Axis in inner region is {0:.2f}".format(\
                                         2.355*self.major_axis.to(u.pix).value))
             self.logger.info("  Median Ellipticity in inner region is {0:.2f}".format(\
-                                                             self.ellipticity))
+                                                             self.ellipticity_median))
+            self.logger.info("  Mode Ellipticity in inner region is {0:.2f}".format(\
+                                                             self.ellipticity_mode))
         else:
             self.FWHM = None
             self.ellipticity = None
