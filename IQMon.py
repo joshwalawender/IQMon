@@ -1155,10 +1155,14 @@ class Image(object):
             MiddleLeft = pyplot.axes([0.000, 0.375, 0.465, 0.320])
             MiddleLeft.set_aspect('equal')
             pyplot.title('Areas of high FWHM in the Image')
+            if self.n_stars_SExtracted > 20000:
+                gridsize = 20
+            else:
+                gridsize = 10
             pyplot.hexbin(self.SExtractor_results['XWIN_IMAGE'],\
                           self.SExtractor_results['YWIN_IMAGE'],\
                           self.SExtractor_results['FWHM_IMAGE'],\
-                          gridsize=20,\
+                          gridsize=gridsize,\
                           mincnt=5,\
                           cmap='Reds')
             pyplot.xlabel('X Pixels', size=10)
@@ -1169,10 +1173,14 @@ class Image(object):
             MiddleRight = pyplot.axes([0.535, 0.375, 0.465, 0.320])
             MiddleRight.set_aspect('equal')
             pyplot.title('Areas of high Ellipticity in the Image')
+            if self.n_stars_SExtracted > 20000:
+                gridsize = 20
+            else:
+                gridsize = 10
             pyplot.hexbin(self.SExtractor_results['XWIN_IMAGE'],\
                           self.SExtractor_results['YWIN_IMAGE'],\
                           self.SExtractor_results['ELLIPTICITY'],\
-                          gridsize=20,\
+                          gridsize=gridsize,\
                           mincnt=5,\
                           cmap='Reds')
             pyplot.xlabel('X Pixels', size=10)
