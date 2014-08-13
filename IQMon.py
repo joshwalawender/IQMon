@@ -1543,14 +1543,15 @@ class Image(object):
             ## Draw Crosshair Over Pointing Location from Header
             self.logger.debug('  Marking pointing at (x, y) = ({}, {})'.format(x, y))
             crosshair_color = 'cyan'
-            ms = int(0.7/100. * math.sqrt(im.size[0]**2 + im.size[1]**2))
-            thickness = 5
+            ms = int((self.tel.pointing_marker_size.to(u.arcsec) / self.tel.pixel_scale).to(u.pix).value)/2
+            self.logger.debug('  Pointing marker diameter is {} = {} pix'.format(self.tel.pointing_marker_size.to(u.arcmin), ms*2))
+            thickness = 3
             for i in range(-1*int((thickness-1)/2),int((thickness+1)/2),1):
-                draw.line((x-3*ms, y+i, x-1*ms, y+i), fill=crosshair_color)
-                draw.line((x+3*ms, y+i, x+1*ms, y+i), fill=crosshair_color)
-                draw.line((x+i, y-3*ms, x+i, y-1*ms), fill=crosshair_color)
-                draw.line((x+i, y+3*ms, x+i, y+1*ms), fill=crosshair_color)
-            radii = np.linspace(2*ms, 2*ms+thickness, thickness+1)
+                draw.line((x-1.5*ms, y+i, x-0.5*ms, y+i), fill=crosshair_color)
+                draw.line((x+1.5*ms, y+i, x+0.5*ms, y+i), fill=crosshair_color)
+                draw.line((x+i, y-1.5*ms, x+i, y-0.5*ms), fill=crosshair_color)
+                draw.line((x+i, y+1.5*ms, x+i, y+0.5*ms), fill=crosshair_color)
+            radii = np.linspace(ms, ms+thickness, thickness+1)
             for r in radii:
                 draw.ellipse((x-r, y-r, x+r, y+r), outline=crosshair_color)
 
