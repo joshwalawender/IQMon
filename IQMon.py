@@ -1162,7 +1162,7 @@ class Image(object):
 
             MiddleLeft = pyplot.axes([0.000, 0.375, 0.465, 0.320])
             MiddleLeft.set_aspect('equal')
-            pyplot.title('Areas of high FWHM in the Image')
+            pyplot.title('Areas of high FWHM in the Image', size=10)
             if self.n_stars_SExtracted > 20000:
                 gridsize = 20
             else:
@@ -1177,10 +1177,12 @@ class Image(object):
             pyplot.ylabel('Y Pixels', size=10)
             pyplot.xlim(0,self.nXPix)
             pyplot.ylim(0,self.nYPix)
+            pyplot.xticks(size=10)
+            pyplot.yticks(size=10)
 
             MiddleRight = pyplot.axes([0.535, 0.375, 0.465, 0.320])
             MiddleRight.set_aspect('equal')
-            pyplot.title('Areas of high Ellipticity in the Image')
+            pyplot.title('Areas of high Ellipticity in the Image', size=10)
             if self.n_stars_SExtracted > 20000:
                 gridsize = 20
             else:
@@ -1195,6 +1197,8 @@ class Image(object):
             pyplot.ylabel('Y Pixels', size=10)
             pyplot.xlim(0,self.nXPix)
             pyplot.ylim(0,self.nYPix)
+            pyplot.xticks(size=10)
+            pyplot.yticks(size=10)
 
             BottomLeft = pyplot.axes([0.000, 0.0, 0.465, 0.320])
             pyplot.title('Correlation of Ellipticity with Image Radius', size=10)
