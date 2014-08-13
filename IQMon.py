@@ -2155,7 +2155,7 @@ class Image(object):
                                         'f4', 'f4', 'f4', 'i4', 'f4', 'f4'),\
                                  masked=True)
         else:
-            self.logger.info("  Reading astropy table object from file: {0}".format(\
+            self.logger.debug("  Reading astropy table object from file: {0}".format(\
                                                                   summaryFile))
             try:
                 SummaryTable = ascii.read(summaryFile, guess=False,
@@ -2253,7 +2253,7 @@ class Image(object):
                               SExtractor_background, SExtractor_background_RMS),
                               mask=tableMask)
         ## Write Table to File
-        self.logger.info("  Writing new summary file.")
+        self.logger.debug("  Writing new summary file.")
         ascii.write(SummaryTable, summaryFile,
                     Writer=ascii.basic.Basic)
 
