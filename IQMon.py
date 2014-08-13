@@ -1149,8 +1149,10 @@ class Image(object):
 
             TopRight = pyplot.axes([0.535, 0.750, 0.465, 0.235])
             pyplot.title('Histogram of Elliptiticty Values for {}'.format(self.raw_file_name), size=10)
-            pyplot.plot([self.ellipticity, self.ellipticity], [0, 1.1*max(ellip_hist)],\
+            pyplot.plot([self.ellipticity_median, self.ellipticity_median], [0, 1.1*max(ellip_hist)],\
                         'ro-', linewidth=2, label='Median Ellipticity')
+            pyplot.plot([self.ellipticity_mode, self.ellipticity_mode], [0, 1.1*max(ellip_hist)],\
+                        'ro-', linewidth=2, label='Mode Ellipticity')
             pyplot.bar(ellip_centers, ellip_hist, align='center', width=0.7*ellip_binsize)
             pyplot.xlabel('Ellipticity', size=10)
             pyplot.ylabel('N Stars', size=10)
