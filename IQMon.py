@@ -1125,6 +1125,7 @@ class Image(object):
 
             Left2 = pyplot.axes([0.000, 0.460, 0.465, 0.240])
             pyplot.bar(fwhm_centers, fwhm_hist, align='center', width=0.7*fwhm_binsize)
+            pyplot.plot([self.FWHM.to(u.pix).value, self.FWHM.to(u.pix).value], [0, 1.5*max(fwhm_hist)], 'r-', label='Median FWHM')
             pyplot.xlabel('FWHM (pixels)', size=10)
             pyplot.ylabel('N Stars', size=10)
             if self.FWHM:
