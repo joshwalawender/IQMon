@@ -1162,16 +1162,18 @@ class Image(object):
 
             MiddleLeft = pyplot.axes([0.000, 0.375, 0.465, 0.320])
             MiddleLeft.set_aspect('equal')
-            pyplot.title('Areas of high FWHM in the Image', size=10)
+            pyplot.title('Average FWHM scaled from {:.1f} pix to {:.1f} pix'.format(0.8*self.FWHM.to(u.pix).value, 2.0*self.FWHM.to(u.pix).value), size=10)
             if self.n_stars_SExtracted > 20000:
                 gridsize = 20
             else:
                 gridsize = 10
-            pyplot.hexbin(self.SExtractor_results['XWIN_IMAGE'],\
-                          self.SExtractor_results['YWIN_IMAGE'],\
-                          self.SExtractor_results['FWHM_IMAGE'],\
+            pyplot.hexbin(self.SExtractor_results['XWIN_IMAGE'].data,\
+                          self.SExtractor_results['YWIN_IMAGE'].data,\
+                          self.SExtractor_results['FWHM_IMAGE'].data,\
                           gridsize=gridsize,\
                           mincnt=5,\
+                          vmin=0.8*self.FWHM.to(u.pix).value,\
+                          vmax=2.0*self.FWHM.to(u.pix).value,\
                           cmap='Reds')
             pyplot.xlabel('X Pixels', size=10)
             pyplot.ylabel('Y Pixels', size=10)
@@ -1182,16 +1184,17 @@ class Image(object):
 
             MiddleRight = pyplot.axes([0.535, 0.375, 0.465, 0.320])
             MiddleRight.set_aspect('equal')
-            pyplot.title('Areas of high Ellipticity in the Image', size=10)
+            pyplot.title('Average Ellipticity scaled from 0.25 to 0.75', size=10)
             if self.n_stars_SExtracted > 20000:
                 gridsize = 20
             else:
                 gridsize = 10
-            pyplot.hexbin(self.SExtractor_results['XWIN_IMAGE'],\
-                          self.SExtractor_results['YWIN_IMAGE'],\
-                          self.SExtractor_results['ELLIPTICITY'],\
+            pyplot.hexbin(self.SExtractor_results['XWIN_IMAGE'].data,\
+                          self.SExtractor_results['YWIN_IMAGE'].data,\
+                          self.SExtractor_results['ELLIPTICITY'].data,\
                           gridsize=gridsize,\
                           mincnt=5,\
+                          vmin=0.25, vmax=0.75,\
                           cmap='Reds')
             pyplot.xlabel('X Pixels', size=10)
             pyplot.ylabel('Y Pixels', size=10)
@@ -2147,7 +2150,7 @@ class Image(object):
         self.logger.debug("  Summary File: {0}".format(summaryFile))
         ## Read in previous data
         if not os.path.exists(summaryFile):
-            self.logger.info("  Making new astropy table object")
+            self.logger.debug("  Making new astropy table object")
             SummaryTable = table.Table(names=("ExpStart", "File", "FWHM (pix)", "Ellipticity",\
                                        "Alt (deg)", "Az (deg)", "Airmass", "pointing_error (arcmin)", \
                                        "ZeroPoint", "nStars", "Background", "Background RMS"),\
