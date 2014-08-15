@@ -1034,10 +1034,10 @@ class Image(object):
                 IQRadiusFactor = 1.0
                 DiagonalRadius = math.sqrt((self.nXPix/2)**2+(self.nYPix/2)**2)
                 IQRadius = DiagonalRadius*IQRadiusFactor
-            CentralFWHMs = [star['FWHM_IMAGE'] for star in self.SExtractor_results if star['ImageRadius'] <= IQRadius]
-            CentralEllipticities = [star['ELLIPTICITY'] for star in self.SExtractor_results if star['ImageRadius'] <= IQRadius]
-            CentralAs = [star['AWIN_IMAGE'] for star in self.SExtractor_results if star['ImageRadius'] <= IQRadius]
-            CentralBs = [star['BWIN_IMAGE'] for star in self.SExtractor_results if star['ImageRadius'] <= IQRadius]
+            CentralFWHMs = [star['FWHM_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= IQRadius) and (float(star['FWHM_IMAGE']) > 0.5)]
+            CentralEllipticities = [star['ELLIPTICITY'] for star in self.SExtractor_results if (star['ImageRadius'] <= IQRadius) and (float(star['FWHM_IMAGE']) > 0.5)]
+            CentralAs = [star['AWIN_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= IQRadius) and (float(star['FWHM_IMAGE']) > 0.5)]
+            CentralBs = [star['BWIN_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= IQRadius) and (float(star['FWHM_IMAGE']) > 0.5)]
             if len(CentralFWHMs) > 3:
                 self.FWHM_median = np.median(CentralFWHMs) * u.pix
                 self.FWHM_mode = mode(CentralFWHMs, 0.2) * u.pix
