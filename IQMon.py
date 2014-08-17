@@ -657,43 +657,47 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Solve Astrometry Using astrometry.net
     ##-------------------------------------------------------------------------
-    def solve_astrometry(self):
+    def solve_astrometry(self, timeout = 30):
         '''
         Solve astrometry in the working image using the astrometry.net solver.
         '''
         self.logger.info("Attempting to solve WCS using Astrometry.net solver.")
         AstrometryCommand = ["solve-field", "-l", "5", "-O", "-p", "-T",
-                             "-L", str(self.tel.pixel_scale.value*0.90),
-                             "-H", str(self.tel.pixel_scale.value*1.10),
+                             "-L", str(self.tel.pixel_scale.value*0.75),
+                             "-H", str(self.tel.pixel_scale.value*1.25),
                              "-u", "arcsecperpix", "-z", "4", self.working_file]
-        AstrometrySTDOUT = ""
+        AstrometrySTDOUT = open(os.path.join(self.tel.temp_file_path, 'astrometry_output.txt'), 'w')
+        self.temp_files.append(os.path.join(self.tel.temp_file_path, 'astrometry_output.txt'))
 
-        try:
-            StartTime = datetime.datetime.now()
-            AstrometrySTDOUT = subprocess.check_output(AstrometryCommand, 
-                               stderr=subprocess.STDOUT, universal_newlines=True)
+        StartTime = datetime.datetime.now()
+        astrometry_process = subprocess.Popen(AstrometryCommand, stdout=AstrometrySTDOUT, stderr=AstrometrySTDOUT)
+        EndTime = datetime.datetime.now()
+        duration = EndTime - StartTime
+        while (astrometry_process.poll() == None) and (duration.seconds < timeout):
             EndTime = datetime.datetime.now()
-        except subprocess.CalledProcessError as e:
+            duration = EndTime - StartTime
+            if duration.seconds > timeout:
+                astrometry_process.terminate()
+                self.logger.warning("Astrometry.net timed out.")
+        with open(os.path.join(self.tel.temp_file_path, 'astrometry_output.txt'), 'r') as AstrometrySTDOUT:
+            output = AstrometrySTDOUT.readlines()
+        if astrometry_process.returncode != 0:
             self.logger.warning("Astrometry.net failed.")
-            for line in e.output.split("\n"):
-                self.logger.error(line)
-            self.astrometry_solved = False
-        except:
-            self.logger.error("solve-field process failed: {0} {1} {2}".format(\
-                       sys.exc_info()[0], sys.exc_info()[1], sys.exc_info()[2]))
+            for line in output:
+                self.logger.warning('  astrometry.net output: {}'.format(line.strip('\n')))
         else:
             total_process_time = (EndTime - StartTime).total_seconds()
             self.logger.debug("  Astrometry.net Processing Time: {:.1f} s".format(\
                                                            total_process_time))
 
-            IsFieldCenter = re.search("Field center:\s\(RA\sH:M:S,\sDec D:M:S\)\s=\s\((\d{1,2}:\d{2}:\d{2}\.\d+,\s[+-]?\d{1,2}:\d{2}:\d{2}\.\d+)\)", AstrometrySTDOUT)
+            IsFieldCenter = re.search("Field center:\s\(RA\sH:M:S,\sDec D:M:S\)\s=\s\((\d{1,2}:\d{2}:\d{2}\.\d+,\s[+-]?\d{1,2}:\d{2}:\d{2}\.\d+)\)", output)
             if IsFieldCenter:
                 self.logger.info("  Astrometry.net field center is: {}".format(\
                                                     IsFieldCenter.group(1)))
             else:
                 self.logger.warning("Could not parse field center from astrometry.net output.")
-                for line in AstrometrySTDOUT.split("\n"):
-                    self.logger.warning("  %s" % line)
+                for line in output:
+                    self.logger.warning('  astrometry.net output: {}'.format(line.strip('\n')))
 
             NewFile = self.working_file.replace(self.file_ext, ".new")
             NewFitsFile = self.working_file.replace(self.file_ext, ".new.fits")
@@ -1569,7 +1573,7 @@ class Image(object):
         draw = ImageDraw.Draw(im)
 
         ## If mark_pointing is set
-        if mark_pointing and self.coordinate_from_header:
+        if mark_pointing and self.coordinate_from_header and self.image_WCS:
             xy = self.image_WCS.wcs_world2pix([[self.coordinate_from_header.ra.degree,\
                                                 self.coordinate_from_header.dec.degree]], 1)[0]
             x = int(xy[0])
