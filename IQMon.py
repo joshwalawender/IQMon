@@ -1611,7 +1611,6 @@ class Image(object):
                 y = star['YWIN_IMAGE']
                 thickness = 1
                 radii = np.linspace(ms, ms+thickness, thickness)
-                print(radii)
                 for r in radii:
                     draw.ellipse((x-r, y-r, x+r, y+r), outline=circle_color)
 
