@@ -477,7 +477,7 @@ class Image(object):
         ## fts extension:  make working copy and rename to .fits
         if self.file_ext == '.fts':
             self.logger.info('Making working copy of raw image: {}'.format(\
-                                                            self.raw_file))
+                                                            self.raw_file_name))
             self.working_file = os.path.join(self.tel.temp_file_path,\
                                              self.raw_file_basename+'.fits')
             shutil.copy2(self.raw_file, self.working_file)
@@ -487,7 +487,7 @@ class Image(object):
         ## fits extension:  make working copy
         elif self.file_ext == '.fits':
             self.logger.info('Making working copy of raw image: {}'.format(\
-                                                            self.raw_file))
+                                                            self.raw_file_name))
             self.working_file = os.path.join(self.tel.temp_file_path,\
                                              self.raw_file_name)
             shutil.copy2(self.raw_file, self.working_file)
@@ -497,7 +497,7 @@ class Image(object):
         ## DSLR file:  convert to fits
         elif self.file_ext in ['.dng', '.DNG', '.cr2', '.CR2']:
             self.logger.info('Converting {} to fits format'.format(\
-                                                            self.raw_file))
+                                                            self.raw_file_name))
             ## Make copy of raw file
             self.working_file = os.path.join(self.tel.temp_file_path, self.raw_file_name)
             self.logger.debug('Copying {} to {}'.format(self.raw_file, self.working_file))
@@ -1594,14 +1594,14 @@ class Image(object):
                 draw.line((x+1.5*ms, y+i, x+0.5*ms, y+i), fill=crosshair_color)
                 draw.line((x+i, y-1.5*ms, x+i, y-0.5*ms), fill=crosshair_color)
                 draw.line((x+i, y+1.5*ms, x+i, y+0.5*ms), fill=crosshair_color)
-            radii = np.linspace(ms, ms+thickness, thickness+1)
+            radii = np.linspace(ms, ms+thickness, thickness)
             for r in radii:
                 draw.ellipse((x-r, y-r, x+r, y+r), outline=crosshair_color)
 
         ## Mark Detected Stars
         if mark_detected_stars and self.SExtractor_results:
             if self.FWHM:
-                ms = max([4, math.ceil(self.FWHM.value)])/binning
+                ms = max([6, 2*math.ceil(self.FWHM.to(u.pix).value)])/binning
             else:
                 ms = 6
             circle_color = 'red'
@@ -1609,15 +1609,16 @@ class Image(object):
             for star in self.SExtractor_results:
                 x = star['XWIN_IMAGE']
                 y = star['YWIN_IMAGE']
-                thickness = 2
-                radii = np.linspace(ms, ms+thickness, thickness+1)
+                thickness = 1
+                radii = np.linspace(ms, ms+thickness, thickness)
+                print(radii)
                 for r in radii:
                     draw.ellipse((x-r, y-r, x+r, y+r), outline=circle_color)
 
         ## Mark Catalog Stars
         if mark_catalog_stars and self.catalog:
             if self.FWHM:
-                ms = max([4, math.ceil(self.FWHM.value)])/binning
+                ms = max([6, 2*math.ceil(self.FWHM.to(u.pix).value)])/binning
             else:
                 ms = 6
             circle_color = 'blue'
@@ -1627,7 +1628,7 @@ class Image(object):
                 xy = self.image_WCS.wcs_world2pix([[float(star['RA']), float(star['Dec'])]], 1)[0]
                 x = int(xy[0])
                 y = int(xy[1])
-                thickness = 2
+                thickness = 1
                 radii = np.linspace(2*ms, 2*ms+thickness, thickness+1)
                 for r in radii:
                     draw.ellipse((x-r, y-r, x+r, y+r), outline=circle_color)
