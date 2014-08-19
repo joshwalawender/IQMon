@@ -1,38 +1,48 @@
 # Readme: IQMon
 
-Copyright © 2012-2013, Dr. Josh Walawender (email: jmwalawender@gmail.com). All rights reserved.
+Copyright © Dr. Josh Walawender (email: jmwalawender@gmail.com). All rights reserved.
 
 
 ## Overview
 
-IQMon is a python module which can be used to quickly analyze an image for on the fly reports of image quality (**I**mage **Q**uality **Mon**itor = **IQMon**).  Originally written to analyze data from the VYSOS telescopes, but also written with the intent of building a set of general tools to analyze any fits image.
+IQMon is a python module which can be used to quickly analyze an image for on the fly reports of image quality (**I**mage **Q**uality **Mon**itor = **IQMon**).  It was originally written to provide a quick look analysis of data from  robotic telescopes.
 
-The base finctionality is that it uses SExtractor to find stars in the image and report the typical Full Width at Half Max (FWHM) and ellipticity.  This allows quick and dirty evaluation of the image quality in near real time (a few to tens of seconds on modest hardware circa 2010).
+The base functionality is that it uses SExtractor to find stars in the image and report the typical Full Width at Half Max (FWHM) and ellipticity.  This allows quick and dirty evaluation of the image quality in near real time (a few to tens of seconds on modest hardware circa 2010).
 
 If the image contains a WCS, the module can also compare the WCS coordinates of the central pixel to the pointing coordinates in the image header to determine the pointing error.  If no WCS is present, the module can also attempt to solve the astrometry in the image using the astrometry.net solver.  
+
+In addition, the software can use SCAMP and SWarp to determine a plate solution which includes distortion parameters and compare the instrumental magnitudes determined by SExtractor to catalog magnitudes to determine the photometric zero point of the image.
 
 ## Requirements
 
 * python2.7.X
 * astropy (<http://www.astropy.org>)
 * pyephem (<http://rhodesmill.org/pyephem/>)
-* SExtractor (<http://www.astromatic.net/software/sextractor>)
-* astrometry.net solver (<http://astrometry.net>)
-
-* matplotlib (Should be bundled with most python installations)
+* numpy
+* matplotlib
 * subprocess
+* SExtractor (<http://www.astromatic.net/software/sextractor>)
+* SCAMP (<http://www.astromatic.net/software/scamp>)
+* SWarp (<http://www.astromatic.net/software/swarp>)
+* astrometry.net solver (<http://astrometry.net>)
 
 ## Version History
 
+<<<<<<< HEAD
 * **v1.0.6**
     * Tweaks related to marking up of jpeg files.  Better markers, user settable maker size, and marks are labeled.
+=======
+* **v1.1**
+    * Added ability to solve astrometry using SCAMP and rectify the image using SWarp
+    * Added ability to solve for Zero Point using the SCAMP-solved data
+>>>>>>> develop
 * **v1.0.5**
     * Bug fixes related to marking up of jpeg files.
 * **v1.0.4**
-	* MakeJPEG now marks the brightest 5000 stars rather than the first 5000 in the table.  Also annotates image to let viewer know more stars were detected.
-	* added option to HTML output to choose which columns are displayed
-	* other minor bug fixes and tweaks
-	* fixed bug where axes in crop were reversed
+    * MakeJPEG now marks the brightest 5000 stars rather than the first 5000 in the table.  Also annotates image to let viewer know more stars were detected.
+    * added option to HTML output to choose which columns are displayed
+    * other minor bug fixes and tweaks
+    * fixed bug where axes in crop were reversed
 * **v1.0.3**
     * Fixed handling of spaces in filenames by repalcing spaces in input file name with underscores when making working file.
     * Fixed bug in MakeJPEG which hard coded a binning of 2x2.
@@ -57,15 +67,6 @@ If the image contains a WCS, the module can also compare the WCS coordinates of 
     * Reports pointing error and position angle
     * Makes jpegs of image and cropped version with circles overlayed on stars found by SExtractor
     * Makes HTML and text file versions of results with one line per image, usually one night of images per file.
-
-
-## Planned Features
-
-… in no particular order:
-
-* Implement reading of raw DSLR images via dcraw.
-* Refine WCS by adding distortion terms.
-* Determine zero point of image by comparing SExtractor photometry with catalog magnitudes (using UCAC4).
 
 
 ## Code Structure
