@@ -84,6 +84,7 @@ class Telescope(object):
         self.pixel_scale = None
         self.fRatio = None
         self.SExtractor_params = None
+        self.SCAMP_params = None
         self.site = None
         self.pointing_marker_size = 1*u.arcmin
         self.PSF_measurement_radius = None
@@ -894,7 +895,7 @@ class Image(object):
                              'CHECKIMAGE_NAME': self.check_image_file,
                             }
 
-        ## Use command line sextractor params
+        ## Use optional sextractor params
         if not self.tel.SExtractor_params:
             SExtractor_params = SExtractor_default
         else:
@@ -1237,7 +1238,8 @@ class Image(object):
             SCAMP_aheader = self.tel.SCAMP_aheader
         else:
             SCAMP_aheader = 'scamp.ahead'
-        SCAMP_params = {
+
+        SCAMP_default = {
                         'DISTORT_DEGREES': distortion_order,
                         'SCAMP_aheader_GLOBAL': SCAMP_aheader,
                         'ASTREF_CATALOG': catalog,
@@ -1254,6 +1256,15 @@ class Image(object):
                         'WRITE_XML': 'Y',
                         'XML_NAME': os.path.join(self.tel.temp_file_path, 'scamp.xml'),
                         }
+
+        if not self.tel.SCAMP_params:
+            SCAMP_params = SCAMP_default
+        else:
+            SCAMP_params = self.tel.SCAMP_params
+            for key in SCAMP_default.keys():
+                if not key in self.tel.SCAMP_params.keys():
+                    SCAMP_params[key] = SCAMP_default[key]
+
         SCAMPCommand = ["scamp", self.SExtractor_catalog]
         for key in SCAMP_params.keys():
             SCAMPCommand.append('-{}'.format(key))

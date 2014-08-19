@@ -54,7 +54,7 @@ def main():
     tel.focal_length = 580.*u.mm
     tel.pixel_size = 6.5*u.micron
     tel.aperture = 100.*u.mm
-    tel.gain = 1.0 / u.adu  ## This is a guess value, need to measure
+    tel.gain = 1.0 / u.adu
     tel.units_for_FWHM = 1.*u.pix
     tel.ROI = None
     tel.threshold_FWHM = 3.0*u.pix
@@ -63,7 +63,7 @@ def main():
     tel.pixel_scale = tel.pixel_size.to(u.mm)/tel.focal_length.to(u.mm)*u.radian.to(u.arcsec)*u.arcsec/u.pix
     tel.fRatio = tel.focal_length.to(u.mm)/tel.aperture.to(u.mm)
     tel.SExtractor_params = {'PHOT_APERTURES': '6.0',
-                            'BACK_SIZE': '16',
+                            'BACK_SIZE': '32',
                             'SEEING_FWHM': '2.5',
                             'SATUR_LEVEL': '50000',
                             'DETECT_MINAREA': '5',
