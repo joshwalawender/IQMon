@@ -1515,7 +1515,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Make JPEG of Image (using matplotlib)
     ##-------------------------------------------------------------------------
-    def new_make_JPEG(self, jpeg_file_name, binning=1, p1=0.15, p2=0.5,\
+    def make_JPEG(self, jpeg_file_name, binning=1, p1=0.15, p2=0.5,\
                       mark_pointing=False,\
                       mark_detected_stars=False,\
                       mark_catalog_stars=False,\
@@ -1673,7 +1673,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Make JPEG of Image (using convert tool in ImageMagick)
     ##-------------------------------------------------------------------------
-    def make_JPEG(self, jpegFileName, binning=1, markCatalogStars=False,\
+    def make_JPEG_ImageMagick(self, jpegFileName, binning=1, markCatalogStars=False,\
                  markDetectedStars=False, markPointing=False,\
                  backgroundSubtracted=False, p1=0.2, p2=1.0):
         '''
