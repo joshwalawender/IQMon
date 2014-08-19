@@ -91,7 +91,7 @@ class Telescope(object):
         self.pixel_scale = None
         self.fRatio = None
         self.SExtractor_params = None
-        self.distortionOrder = 1
+        self.distortion_order = 1
         self.site = None
         self.pointing_marker_size = 1*u.arcmin
         self.PSF_measurement_radius = None
@@ -1246,7 +1246,7 @@ class Image(object):
         else:
             SCAMP_aheader = 'scamp.ahead'
         SCAMP_params = {
-                        'DISTORT_DEGREES': self.tel.distortionOrder,
+                        'DISTORT_DEGREES': self.tel.distortion_order,
                         'SCAMP_aheader_GLOBAL': SCAMP_aheader,
                         'ASTREF_CATALOG': catalog,
                         'SAVE_REFCATALOG': 'N',
@@ -1267,7 +1267,7 @@ class Image(object):
             SCAMPCommand.append('-{}'.format(key))
             SCAMPCommand.append('{}'.format(SCAMP_params[key]))
         self.logger.info("Running SCAMP on {} catalog with distortion order {}.".format(\
-                                            catalog, self.tel.distortionOrder))
+                                            catalog, self.tel.distortion_order))
         if SCAMP_aheader:
             self.logger.info("  Using SCAMP_aheader file: {}".format(SCAMP_aheader))
         self.logger.debug("  SCAMP command: {}".format(SCAMPCommand))
