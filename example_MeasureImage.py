@@ -71,7 +71,7 @@ def main():
                             'ANALYSIS_THRESH': '5.0',
                             'FILTER': 'N',
                             }
-    tel.distortionOrder = 5
+    tel.distortion_order = 5
     tel.pointing_marker_size = 4*u.arcmin
     ## Define Site (ephem site object)
     tel.site = ephem.Observer()
@@ -119,7 +119,7 @@ def main():
     image.make_PSF_plot()
     image.measure_zero_point(plot=True)
     CatalogJPEG = image.rawFileBasename+"_catstars.jpg"
-    image.make_JPEG(CatalogJPEG, markCatalogStars=True, markPointing=True, binning=2)
+    image.make_JPEG(CatalogJPEG, mark_catalog_stars=True, mark_pointing=True, binning=2)
     
     image.clean_up()               ## Cleanup (delete) temporary files.
     image.calculate_process_time() ## Calculate how long it took to process this image

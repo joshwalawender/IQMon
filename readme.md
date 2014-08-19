@@ -5,7 +5,7 @@ Copyright © Dr. Josh Walawender (email: jmwalawender@gmail.com). All rights res
 
 ## Overview
 
-IQMon is a python module which can be used to quickly analyze an image for on the fly reports of image quality (**I**mage **Q**uality **Mon**itor = **IQMon**).  It was originally written to provide a quick look analysis of data from  robotic telescopes.
+IQMon is a python module which can be used to quickly analyze an image for on the fly reports of image quality (Image Quality Monitor = IQMon).  It was originally written to provide a quick look analysis of data from robotic telescopes.
 
 The base functionality is that it uses SExtractor to find stars in the image and report the typical Full Width at Half Max (FWHM) and ellipticity.  This allows quick and dirty evaluation of the image quality in near real time (a few to tens of seconds on modest hardware circa 2010).
 
@@ -15,7 +15,7 @@ In addition, the software can use SCAMP and SWarp to determine a plate solution 
 
 ## Requirements
 
-* python2.7.X
+* python2.7.X or python3.X
 * astropy (<http://www.astropy.org>)
 * pyephem (<http://rhodesmill.org/pyephem/>)
 * numpy
@@ -31,6 +31,10 @@ In addition, the software can use SCAMP and SWarp to determine a plate solution 
 * **v1.1**
     * Added ability to solve astrometry using SCAMP and rectify the image using SWarp
     * Added ability to solve for Zero Point using the SCAMP-solved data
+    * Renamed many methods to better follow PEP8 conventions
+    * Refactored `make_JPEG` to use matplotlib and PIL instead of ImageMagick.  The previous method is available as `make_JPEG_ImageMagick`.
+* **v1.0.6**
+    * Tweaks related to marking up of jpeg files.  Better markers, user settable maker size, and marks are labeled.
 * **v1.0.5**
     * Bug fixes related to marking up of jpeg files.
 * **v1.0.4**
@@ -66,109 +70,16 @@ In addition, the software can use SCAMP and SWarp to determine a plate solution 
 
 ## Code Structure
 
-IQMon functionality centers around the use of three objects:  IQMon.Config, IQMon.Telescope, and IQMon.Image.  When used, you must create one of each of these objects.
+IQMon functionality centers around the use of two objects:  IQMon.Telescope and IQMon.Image.  When used, you must create one of each of these objects.
 
-* IQMon.Config is a singleton and holds general configuration information for the module.  It has several properties, all of which are paths to things like data directories or directories for temporary files.
-
-* IQMon.Telescope object is also a singleton and holds detailed information on the telescope used to take the data.
+* IQMon.Telescope object and holds detailed information on the telescope used to take the data and some custom configuration parameters.
 
 * IQMon.Image object holds information about the image and contains the methods which do all of the image analysis which then fills in the object properties.
 
 ### Example Use
 
-A typical code to use IQMon on a single image might be structured something like this:
-
-```
-def listDarks():
-    ## define a function to return a list of the paths
-    ## to dark file(s) on your system
-    return Darks
-
-def main():
-    ## main program
-    FitsFile = "/path/to/fits/file"
-    
-    ## Establish IQMon Configuration
-    config = IQMon.Config()  ## This reads configuration info in
-                             ## your $HOME/.IQMonConfig file
-    ## Create Telescope Object
-    tel = IQMon.Telescope()
-    ## Define your telescope's properties
-    tel.name = "MyTelescope"
-    tel.longName = "MyReallyExcellentTelescope"
-    tel.focalLength = 735.*u.mm
-    tel.pixelSize = 9.0*u.micron
-    tel.aperture = 135.*u.mm
-    tel.gain = 1.6 / u.adu
-    tel.unitsForFWHM = 1.*u.pix
-    tel.ROI = "[1024:3072,1024:3072]"
-    tel.thresholdFWHM = 2.5*u.pix
-    tel.thresholdPointingErr = 5.0*u.arcmin
-    tel.thresholdEllipticity = 0.30
-    tel.pixelScale = tel.pixelSize.to(u.mm) / tel.focalLength.to(u.mm) * u.radian.to(u.arcsec) * u.arcsec / u.pix
-    tel.fRatio = tel.focalLength.to(u.mm) / tel.aperture.to(u.mm)
-    tel.SExtractorPhotAperture = 6.0*u.pix
-    tel.SExtractorSeeing = 2.0*u.arcsec
-    tel.site = ephem.Observer()
-    
-    ## Create IQMon.Image Object
-    image = IQMon.Image(FitsFile, tel, config)  ## Create image object
-            
-    ## Create Filenames and set verbosity
-    IQMonLogFileName = "/path/to/my/log"
-    htmlImageList = "/path/to/my/HTML/output"
-    summaryFile = "/path/to/my/text/output"
-    FullFrameJPEG = "/path/to/full/frame/jpeg"
-    CropFrameJPEG = "/path/to/crop/frame/jpeg"
-    verbose = True
-    
-    ## Perform Actual Image Analysis
-    image.MakeLogger(IQMonLogFileName, verbose)
-    image.logger.info("###### Processing Image:  %s ######", FitsFilename)
-    image.logger.info("Setting telescope variable to %s", telescope)
-    image.tel.CheckUnits()
-    image.ReadImage()           ## Create working copy of image (don't edit raw file!)
-    image.GetHeader()           ## Extract values from header
-    image.MakeJPEG(FullFrameJPEG, rotate=True, binning=2)
-    if not image.imageWCS:      ## If no WCS found in header ...
-        image.SolveAstrometry() ## Solve Astrometry
-        image.GetHeader()       ## Refresh Header
-    image.DeterminePointingError() ## Calculate Pointing Error
-    darks = ListDarks(image)    ## List dark files
-    image.DarkSubtract(darks)   ## Dark Subtract Image
-    image.Crop()                ## Crop Image
-    image.GetHeader()           ## Refresh Header
-    image.RunSExtractor()       ## Run SExtractor
-    image.DetermineFWHM()       ## Determine FWHM from SExtractor results
-    image.MakeJPEG(CropFrameJPEG, marked=True, binning=1)
-    image.CleanUp()             ## Cleanup (delete) temporary files.
-    image.CalculateProcessTime()## Calculate how long it took to process this image
-    image.AddWebLogEntry(htmlImageList) ## Add line for this image to HTML table
-    image.AddSummaryEntry(summaryFile)  ## Add line for this image to text table
-```
+Please see example_MeasureImage.py file.
 
 ## License Terms
 
-Copyright (c) 2013, Josh Walawender
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without modification,
-are permitted provided that the following conditions are met:
-
-* Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
-
-* Redistributions in binary form must reproduce the above copyright notice, this
-  list of conditions and the following disclaimer in the documentation and/or
-  other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+Please see LICENSE file.
