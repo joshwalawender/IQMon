@@ -37,8 +37,8 @@ import astropy.io.ascii as ascii
 ## Mode Function
 ##-----------------------------------------------------------------------------
 def mode(data, binsize):
-    pctile95 = math.ceil(np.percentile(data, 99.0))
-    hist, bins = np.histogram(data, bins=binsize*np.arange(int(pctile95/binsize)+1))
+    pctile = math.ceil(np.percentile(data, 99.0))
+    hist, bins = np.histogram(data, bins=binsize*np.arange(int(pctile/binsize)+1))
     centers = (bins[:-1] + bins[1:]) / 2
     foo = zip(hist, centers)
     return max(foo)[1]
@@ -52,16 +52,9 @@ class Telescope(object):
     '''
     Contains information about the telescope that can be passed to methods and
     functions.  The concept for operation is that the user will write a simple
-    script which creates a telescope object and assigned values to all it's
+    script which creates a telescope object and assigned values to all its
     properties (or sets them to None).
     '''
-#     _singletons = dict()
-# 
-#     def __new__(cls):
-#         if not cls in cls._singletons:
-#             cls._singletons[cls] = object.__new__(cls)
-#         return cls._singletons[cls]
-
     def __init__(self, path_temp, path_plots):
         self.temp_file_path = path_temp
         self.plot_file_path = path_plots
@@ -91,7 +84,6 @@ class Telescope(object):
         self.pixel_scale = None
         self.fRatio = None
         self.SExtractor_params = None
-        self.distortion_order = 1
         self.site = None
         self.pointing_marker_size = 1*u.arcmin
         self.PSF_measurement_radius = None
@@ -1236,7 +1228,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Run SCAMP
     ##-------------------------------------------------------------------------
-    def run_SCAMP(self, catalog='USNO-B1', mergedcat_name='scamp.cat', mergedcat_type='ASCII_HEAD'):
+    def run_SCAMP(self, catalog='USNO-B1', mergedcat_name='scamp.cat', mergedcat_type='ASCII_HEAD', distortion_order=1):
         '''
         Run SCAMP on SExtractor output catalog.
         '''
@@ -1246,7 +1238,7 @@ class Image(object):
         else:
             SCAMP_aheader = 'scamp.ahead'
         SCAMP_params = {
-                        'DISTORT_DEGREES': self.tel.distortion_order,
+                        'DISTORT_DEGREES': distortion_order,
                         'SCAMP_aheader_GLOBAL': SCAMP_aheader,
                         'ASTREF_CATALOG': catalog,
                         'SAVE_REFCATALOG': 'N',
@@ -1267,7 +1259,7 @@ class Image(object):
             SCAMPCommand.append('-{}'.format(key))
             SCAMPCommand.append('{}'.format(SCAMP_params[key]))
         self.logger.info("Running SCAMP on {} catalog with distortion order {}.".format(\
-                                            catalog, self.tel.distortion_order))
+                                            catalog, distortion_order))
         if SCAMP_aheader:
             self.logger.info("  Using SCAMP_aheader file: {}".format(SCAMP_aheader))
         self.logger.debug("  SCAMP command: {}".format(SCAMPCommand))

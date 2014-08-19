@@ -71,7 +71,6 @@ def main():
                             'ANALYSIS_THRESH': '5.0',
                             'FILTER': 'N',
                             }
-    tel.distortion_order = 5
     tel.pointing_marker_size = 4*u.arcmin
     ## Define Site (ephem site object)
     tel.site = ephem.Observer()
