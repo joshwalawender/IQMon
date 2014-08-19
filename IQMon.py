@@ -1026,15 +1026,15 @@ class Image(object):
             if self.tel.PSF_measurement_radius:
                 self.logger.info('  Using stars in the inner {} pixels.'.format(\
                                               self.tel.PSF_measurement_radius))
-                IQRadius = self.tel.PSF_measurement_radius
             else:
                 IQRadiusFactor = 1.0
                 DiagonalRadius = math.sqrt((self.nXPix/2)**2+(self.nYPix/2)**2)
-                IQRadius = DiagonalRadius*IQRadiusFactor
-            CentralFWHMs = [star['FWHM_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= IQRadius) and (float(star['FWHM_IMAGE']) > 0.5)]
-            CentralEllipticities = [star['ELLIPTICITY'] for star in self.SExtractor_results if (star['ImageRadius'] <= IQRadius) and (float(star['FWHM_IMAGE']) > 0.5)]
-            CentralAs = [star['AWIN_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= IQRadius) and (float(star['FWHM_IMAGE']) > 0.5)]
-            CentralBs = [star['BWIN_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= IQRadius) and (float(star['FWHM_IMAGE']) > 0.5)]
+                self.tel.PSF_measurement_radius = DiagonalRadius*IQRadiusFactor
+                self.logger.info('  Using all stars in image.')
+            CentralFWHMs = [star['FWHM_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius) and (float(star['FWHM_IMAGE']) > 0.5)]
+            CentralEllipticities = [star['ELLIPTICITY'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius) and (float(star['FWHM_IMAGE']) > 0.5)]
+            CentralAs = [star['AWIN_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius) and (float(star['FWHM_IMAGE']) > 0.5)]
+            CentralBs = [star['BWIN_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius) and (float(star['FWHM_IMAGE']) > 0.5)]
             if len(CentralFWHMs) > 3:
                 self.FWHM_median = np.median(CentralFWHMs) * u.pix
                 self.FWHM_mode = mode(CentralFWHMs, 0.2) * u.pix
@@ -1086,6 +1086,8 @@ class Image(object):
         star_x = [star['XWIN_IMAGE'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
         star_y = [star['YWIN_IMAGE'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
         uncorrected_diffs = [star['THETAWIN_IMAGE']-star['AngleInImage'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
+        CentralFWHMs = [star['FWHM_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius) and (float(star['FWHM_IMAGE']) > 0.5)]
+        CentralEllipticities = [star['ELLIPTICITY'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius) and (float(star['FWHM_IMAGE']) > 0.5)]
         
         nstars = len(star_angles)
         self.logger.debug('  Found {} stars with ellipticity greater than {:.2f}.'.format(\
@@ -1105,13 +1107,13 @@ class Image(object):
         angle_centers = (diff_bins[:-1] + diff_bins[1:]) / 2
 
         ellip_binsize = 0.05
-        ellip_hist, ellip_bins = np.histogram(self.SExtractor_results['ELLIPTICITY'],\
+        ellip_hist, ellip_bins = np.histogram(CentralEllipticities,\
                                               bins=ellip_binsize*np.arange(21))
         ellip_centers = (ellip_bins[:-1] + ellip_bins[1:]) / 2
 
         fwhm_binsize = 0.2
-        fwhm_95pctile = math.ceil(np.percentile(self.SExtractor_results['FWHM_IMAGE'], 95.0))
-        fwhm_hist, fwhm_bins = np.histogram(self.SExtractor_results['FWHM_IMAGE'],\
+        fwhm_95pctile = math.ceil(np.percentile(CentralFWHMs, 95.0))
+        fwhm_hist, fwhm_bins = np.histogram(CentralFWHMs,\
                                                bins=fwhm_binsize*np.arange(int(fwhm_95pctile/fwhm_binsize)+11))
         fwhm_centers = (fwhm_bins[:-1] + fwhm_bins[1:]) / 2
 
@@ -1132,7 +1134,6 @@ class Image(object):
 
             TopLeft = pyplot.axes([0.000, 0.750, 0.465, 0.235])
             pyplot.title('Histogram of FWHM Values for {}'.format(self.raw_file_name), size=10)
-
             pyplot.bar(fwhm_centers, fwhm_hist, align='center', width=0.7*fwhm_binsize)
             pyplot.plot([self.FWHM_median.to(u.pix).value, self.FWHM_median.to(u.pix).value], [0, 1.1*max(fwhm_hist)],\
                         'ro-', linewidth=2, label='Median FWHM')
@@ -1171,7 +1172,12 @@ class Image(object):
                           mincnt=5,\
                           vmin=0.8*self.FWHM.to(u.pix).value,\
                           vmax=2.0*self.FWHM.to(u.pix).value,\
+                          alpha=0.5,\
                           cmap='Reds')
+#             center_region = pyplot.Circle((self.nXPix/2, self.nYPix/2),\
+#                                    radius=self.tel.PSF_measurement_radius/self.nXPix,\
+#                                    color='k')
+#             MiddleLeft.add_artist(center_region)
             pyplot.xlabel('X Pixels', size=10)
             pyplot.ylabel('Y Pixels', size=10)
             pyplot.xlim(0,self.nXPix)
@@ -1192,7 +1198,9 @@ class Image(object):
                           gridsize=gridsize,\
                           mincnt=5,\
                           vmin=0.25, vmax=0.75,\
+                          alpha=0.5,\
                           cmap='Reds')
+#             MiddleRight.add_artist(center_region)
             pyplot.xlabel('X Pixels', size=10)
             pyplot.ylabel('Y Pixels', size=10)
             pyplot.xlim(0,self.nXPix)
