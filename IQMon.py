@@ -438,6 +438,7 @@ class Image(object):
                             ignore_missing_end=True, mode='update')
         hdulist[0].header[keyword] = value
         hdulist.flush()
+        self.header[keyword] = value
 
 
     ##-------------------------------------------------------------------------
@@ -786,11 +787,13 @@ class Image(object):
             self.wcs_pixel_scale = pixel_scale
 
             ## Determine Position Angle
-            ang1 = math.acos(PC[0][0])
-            ang2 = math.acos(PC[0][1])
-            ang3 = math.acos(PC[1][0])
-            ang4 = math.acos(PC[1][1])
-            self.position_angle = (270 - np.mean([ang1, ang2, ang3, ang4])*180/math.pi) * u.deg
+            PCnorm = pixel_scale.to(u.deg/u.pix).value
+            angles = np.array([90*u.deg.to(u.radian) - np.arccos(PC[0][0]/PCnorm),\
+                               90*u.deg.to(u.radian) - np.arcsin(-1*PC[0][1]/PCnorm),\
+                               90*u.deg.to(u.radian) - np.arcsin(PC[1][0]/PCnorm),\
+                               90*u.deg.to(u.radian) - np.arccos(PC[1][1]/PCnorm),\
+                              ]) * u.radian
+            self.position_angle = angles[~np.isnan(angles)].mean().to(u.deg)
 
             ## Determine Flip State
             flipped = np.linalg.det(PC) > 0
