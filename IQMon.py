@@ -1533,6 +1533,7 @@ class Image(object):
                       mark_pointing=False,\
                       mark_detected_stars=False,\
                       mark_catalog_stars=False,\
+                      make_hist=False,\
                       transform=None,
                       crop=None,
                       quality=70,
@@ -1552,23 +1553,24 @@ class Image(object):
         data_masked = np.ma.masked_equal(data, 0)
         data_nonzero = data_masked[~data_masked.mask]
 
-#         ## Make exposure histogram (of unscaled data)
-#         self.logger.debug('  Make histogram of unscaled data.')
-#         histogram_plot_file = os.path.join(self.tel.plot_file_path, '{}_hist.png'.format(self.raw_file_basename))
-#         hist_low = np.percentile(data_nonzero.ravel(), p1)
-#         hist_high = np.percentile(data_nonzero.ravel(), 100.-p2)
-#         hist_nbins = 128
-#         hist_binsize = (hist_high-hist_low)/128
-#         hist_bins = np.arange(hist_low,hist_high,hist_binsize)
-#         self.logger.debug('  Histogram range: {} {}.'.format(hist_low, hist_high))
-#         pyplot.figure()
-#         pyplot.hist(data.ravel(), bins=hist_bins, label='binsize = {:4f}'.format(hist_binsize))
-#         pyplot.xlim(hist_low,hist_high)
-#         pyplot.legend(loc='best')
-#         pyplot.xlabel('Pixel value')
-#         pyplot.ylabel('Number of Pixels')
-#         self.logger.debug('  Saving histogram to {}.'.format(histogram_plot_file))
-#         pyplot.savefig(histogram_plot_file)
+        ## Make exposure histogram (of unscaled data)
+        if make_hist:
+            self.logger.info('  Make histogram of unscaled data.')
+            histogram_plot_file = os.path.join(self.tel.plot_file_path, '{}_hist.png'.format(self.raw_file_basename))
+            hist_low = np.percentile(data_nonzero.ravel(), p1)
+            hist_high = np.percentile(data_nonzero.ravel(), 100.-p2)
+            hist_nbins = 128
+            hist_binsize = (hist_high-hist_low)/128
+            hist_bins = np.arange(hist_low,hist_high,hist_binsize)
+            self.logger.debug('  Histogram range: {} {}.'.format(hist_low, hist_high))
+            pyplot.figure()
+            pyplot.hist(data.ravel(), bins=hist_bins, label='binsize = {:4f}'.format(hist_binsize))
+            pyplot.xlim(hist_low,hist_high)
+            pyplot.legend(loc='best')
+            pyplot.xlabel('Pixel value')
+            pyplot.ylabel('Number of Pixels')
+            self.logger.info('  Saving histogram to {}.'.format(histogram_plot_file))
+            pyplot.savefig(histogram_plot_file)
 
         ## Rescale data using arcsinh transform for jpeg
         self.logger.debug('  Rescaling image data using arcsinh')
@@ -1676,7 +1678,7 @@ class Image(object):
             im.thumbnail(size, Image.ANTIALIAS)
 
         ## Save to JPEG
-        self.logger.debug('  Saving jpeg (binning={}, quality={:.0f}) to: {}'.format(binning, quality, jpeg_file_name))
+        self.logger.info('  Saving jpeg (p1={:.1f}, p2={:.1f}), binning={}, quality={:.0f}) to: {}'.format(p1, p2, binning, quality, jpeg_file_name))
         im.save(jpeg_file, 'JPEG', quality=quality)
         self.jpeg_file_names.append(jpeg_file_name)
 
