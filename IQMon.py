@@ -1081,7 +1081,7 @@ class Image(object):
             self.PSF_plot_filename = self.raw_file_basename+'_PSFinfo.png'
         self.PSF_plotfile = os.path.join(self.tel.plot_file_path, self.PSF_plot_filename)
 
-        self.logger.info('Generating plots of PSF staistics: {}'.format(self.PSF_plot_filename))
+        self.logger.info('Generating plots of PSF statistics: {}'.format(self.PSF_plot_filename))
 
         ellip_threshold = 0.15
         star_angles = [star['THETAWIN_IMAGE'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
