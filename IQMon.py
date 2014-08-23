@@ -682,8 +682,7 @@ class Image(object):
             total_process_time = (EndTime - StartTime).total_seconds()
             self.logger.debug("  Astrometry.net Processing Time: {:.1f} s".format(\
                                                            total_process_time))
-
-            IsFieldCenter = re.search("Field center:\s\(RA\sH:M:S,\sDec D:M:S\)\s=\s\((\d{1,2}:\d{2}:\d{2}\.\d+,\s[+-]?\d{1,2}:\d{2}:\d{2}\.\d+)\)", output)
+            IsFieldCenter = re.search("Field center:\s\(RA\sH:M:S,\sDec D:M:S\)\s=\s\((\d{1,2}:\d{2}:\d{2}\.\d+,\s[+-]?\d{1,2}:\d{2}:\d{2}\.\d+)\)", ''.join(output))
             if IsFieldCenter:
                 self.logger.info("  Astrometry.net field center is: {}".format(\
                                                     IsFieldCenter.group(1)))
@@ -1031,11 +1030,15 @@ class Image(object):
                 IQRadiusFactor = 1.0
                 DiagonalRadius = math.sqrt((self.nXPix/2)**2+(self.nYPix/2)**2)
                 IQRadius = DiagonalRadius*IQRadiusFactor
-            CentralFWHMs = [star['FWHM_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= IQRadius) and (float(star['FWHM_IMAGE']) > 0.5)]
-            CentralEllipticities = [star['ELLIPTICITY'] for star in self.SExtractor_results if (star['ImageRadius'] <= IQRadius) and (float(star['FWHM_IMAGE']) > 0.5)]
-            CentralAs = [star['AWIN_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= IQRadius) and (float(star['FWHM_IMAGE']) > 0.5)]
-            CentralBs = [star['BWIN_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= IQRadius) and (float(star['FWHM_IMAGE']) > 0.5)]
-            if len(CentralFWHMs) > 3:
+            CentralFWHMs = [star['FWHM_IMAGE'] for star in self.SExtractor_results\
+                           if (star['ImageRadius'] <= IQRadius) and (float(star['FWHM_IMAGE']) > 0.5)]
+            CentralEllipticities = [star['ELLIPTICITY'] for star in self.SExtractor_results\
+                           if (star['ImageRadius'] <= IQRadius) and (float(star['FWHM_IMAGE']) > 0.5)]
+            CentralAs = [star['AWIN_IMAGE'] for star in self.SExtractor_results\
+                           if (star['ImageRadius'] <= IQRadius) and (float(star['FWHM_IMAGE']) > 0.5)]
+            CentralBs = [star['BWIN_IMAGE'] for star in self.SExtractor_results\
+                           if (star['ImageRadius'] <= IQRadius) and (float(star['FWHM_IMAGE']) > 0.5)]
+            if len(CentralFWHMs) > 25:
                 self.FWHM_median = np.median(CentralFWHMs) * u.pix
                 self.FWHM_mode = mode(CentralFWHMs, 0.2) * u.pix
                 self.FWHM = self.FWHM_mode
@@ -1044,26 +1047,31 @@ class Image(object):
                 self.ellipticity = self.ellipticity_mode
                 self.major_axis = np.median(CentralAs) * u.pix
                 self.minor_axis = np.median(CentralBs) * u.pix
+                self.logger.debug("  Using {0} stars in central region to determine PSF quality.".format(\
+                                                                len(CentralFWHMs)))
+                self.logger.info("  Median FWHM in inner region is {0:.2f} pixels".format(\
+                                                        self.FWHM_median.to(u.pix).value))
+                self.logger.info("  Mode FWHM in inner region is {0:.2f} pixels".format(\
+                                                        self.FWHM_mode.to(u.pix).value))
+                self.logger.info("  Median Minor Axis in inner region is {0:.2f}".format(\
+                                            2.355*self.minor_axis.to(u.pix).value))
+                self.logger.info("  Median Major Axis in inner region is {0:.2f}".format(\
+                                            2.355*self.major_axis.to(u.pix).value))
+                self.logger.info("  Median Ellipticity in inner region is {0:.2f}".format(\
+                                                                 self.ellipticity_median))
+                self.logger.info("  Mode Ellipticity in inner region is {0:.2f}".format(\
+                                                                 self.ellipticity_mode))
             else:
                 self.logger.warning("  Not enough stars detected in central region of image to form median FWHM.")
-            self.logger.debug("  Using {0} stars in central region to determine FWHM and ellipticity.".format(\
-                                                            len(CentralFWHMs)))
-            self.logger.info("  Median FWHM in inner region is {0:.2f} pixels".format(\
-                                                    self.FWHM_median.to(u.pix).value))
-            self.logger.info("  Mode FWHM in inner region is {0:.2f} pixels".format(\
-                                                    self.FWHM_mode.to(u.pix).value))
-            self.logger.info("  Median Minor Axis in inner region is {0:.2f}".format(\
-                                        2.355*self.minor_axis.to(u.pix).value))
-            self.logger.info("  Median Major Axis in inner region is {0:.2f}".format(\
-                                        2.355*self.major_axis.to(u.pix).value))
-            self.logger.info("  Median Ellipticity in inner region is {0:.2f}".format(\
-                                                             self.ellipticity_median))
-            self.logger.info("  Mode Ellipticity in inner region is {0:.2f}".format(\
-                                                             self.ellipticity_mode))
         else:
+            self.FWHM_median = None
+            self.FWHM_mode = None
             self.FWHM = None
+            self.ellipticity_median = None
+            self.ellipticity_mode = None
             self.ellipticity = None
-
+            self.major_axis = None
+            self.minor_axis = None
 
     ##-------------------------------------------------------------------------
     ## Make PSF Statistics Plots
@@ -1079,6 +1087,9 @@ class Image(object):
         self.PSF_plotfile = os.path.join(self.tel.plot_file_path, self.PSF_plot_filename)
 
         self.logger.info('Generating plots of PSF staistics: {}'.format(self.PSF_plot_filename))
+        if not self.FWHM:
+            self.logger.info('  No FWHM statistics found.  Skippign plot creation.')
+            return
 
         ellip_threshold = 0.15
         star_angles = [star['THETAWIN_IMAGE'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
