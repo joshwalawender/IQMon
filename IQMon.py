@@ -88,7 +88,9 @@ class Telescope(object):
         self.site = None
         self.pointing_marker_size = 1*u.arcmin
         self.PSF_measurement_radius = None
-        
+        self.saturation = None
+
+
     def check_units(self):
         '''
         Checks whether the telescope properties have the right type.  If a unit
@@ -154,6 +156,11 @@ class Telescope(object):
             assert self.fRatio.to(u.dimensionless_unscaled)
         else:
             assert float(self.fRatio)
+        ## Default saturation to units of ADU
+        if type(self.saturation) == u.quantity.Quantity:
+            assert self.saturation.to(u.adu)
+        else:
+            self.saturation *= u.adu
 
 
     ##-------------------------------------------------------------------------
@@ -542,12 +549,6 @@ class Image(object):
                                              self.raw_file_name)
             sys.exit(1)
 
-
-    ##-------------------------------------------------------------------------
-    ## Flag Saturated Pixels
-    ##-------------------------------------------------------------------------
-    def flag_saturated(self):
-        pass
 
     ##-------------------------------------------------------------------------
     ## Dark Subtract Image
@@ -1533,6 +1534,7 @@ class Image(object):
                       mark_pointing=False,\
                       mark_detected_stars=False,\
                       mark_catalog_stars=False,\
+                      mark_saturated=False,\
                       make_hist=False,\
                       transform=None,
                       crop=None,
@@ -1550,8 +1552,8 @@ class Image(object):
         self.logger.debug('  Opening working file')
         with fits.open(self.working_file, ignore_missing_end=True) as hdulist:
             data = hdulist[0].data
-        data_masked = np.ma.masked_equal(data, 0)
-        data_nonzero = data_masked[~data_masked.mask]
+        data_zero = np.ma.masked_equal(data, 0)
+        data_nonzero = data_zero[~data_zero.mask]
 
         ## Make exposure histogram (of unscaled data)
         if make_hist:
@@ -1574,7 +1576,7 @@ class Image(object):
 
         ## Rescale data using arcsinh transform for jpeg
         self.logger.debug('  Rescaling image data using arcsinh')
-        rescaled_data = np.arcsinh(data_masked)
+        rescaled_data = np.arcsinh(data_zero)
         rescaled_data = rescaled_data / rescaled_data.max()
         rescaled_data_nonzero = rescaled_data[~rescaled_data.mask]
         low = np.percentile(rescaled_data_nonzero, p1)
@@ -1620,7 +1622,7 @@ class Image(object):
                 ms = max([6, 2*math.ceil(self.FWHM.to(u.pix).value)])/binning
             else:
                 ms = 6
-            circle_color = 'red'
+            circle_color = 'orange'
             self.logger.debug('  Marking detected stars with {} radius {} circles'.format(ms, circle_color))
             for star in self.SExtractor_results:
                 x = star['XWIN_IMAGE']
@@ -1647,6 +1649,14 @@ class Image(object):
                 radii = np.linspace(2*ms, 2*ms+thickness, thickness+1)
                 for r in radii:
                     draw.ellipse((x-r, y-r, x+r, y+r), outline=circle_color)
+
+        ## Flag Saturated Pixels
+        if mark_saturated and self.tel.saturation:
+            data_saturated = np.ma.masked_greater(data, self.tel.saturation)
+            indices = np.where(data_saturated.mask == 1)
+            saturated_color = 'red'
+            for i in range(0,len(indices[0])):
+                draw.point((indices[0][i], indices[1][i]), fill=saturated_color)
 
         ## Flip jpeg
         if transform:
