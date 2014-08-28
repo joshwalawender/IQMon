@@ -157,10 +157,11 @@ class Telescope(object):
         else:
             assert float(self.fRatio)
         ## Default saturation to units of ADU
-        if type(self.saturation) == u.quantity.Quantity:
-            assert self.saturation.to(u.adu)
-        else:
-            self.saturation *= u.adu
+        if self.saturation:
+            if type(self.saturation) == u.quantity.Quantity:
+                assert self.saturation.to(u.adu)
+            else:
+                self.saturation *= u.adu
 
 
     ##-------------------------------------------------------------------------
@@ -1652,11 +1653,13 @@ class Image(object):
 
         ## Flag Saturated Pixels
         if mark_saturated and self.tel.saturation:
-            data_saturated = np.ma.masked_greater(data, self.tel.saturation)
-            indices = np.where(data_saturated.mask == 1)
             saturated_color = 'red'
-            for i in range(0,len(indices[0])):
-                draw.point((indices[0][i], indices[1][i]), fill=saturated_color)
+            with fits.open(self.raw_file, ignore_missing_end=True) as hdulist:
+                data_raw = hdulist[0].data
+            data_saturated = np.ma.masked_greater(data_raw, self.tel.saturation)
+            indices = np.where(data_saturated.mask == 1)
+            xy = zip(indices[1], indices[0])
+            draw.point(xy, fill=saturated_color)
 
         ## Flip jpeg
         if transform:
