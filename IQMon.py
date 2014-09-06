@@ -88,7 +88,17 @@ class Telescope(object):
         self.site = None
         self.pointing_marker_size = 1*u.arcmin
         self.PSF_measurement_radius = None
-        
+
+    def __del__(self):
+        print('Deleted telescope object')
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self ,type, value, traceback):
+        self.__del__()
+
+
     def check_units(self):
         '''
         Checks whether the telescope properties have the right type.  If a unit
@@ -233,6 +243,23 @@ class Image(object):
         self.SCAMP_catalog = None
         self.catalog_file_path = None
 
+    def __del__(self):
+#         print('Deleting object referring to {}'.format(self.raw_file_name))
+        if self.logger:
+            self.logger = None
+        if self.temp_files:
+            for item in self.temp_files:
+                if os.path.exists(item):
+#                     print("  Deleting {0}".format(item))
+                    os.remove(item)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self ,type, value, traceback):
+        self.__del__()
+
+
     ##-------------------------------------------------------------------------
     ## Make Logger Object
     ##-------------------------------------------------------------------------
@@ -252,19 +279,20 @@ class Image(object):
         always be at debug level).
         '''
         self.logger = logging.getLogger('IQMonLogger')
-        self.logger.setLevel(logging.DEBUG)
-        LogFileHandler = logging.FileHandler(IQMonLogFileName)
-        LogFileHandler.setLevel(logging.DEBUG)
-        LogConsoleHandler = logging.StreamHandler()
-        if verbose:
-            LogConsoleHandler.setLevel(logging.DEBUG)
-        else:
-            LogConsoleHandler.setLevel(logging.INFO)
-        LogFormat = logging.Formatter('%(asctime)23s %(levelname)8s: %(message)s')
-        LogFileHandler.setFormatter(LogFormat)
-        LogConsoleHandler.setFormatter(LogFormat)
-        self.logger.addHandler(LogConsoleHandler)
-        self.logger.addHandler(LogFileHandler)
+        if len(self.logger.handlers) < 1:
+            self.logger.setLevel(logging.DEBUG)
+            LogFileHandler = logging.FileHandler(IQMonLogFileName)
+            LogFileHandler.setLevel(logging.DEBUG)
+            LogConsoleHandler = logging.StreamHandler()
+            if verbose:
+                LogConsoleHandler.setLevel(logging.DEBUG)
+            else:
+                LogConsoleHandler.setLevel(logging.INFO)
+            LogFormat = logging.Formatter('%(asctime)23s %(levelname)8s: %(message)s')
+            LogFileHandler.setFormatter(LogFormat)
+            LogConsoleHandler.setFormatter(LogFormat)
+            self.logger.addHandler(LogConsoleHandler)
+            self.logger.addHandler(LogFileHandler)
 
 
     ##-------------------------------------------------------------------------
@@ -276,9 +304,15 @@ class Image(object):
         '''
         self.logger.info("Reading image header.")
 #         self.header = fits.getheader(self.working_file, ext=0)
-        hdulist = fits.open(self.working_file, ignore_missing_end=True)
-        self.header = hdulist[0].header
-        
+#         hdulist = fits.open(self.working_file, ignore_missing_end=True)
+        with fits.open(self.working_file, ignore_missing_end=True) as hdulist:
+            self.header = hdulist[0].header
+            self.nYPix, self.nXPix = hdulist[0].data.shape
+            self.logger.debug('  Image size is: {},{}'.format(\
+                                                       self.nXPix, self.nYPix))
+
+
+
         ## Get exposure time from header (assumes seconds)
         try:
             self.exptime = float(self.header['EXPTIME']) * u.s
@@ -334,12 +368,6 @@ class Image(object):
             self.logger.debug("  Header altitude = {0:.0f} meters".format(\
                                               self.altitude.to(u.meter).value))
 
-
-        ## Determine Image Size in Pixels
-        self.nYPix, self.nXPix = hdulist[0].data.shape
-        self.logger.debug('  Image size is: {},{}'.format(\
-                                                       self.nXPix, self.nYPix))
-
         ## Read Header Coordinates in to astropy coordinates object
         self.coordinate_from_header = None
         if ('RA' in self.header.keys()) and ('DEC' in self.header.keys()):
@@ -375,8 +403,6 @@ class Image(object):
                                               self.position_angle.to(u.deg).value))
                 if self.image_flipped:
                     self.logger.debug("  Image is mirrored.")
-
-        hdulist.close()
 
         ## Determine Alt, Az, Moon Sep, Moon Illum using ephem module
         if self.dateObs and self.latitude and self.longitude and self.coordinate_from_header:
@@ -434,10 +460,11 @@ class Image(object):
         Edit a single keyword in the image fits header.
         '''
         self.logger.info('Editing image header: {} = {}'.format(keyword, value))
-        hdulist = fits.open(self.working_file,\
-                            ignore_missing_end=True, mode='update')
-        hdulist[0].header[keyword] = value
-        hdulist.flush()
+#         hdulist = fits.open(self.working_file,\
+#                             ignore_missing_end=True, mode='update')
+        with fits.open(self.working_file, ignore_missing_end=True, mode='update') as hdulist:
+            hdulist[0].header[keyword] = value
+            hdulist.flush()
 
 
     ##-------------------------------------------------------------------------
@@ -528,12 +555,12 @@ class Image(object):
                 self.logger.critical('PPM to fits conversion failed.  Could not find fits file.')
             ## Write new fits file with only green image
             self.logger.debug('Only keeping green channel for analysis')
-            hdulist = fits.open(self.working_file, 'update')
-            if len(hdulist) == 1:
-                data = hdulist[0].data
-                green_data = data[1]
-                hdulist[0].data = green_data
-                hdulist.flush()
+            with fits.open(self.working_file, 'update') as hdulist:
+                if len(hdulist) == 1:
+                    data = hdulist[0].data
+                    green_data = data[1]
+                    hdulist[0].data = green_data
+                    hdulist.flush()
         else:
             self.logger.warning('Unrecognixed file extension: {}'.format(\
                                                                 self.file_ext))
@@ -611,6 +638,8 @@ class Image(object):
                                                     np.median(MasterDarkData)))
         self.logger.debug("  Median level of dark subtracted = {0}".format(\
                                                    np.median(DifferenceImage)))
+        hdulist_dark.close()
+        hdulist_image.close()
 
 
     ##-------------------------------------------------------------------------
@@ -638,10 +667,10 @@ class Image(object):
             self.logger.debug("  Cropping Image To [{0}:{1},{2}:{3}]".format(\
                                                     self.crop_x1, self.crop_x2,\
                                                     self.crop_y1, self.crop_y2))
-            hdulist = fits.open(self.working_file, mode="update")
-            hdulist[0].data = hdulist[0].data[self.crop_y1:self.crop_y2,self.crop_x1:self.crop_x2]
-            hdulist.flush()
-            hdulist.close()
+#             hdulist = fits.open(self.working_file, mode="update")
+            with fits.open(self.working_file, mode="update") as hdulist:
+                hdulist[0].data = hdulist[0].data[self.crop_y1:self.crop_y2,self.crop_x1:self.crop_x2]
+                hdulist.flush()
             self.cropped = True
             self.original_nXPix = self.nXPix
             self.original_nYPix = self.nYPix
@@ -650,7 +679,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Solve Astrometry Using astrometry.net
     ##-------------------------------------------------------------------------
-    def solve_astrometry(self, timeout = 30):
+    def solve_astrometry(self, timeout=None):
         '''
         Solve astrometry in the working image using the astrometry.net solver.
         '''
@@ -662,19 +691,36 @@ class Image(object):
         AstrometrySTDOUT = open(os.path.join(self.tel.temp_file_path, 'astrometry_output.txt'), 'w')
         self.temp_files.append(os.path.join(self.tel.temp_file_path, 'astrometry_output.txt'))
 
-        StartTime = datetime.datetime.now()
-        astrometry_process = subprocess.Popen(AstrometryCommand, stdout=AstrometrySTDOUT, stderr=AstrometrySTDOUT)
-        EndTime = datetime.datetime.now()
-        duration = EndTime - StartTime
-        while (astrometry_process.poll() == None) and (duration.seconds < timeout):
+        if timeout:
+            StartTime = datetime.datetime.now()
+            astrometry_process = subprocess.Popen(AstrometryCommand, stdout=AstrometrySTDOUT, stderr=AstrometrySTDOUT)
             EndTime = datetime.datetime.now()
             duration = EndTime - StartTime
-            if duration.seconds > timeout:
-                astrometry_process.terminate()
-                self.logger.warning("Astrometry.net timed out.")
+
+            wait = True
+            while wait:
+                if astrometry_process.poll() == None:
+                    ## Process has not finished
+                    EndTime = datetime.datetime.now()
+                    duration = EndTime - StartTime
+                    if duration.seconds > timeout:
+                        astrometry_process.terminate()
+                        wait = False
+                        self.logger.warning("Astrometry.net timed out.")
+                else:
+                    ## Process finished
+                    wait = False
+            rtncode = astrometry_process.returncode
+        else:
+            StartTime = datetime.datetime.now()
+            rtncode = subprocess.call(AstrometryCommand, stdout=AstrometrySTDOUT, stderr=AstrometrySTDOUT)
+            EndTime = datetime.datetime.now()
+            duration = EndTime - StartTime
+
         with open(os.path.join(self.tel.temp_file_path, 'astrometry_output.txt'), 'r') as AstrometrySTDOUT:
             output = AstrometrySTDOUT.readlines()
-        if astrometry_process.returncode != 0:
+
+        if rtncode != 0:
             self.logger.warning("Astrometry.net failed.")
             for line in output:
                 self.logger.warning('  astrometry.net output: {}'.format(line.strip('\n')))
@@ -755,7 +801,7 @@ class Image(object):
                        ('CDELT2' in header.keys()):
                         ## If the wcs in header format meets all of the above
                         ## assumptions, do nothing and proceed to header analysis.
-                        pass
+                        self.logger.debug('  {}'.format(header))
                     else:
                         self.logger.warning('WCS does not match expected contents.')
                         for key in header.keys():
@@ -1086,7 +1132,7 @@ class Image(object):
             self.PSF_plot_filename = self.raw_file_basename+'_PSFinfo.png'
         self.PSF_plotfile = os.path.join(self.tel.plot_file_path, self.PSF_plot_filename)
 
-        self.logger.info('Generating plots of PSF staistics: {}'.format(self.PSF_plot_filename))
+        self.logger.info('Generating plots of PSF statistics: {}'.format(self.PSF_plot_filename))
         if not self.FWHM:
             self.logger.info('  No FWHM statistics found.  Skippign plot creation.')
             return
