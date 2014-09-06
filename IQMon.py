@@ -88,6 +88,8 @@ class Telescope(object):
         self.site = None
         self.pointing_marker_size = 1*u.arcmin
         self.PSF_measurement_radius = None
+        self.saturation = None
+
 
     def __del__(self):
         print('Deleted telescope object')
@@ -164,6 +166,12 @@ class Telescope(object):
             assert self.fRatio.to(u.dimensionless_unscaled)
         else:
             assert float(self.fRatio)
+        ## Default saturation to units of ADU
+        if self.saturation:
+            if type(self.saturation) == u.quantity.Quantity:
+                assert self.saturation.to(u.adu)
+            else:
+                self.saturation *= u.adu
 
 
     ##-------------------------------------------------------------------------
@@ -570,12 +578,6 @@ class Image(object):
 
 
     ##-------------------------------------------------------------------------
-    ## Flag Saturated Pixels
-    ##-------------------------------------------------------------------------
-    def flag_saturated(self):
-        pass
-
-    ##-------------------------------------------------------------------------
     ## Dark Subtract Image
     ##-------------------------------------------------------------------------
     def dark_subtract(self, Darks):
@@ -831,11 +833,13 @@ class Image(object):
             self.wcs_pixel_scale = pixel_scale
 
             ## Determine Position Angle
-            ang1 = math.acos(PC[0][0])
-            ang2 = math.acos(PC[0][1])
-            ang3 = math.acos(PC[1][0])
-            ang4 = math.acos(PC[1][1])
-            self.position_angle = (270 - np.mean([ang1, ang2, ang3, ang4])*180/math.pi) * u.deg
+            PCnorm = pixel_scale.to(u.deg/u.pix).value
+            angles = np.array([90*u.deg.to(u.radian) - np.arccos(PC[0][0]/PCnorm),\
+                               90*u.deg.to(u.radian) - np.arcsin(-1*PC[0][1]/PCnorm),\
+                               90*u.deg.to(u.radian) - np.arcsin(PC[1][0]/PCnorm),\
+                               90*u.deg.to(u.radian) - np.arccos(PC[1][1]/PCnorm),\
+                              ]) * u.radian
+            self.position_angle = angles[~np.isnan(angles)].mean().to(u.deg)
 
             ## Determine Flip State
             flipped = np.linalg.det(PC) > 0
@@ -1071,20 +1075,16 @@ class Image(object):
             if self.tel.PSF_measurement_radius:
                 self.logger.info('  Using stars in the inner {} pixels.'.format(\
                                               self.tel.PSF_measurement_radius))
-                IQRadius = self.tel.PSF_measurement_radius
             else:
                 IQRadiusFactor = 1.0
                 DiagonalRadius = math.sqrt((self.nXPix/2)**2+(self.nYPix/2)**2)
-                IQRadius = DiagonalRadius*IQRadiusFactor
-            CentralFWHMs = [star['FWHM_IMAGE'] for star in self.SExtractor_results\
-                           if (star['ImageRadius'] <= IQRadius) and (float(star['FWHM_IMAGE']) > 0.5)]
-            CentralEllipticities = [star['ELLIPTICITY'] for star in self.SExtractor_results\
-                           if (star['ImageRadius'] <= IQRadius) and (float(star['FWHM_IMAGE']) > 0.5)]
-            CentralAs = [star['AWIN_IMAGE'] for star in self.SExtractor_results\
-                           if (star['ImageRadius'] <= IQRadius) and (float(star['FWHM_IMAGE']) > 0.5)]
-            CentralBs = [star['BWIN_IMAGE'] for star in self.SExtractor_results\
-                           if (star['ImageRadius'] <= IQRadius) and (float(star['FWHM_IMAGE']) > 0.5)]
-            if len(CentralFWHMs) > 25:
+                self.tel.PSF_measurement_radius = DiagonalRadius*IQRadiusFactor
+                self.logger.info('  Using all stars in image.')
+            CentralFWHMs = [star['FWHM_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius) and (float(star['FWHM_IMAGE']) > 0.5)]
+            CentralEllipticities = [star['ELLIPTICITY'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius) and (float(star['FWHM_IMAGE']) > 0.5)]
+            CentralAs = [star['AWIN_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius) and (float(star['FWHM_IMAGE']) > 0.5)]
+            CentralBs = [star['BWIN_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius) and (float(star['FWHM_IMAGE']) > 0.5)]
+            if len(CentralFWHMs) > 3:
                 self.FWHM_median = np.median(CentralFWHMs) * u.pix
                 self.FWHM_mode = mode(CentralFWHMs, 0.2) * u.pix
                 self.FWHM = self.FWHM_mode
@@ -1143,6 +1143,8 @@ class Image(object):
         star_x = [star['XWIN_IMAGE'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
         star_y = [star['YWIN_IMAGE'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
         uncorrected_diffs = [star['THETAWIN_IMAGE']-star['AngleInImage'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
+        CentralFWHMs = [star['FWHM_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius) and (float(star['FWHM_IMAGE']) > 0.5)]
+        CentralEllipticities = [star['ELLIPTICITY'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius) and (float(star['FWHM_IMAGE']) > 0.5)]
         
         nstars = len(star_angles)
         self.logger.debug('  Found {} stars with ellipticity greater than {:.2f}.'.format(\
@@ -1162,13 +1164,13 @@ class Image(object):
         angle_centers = (diff_bins[:-1] + diff_bins[1:]) / 2
 
         ellip_binsize = 0.05
-        ellip_hist, ellip_bins = np.histogram(self.SExtractor_results['ELLIPTICITY'],\
+        ellip_hist, ellip_bins = np.histogram(CentralEllipticities,\
                                               bins=ellip_binsize*np.arange(21))
         ellip_centers = (ellip_bins[:-1] + ellip_bins[1:]) / 2
 
         fwhm_binsize = 0.2
-        fwhm_95pctile = math.ceil(np.percentile(self.SExtractor_results['FWHM_IMAGE'], 95.0))
-        fwhm_hist, fwhm_bins = np.histogram(self.SExtractor_results['FWHM_IMAGE'],\
+        fwhm_95pctile = math.ceil(np.percentile(CentralFWHMs, 95.0))
+        fwhm_hist, fwhm_bins = np.histogram(CentralFWHMs,\
                                                bins=fwhm_binsize*np.arange(int(fwhm_95pctile/fwhm_binsize)+11))
         fwhm_centers = (fwhm_bins[:-1] + fwhm_bins[1:]) / 2
 
@@ -1189,7 +1191,6 @@ class Image(object):
 
             TopLeft = pyplot.axes([0.000, 0.750, 0.465, 0.235])
             pyplot.title('Histogram of FWHM Values for {}'.format(self.raw_file_name), size=10)
-
             pyplot.bar(fwhm_centers, fwhm_hist, align='center', width=0.7*fwhm_binsize)
             pyplot.plot([self.FWHM_median.to(u.pix).value, self.FWHM_median.to(u.pix).value], [0, 1.1*max(fwhm_hist)],\
                         'ro-', linewidth=2, label='Median FWHM')
@@ -1228,7 +1229,12 @@ class Image(object):
                           mincnt=5,\
                           vmin=0.8*self.FWHM.to(u.pix).value,\
                           vmax=2.0*self.FWHM.to(u.pix).value,\
+                          alpha=0.5,\
                           cmap='Reds')
+#             center_region = pyplot.Circle((self.nXPix/2, self.nYPix/2),\
+#                                    radius=self.tel.PSF_measurement_radius/self.nXPix,\
+#                                    color='k')
+#             MiddleLeft.add_artist(center_region)
             pyplot.xlabel('X Pixels', size=10)
             pyplot.ylabel('Y Pixels', size=10)
             pyplot.xlim(0,self.nXPix)
@@ -1249,7 +1255,9 @@ class Image(object):
                           gridsize=gridsize,\
                           mincnt=5,\
                           vmin=0.25, vmax=0.75,\
+                          alpha=0.5,\
                           cmap='Reds')
+#             MiddleRight.add_artist(center_region)
             pyplot.xlabel('X Pixels', size=10)
             pyplot.ylabel('Y Pixels', size=10)
             pyplot.xlim(0,self.nXPix)
@@ -1579,6 +1587,8 @@ class Image(object):
                       mark_pointing=False,\
                       mark_detected_stars=False,\
                       mark_catalog_stars=False,\
+                      mark_saturated=False,\
+                      make_hist=False,\
                       transform=None,
                       crop=None,
                       quality=70,
@@ -1595,30 +1605,31 @@ class Image(object):
         self.logger.debug('  Opening working file')
         with fits.open(self.working_file, ignore_missing_end=True) as hdulist:
             data = hdulist[0].data
-        data_masked = np.ma.masked_equal(data, 0)
-        data_nonzero = data_masked[~data_masked.mask]
+        data_zero = np.ma.masked_equal(data, 0)
+        data_nonzero = data_zero[~data_zero.mask]
 
-#         ## Make exposure histogram (of unscaled data)
-#         self.logger.debug('  Make histogram of unscaled data.')
-#         histogram_plot_file = os.path.join(self.tel.plot_file_path, '{}_hist.png'.format(self.raw_file_basename))
-#         hist_low = np.percentile(data_nonzero.ravel(), p1)
-#         hist_high = np.percentile(data_nonzero.ravel(), 100.-p2)
-#         hist_nbins = 128
-#         hist_binsize = (hist_high-hist_low)/128
-#         hist_bins = np.arange(hist_low,hist_high,hist_binsize)
-#         self.logger.debug('  Histogram range: {} {}.'.format(hist_low, hist_high))
-#         pyplot.figure()
-#         pyplot.hist(data.ravel(), bins=hist_bins, label='binsize = {:4f}'.format(hist_binsize))
-#         pyplot.xlim(hist_low,hist_high)
-#         pyplot.legend(loc='best')
-#         pyplot.xlabel('Pixel value')
-#         pyplot.ylabel('Number of Pixels')
-#         self.logger.debug('  Saving histogram to {}.'.format(histogram_plot_file))
-#         pyplot.savefig(histogram_plot_file)
+        ## Make exposure histogram (of unscaled data)
+        if make_hist:
+            self.logger.info('  Make histogram of unscaled data.')
+            histogram_plot_file = os.path.join(self.tel.plot_file_path, '{}_hist.png'.format(self.raw_file_basename))
+            hist_low = np.percentile(data_nonzero.ravel(), p1)
+            hist_high = np.percentile(data_nonzero.ravel(), 100.-p2)
+            hist_nbins = 128
+            hist_binsize = (hist_high-hist_low)/128
+            hist_bins = np.arange(hist_low,hist_high,hist_binsize)
+            self.logger.debug('  Histogram range: {} {}.'.format(hist_low, hist_high))
+            pyplot.figure()
+            pyplot.hist(data.ravel(), bins=hist_bins, label='binsize = {:4f}'.format(hist_binsize))
+            pyplot.xlim(hist_low,hist_high)
+            pyplot.legend(loc='best')
+            pyplot.xlabel('Pixel value')
+            pyplot.ylabel('Number of Pixels')
+            self.logger.info('  Saving histogram to {}.'.format(histogram_plot_file))
+            pyplot.savefig(histogram_plot_file)
 
         ## Rescale data using arcsinh transform for jpeg
         self.logger.debug('  Rescaling image data using arcsinh')
-        rescaled_data = np.arcsinh(data_masked)
+        rescaled_data = np.arcsinh(data_zero)
         rescaled_data = rescaled_data / rescaled_data.max()
         rescaled_data_nonzero = rescaled_data[~rescaled_data.mask]
         low = np.percentile(rescaled_data_nonzero, p1)
@@ -1664,7 +1675,7 @@ class Image(object):
                 ms = max([6, 2*math.ceil(self.FWHM.to(u.pix).value)])/binning
             else:
                 ms = 6
-            circle_color = 'red'
+            circle_color = 'orange'
             self.logger.debug('  Marking detected stars with {} radius {} circles'.format(ms, circle_color))
             for star in self.SExtractor_results:
                 x = star['XWIN_IMAGE']
@@ -1691,6 +1702,16 @@ class Image(object):
                 radii = np.linspace(2*ms, 2*ms+thickness, thickness+1)
                 for r in radii:
                     draw.ellipse((x-r, y-r, x+r, y+r), outline=circle_color)
+
+        ## Flag Saturated Pixels
+        if mark_saturated and self.tel.saturation:
+            saturated_color = 'red'
+            with fits.open(self.raw_file, ignore_missing_end=True) as hdulist:
+                data_raw = hdulist[0].data
+            data_saturated = np.ma.masked_greater(data_raw, self.tel.saturation)
+            indices = np.where(data_saturated.mask == 1)
+            xy = zip(indices[1], indices[0])
+            draw.point(xy, fill=saturated_color)
 
         ## Flip jpeg
         if transform:
@@ -1722,7 +1743,7 @@ class Image(object):
             im.thumbnail(size, Image.ANTIALIAS)
 
         ## Save to JPEG
-        self.logger.debug('  Saving jpeg (binning={}, quality={:.0f}) to: {}'.format(binning, quality, jpeg_file_name))
+        self.logger.info('  Saving jpeg (p1={:.1f}, p2={:.1f}), binning={}, quality={:.0f}) to: {}'.format(p1, p2, binning, quality, jpeg_file_name))
         im.save(jpeg_file, 'JPEG', quality=quality)
         self.jpeg_file_names.append(jpeg_file_name)
 
