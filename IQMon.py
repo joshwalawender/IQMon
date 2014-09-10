@@ -597,6 +597,7 @@ class Image(object):
             self.logger.debug("  Found master dark.  Opening master dark data.")
             hdulist_dark = fits.open(Darks[0])
             MasterDarkData = hdulist_dark[0].data
+            hdulist_dark.close()
         elif len(Darks) > 1:
             self.logger.info("  Median combining {0} darks.".format(len(Darks)))
             ## Combine multiple darks frames
@@ -640,7 +641,6 @@ class Image(object):
                                                     np.median(MasterDarkData)))
         self.logger.debug("  Median level of dark subtracted = {0}".format(\
                                                    np.median(DifferenceImage)))
-        hdulist_dark.close()
         hdulist_image.close()
 
 
@@ -1997,7 +1997,7 @@ class Image(object):
                                "ZeroPoint", "nStars", "ProcessTime"]
         ## If HTML file does not yet exist, create it and insert header
         ## from template file.
-        self.logger.info('Adding results to HTML table.')
+        self.logger.info('Adding results to HTML table: {}'.format(htmlImageList))
         if not os.path.exists(htmlImageList):
             self.logger.debug("  HTML file does not exist.  Creating it.")
             HTML = open(htmlImageList, 'w')
