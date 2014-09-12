@@ -888,7 +888,7 @@ class Image(object):
             self.logger.warning("Pointing error not calculated.")
         ## Flag pointing error
         try:
-            if self.pointing_error.arcminute > self.threshold_pointing_err.to(u.arcmin).value:
+            if self.pointing_error.arcminute > self.tel.threshold_pointing_err.to(u.arcmin).value:
                 self.flags['pointing error'] = True
         except:
             pass
@@ -1134,13 +1134,13 @@ class Image(object):
             self.minor_axis = None
         ## Flag FWHM
         try:
-            if self.FWHM > self.threshold_FWHM:
+            if self.FWHM > self.tel.threshold_FWHM.to(u.pix, equivalencies=self.tel.pixel_scale_equivalency):
                 self.flags['FWHM'] = True
         except:
             pass
         ## Check ellipticity
         try:
-            if self.ellipticity > self.threshold_ellipticity:
+            if self.ellipticity > self.tel.threshold_ellipticity:
                 self.flags['ellipticity'] = True
         except:
             pass
@@ -1542,7 +1542,7 @@ class Image(object):
 
         ## Check zero point
         try:
-            if self.zero_point > self.threshold_zeropoint:
+            if self.zero_point > self.tel.threshold_zeropoint:
                 self.flags['zero point'] = True
         except:
             pass
@@ -2193,7 +2193,7 @@ class Image(object):
         if "FWHM" in fields:
             if self.FWHM:
                 ## Decide whether to flag FWHM value with red color
-                if self.FWHM > self.tel.threshold_FWHM.to(u.pix, equivalencies=self.tel.pixel_scale_equivalency):
+                if self.flags['FWHM']:
                     colorFWHM = "#FF5C33"
                 else:
                     colorFWHM = "#70DB70"
@@ -2208,7 +2208,7 @@ class Image(object):
         if "ellipticity" in fields:
             if self.ellipticity:
                 ## Decide whether to flag ellipticity value with red color
-                if self.ellipticity > self.tel.threshold_ellipticity:
+                if self.flags['ellipticity']:
                     colorEllipticity = "#FF5C33"
                 else:
                     colorEllipticity = "#70DB70"
@@ -2225,7 +2225,7 @@ class Image(object):
         if "PErr" in fields:
             if self.pointing_error:
                 ## Decide whether to flag pointing error value with red color
-                if self.pointing_error.arcminute > self.tel.threshold_pointing_err.to(u.arcmin).value:
+                if self.flags['pointing error']:
                     colorpointing_error = "#FF5C33"
                 else:
                     colorpointing_error = "#70DB70"
@@ -2242,7 +2242,12 @@ class Image(object):
         ## Write zero point
         if "ZeroPoint" in fields:
             if self.zero_point:
-                HTML.write("      <td style='color:{}'>{:.2f}</td>\n".format("black", self.zero_point))
+                ## Decide whether to flag pointing error value with red color
+                if self.flags['zero point']:
+                    colorzero_point = "#FF5C33"
+                else:
+                    colorzero_point = "#70DB70"
+                HTML.write("      <td style='color:{}'>{:.2f}</td>\n".format(colorzero_point, self.zero_point))
             else:
                 HTML.write("      <td style='color:{}'>{}</td>\n".format("black", ""))
         ## Write number of stars detected by SExtractor
