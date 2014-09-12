@@ -17,6 +17,7 @@ import shutil
 import datetime
 import subprocess
 import logging
+import yaml
 import math
 import numpy as np
 import matplotlib as mpl
@@ -81,6 +82,7 @@ class Telescope(object):
         self.threshold_FWHM = None
         self.threshold_pointing_err = None
         self.threshold_ellipticity = None
+        self.threshold_zeropoint = None
         self.pixel_scale = None
         self.fRatio = None
         self.SExtractor_params = None
@@ -231,8 +233,8 @@ class Image(object):
         self.SExtractor_catalog = None
         self.SExtractor_results = None
         self.position_angle = None
-        self.zeroPoint = None
-        self.zeroPoint_plotfile = None
+        self.zero_point = None
+        self.zero_point_plotfile = None
         self.total_process_time = None
         self.FWHM = None
         self.ellipticity = None
@@ -250,6 +252,12 @@ class Image(object):
         self.original_nYPix = None
         self.SCAMP_catalog = None
         self.catalog_file_path = None
+        self.flags = {
+                      'FWHM': False,\
+                      'ellipticity': False,\
+                      'pointing error': False,\
+                      'zero point': False,\
+                     }
 
     def __del__(self):
 #         print('Deleting object referring to {}'.format(self.raw_file_name))
@@ -342,12 +350,12 @@ class Image(object):
         ## Get Observation Date and Time from header
         ## (assumes YYYY-MM-DDTHH:MM:SS format)
         try:
-            self.dateObs = self.header["DATE-OBS"]
+            self.observation_date = self.header["DATE-OBS"]
         except:
-            self.dateObs = None
+            self.observation_date = None
             self.logger.debug("  No date value found in header")
         else:
-            self.logger.debug("  Header date = {0}".format(self.dateObs))
+            self.logger.debug("  Header date = {0}".format(self.observation_date))
         ## Get Site Latitude from header (assumes decimal degrees)
         try:
             self.latitude = self.header["LAT-OBS"] * u.deg
@@ -413,10 +421,10 @@ class Image(object):
                     self.logger.debug("  Image is mirrored.")
 
         ## Determine Alt, Az, Moon Sep, Moon Illum using ephem module
-        if self.dateObs and self.latitude and self.longitude and self.coordinate_from_header:
+        if self.observation_date and self.latitude and self.longitude and self.coordinate_from_header:
             ## Populate site object properties
-            SiteDate = "/".join(self.dateObs[0:10].split("-"))
-            SiteTime = self.dateObs[11:]        
+            SiteDate = "/".join(self.observation_date[0:10].split("-"))
+            SiteTime = self.observation_date[11:]        
             self.tel.site.date = ephem.Date(SiteDate+" "+SiteTime)
             self.tel.site.lat = str(self.latitude.to(u.deg).value)
             self.tel.site.lon = str(self.longitude.to(u.deg).value)
@@ -878,6 +886,12 @@ class Image(object):
                                                 self.pointing_error.arcminute))
         except:
             self.logger.warning("Pointing error not calculated.")
+        ## Flag pointing error
+        try:
+            if self.pointing_error.arcminute > self.threshold_pointing_err.to(u.arcmin).value:
+                self.flags['pointing error'] = True
+        except:
+            pass
 
 
     ##-------------------------------------------------------------------------
@@ -1118,6 +1132,19 @@ class Image(object):
             self.ellipticity = None
             self.major_axis = None
             self.minor_axis = None
+        ## Flag FWHM
+        try:
+            if self.FWHM > self.threshold_FWHM:
+                self.flags['FWHM'] = True
+        except:
+            pass
+        ## Check ellipticity
+        try:
+            if self.ellipticity > self.threshold_ellipticity:
+                self.flags['ellipticity'] = True
+        except:
+            pass
+
 
     ##-------------------------------------------------------------------------
     ## Make PSF Statistics Plots
@@ -1134,7 +1161,7 @@ class Image(object):
 
         self.logger.info('Generating plots of PSF statistics: {}'.format(self.PSF_plot_filename))
         if not self.FWHM:
-            self.logger.info('  No FWHM statistics found.  Skippign plot creation.')
+            self.logger.info('  No FWHM statistics found.  Skipping plot creation.')
             return
 
         ellip_threshold = 0.15
@@ -1187,7 +1214,7 @@ class Image(object):
             self.logger.debug('  Generating figure {}'.format(self.PSF_plotfile))
 
             pyplot.ioff()
-            pyplot.figure(figsize=(10,11), dpi=100)
+            fig = pyplot.figure(figsize=(10,11), dpi=100)
 
             TopLeft = pyplot.axes([0.000, 0.750, 0.465, 0.235])
             pyplot.title('Histogram of FWHM Values for {}'.format(self.raw_file_name), size=10)
@@ -1289,6 +1316,7 @@ class Image(object):
             pyplot.yticks(30*(np.arange(7)-3), size=10)
 
             pyplot.savefig(self.PSF_plotfile, dpi=100, bbox_inches='tight', pad_inches=0.10)
+            pyplot.close(fig)
 
 
     ##-------------------------------------------------------------------------
@@ -1510,18 +1538,26 @@ class Image(object):
         ZeroPoint_median = np.median(self.SExtractor_results['MagDiff'])
         self.logger.debug('Mean Zero Point = {:.2f}'.format(ZeroPoint_mean))
         self.logger.info('Median Zero Point = {:.2f}'.format(ZeroPoint_median))
-        self.zeroPoint = ZeroPoint_median
+        self.zero_point = ZeroPoint_median
+
+        ## Check zero point
+        try:
+            if self.zero_point > self.threshold_zeropoint:
+                self.flags['zero point'] = True
+        except:
+            pass
+
         ## Make Plot if Requested
         if plot:
             self.logger.info('Making ZeroPoint Plot')
-            self.zeroPoint_plotfile = os.path.join(self.tel.plot_file_path,\
+            self.zero_point_plotfile = os.path.join(self.tel.plot_file_path,\
                                        self.raw_file_basename+'_ZeroPoint.png')
             pyplot.ioff()
-            pyplot.figure(figsize=(9,11), dpi=100)
+            fig = pyplot.figure(figsize=(9,11), dpi=100)
 
             Fig1 = pyplot.axes([0.0, 0.5, 1.0, 0.4])
             pyplot.title('Instrumental Magnitudes vs. Calalog Magnitudes (Zero Point = {:.2f})'.format(\
-                                                               self.zeroPoint))
+                                                               self.zero_point))
             pyplot.plot(self.SExtractor_results['VECTOR_ASSOC'].data[:,2],\
                         self.SExtractor_results['MAG_AUTO'],\
                         'bo', markersize=4, markeredgewidth=0)
@@ -1544,14 +1580,14 @@ class Image(object):
             ## Plot Fitted Line
             fit_mags_cat = [math.floor(sorted_cat_mag[minmax_idx_cat_mag[0]]),\
                             math.ceil(sorted_cat_mag[minmax_idx_cat_mag[1]])]
-            fit_mags_inst = fit_mags_cat - self.zeroPoint
+            fit_mags_inst = fit_mags_cat - self.zero_point
             pyplot.plot(fit_mags_cat, fit_mags_inst, 'k-', alpha=0.5,\
-                        label='Zero Point = {:.2f}'.format(self.zeroPoint))
+                        label='Zero Point = {:.2f}'.format(self.zero_point))
 
             Fig2 = pyplot.axes([0.0, 0.0, 1.0, 0.4])
             pyplot.title('Magnitude Residuals (Zero Point = {:.2f})'.format(\
-                                                               self.zeroPoint))
-            residuals = (self.SExtractor_results['MAG_AUTO'].data + self.zeroPoint)\
+                                                               self.zero_point))
+            residuals = (self.SExtractor_results['MAG_AUTO'].data + self.zero_point)\
                          - self.SExtractor_results['VECTOR_ASSOC'].data[:,2]
             pyplot.plot(self.SExtractor_results['VECTOR_ASSOC'].data[:,2],\
                         residuals, \
@@ -1574,10 +1610,11 @@ class Image(object):
                         sorted_residuals[minmax_idx_residuals[1]]+0.1)
             ## Plot Zero Line
             pyplot.plot(fit_mags_cat, [0, 0], 'k-', alpha=0.5,\
-                        label='Zero Point = {:.2f}'.format(self.zeroPoint))
+                        label='Zero Point = {:.2f}'.format(self.zero_point))
 
-            pyplot.savefig(self.zeroPoint_plotfile, dpi=100,\
+            pyplot.savefig(self.zero_point_plotfile, dpi=100,\
                            bbox_inches='tight', pad_inches=0.10)
+            pyplot.close(fig)
 
 
     ##-------------------------------------------------------------------------
@@ -1618,7 +1655,7 @@ class Image(object):
             hist_binsize = (hist_high-hist_low)/128
             hist_bins = np.arange(hist_low,hist_high,hist_binsize)
             self.logger.debug('  Histogram range: {} {}.'.format(hist_low, hist_high))
-            pyplot.figure()
+            fig = pyplot.figure()
             pyplot.hist(data.ravel(), bins=hist_bins, label='binsize = {:4f}'.format(hist_binsize))
             pyplot.xlim(hist_low,hist_high)
             pyplot.legend(loc='best')
@@ -1626,6 +1663,7 @@ class Image(object):
             pyplot.ylabel('Number of Pixels')
             self.logger.info('  Saving histogram to {}.'.format(histogram_plot_file))
             pyplot.savefig(histogram_plot_file)
+            pyplot.close(fig)
 
         ## Rescale data using arcsinh transform for jpeg
         self.logger.debug('  Rescaling image data using arcsinh')
@@ -2081,7 +2119,7 @@ class Image(object):
         HTML.write("    <tr>\n")
         ## Write Observation Date and Time
         if "Date and Time" in fields:
-            HTML.write("      <td style='color:black;text-align:left'>{0}</td>\n".format(self.dateObs))
+            HTML.write("      <td style='color:black;text-align:left'>{0}</td>\n".format(self.observation_date))
         ## Write Filename (and links to jpegs)
         if "Filename" in fields:
             if len(self.jpeg_file_names) == 0:
@@ -2104,8 +2142,8 @@ class Image(object):
                 PSFplot_html = " (<a href='{}'>PSF</a>)".format(os.path.join("..", "..", "Plots", self.PSF_plot_filename))
             else:
                 PSFplot_html = ""
-            if self.zeroPoint_plotfile:
-                ZPplot_html = " (<a href='{}'>ZP</a>)".format(os.path.join("..", "..", "Plots", self.zeroPoint_plotfile))
+            if self.zero_point_plotfile:
+                ZPplot_html = " (<a href='{}'>ZP</a>)".format(os.path.join("..", "..", "Plots", self.zero_point_plotfile))
             else:
                 ZPplot_html = ""
             htmlline = "      <td style='color:black;text-align:left'>" + JPEG1_html + "{}</a>".format(self.raw_file_basename) + JPEG2_html + JPEG3_html + PSFplot_html + ZPplot_html + "</td>\n"
@@ -2203,8 +2241,8 @@ class Image(object):
                 HTML.write("      <td style='color:{}'>{}</td>\n".format("black", ""))
         ## Write zero point
         if "ZeroPoint" in fields:
-            if self.zeroPoint:
-                HTML.write("      <td style='color:{}'>{:.2f}</td>\n".format("black", self.zeroPoint))
+            if self.zero_point:
+                HTML.write("      <td style='color:{}'>{:.2f}</td>\n".format("black", self.zero_point))
             else:
                 HTML.write("      <td style='color:{}'>{}</td>\n".format("black", ""))
         ## Write number of stars detected by SExtractor
@@ -2230,6 +2268,75 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Append Line With Image Info to Summary Text File
     ##-------------------------------------------------------------------------
+    def add_yaml_entry(self, summary_file):
+        self.logger.info("Writing YAML Summary File: {}".format(summary_file))
+        result_list = []
+        if os.path.exists(summary_file):
+            self.logger.debug('  Reading existing summary file.')
+            with open(summary_file, 'r') as yaml_string:
+                result_list = yaml.load(yaml_string)
+        ## Form dictionary with new result info
+        try:
+            FWHM_median_pix = self.FWHM_median.to(u.pix).value
+        except:
+            FWHM_median_pix = None
+        try:
+            FWHM_mode_pix = self.FWHM_mode.to(u.pix).value
+        except:
+            FWHM_mode_pix = None
+        try:
+            FWHM_pix = self.FWHM.to(u.pix).value
+        except:
+            FWHM_pix = None
+        try:
+            pointing_error_arcmin = self.pointing_error.arcminute
+        except:
+            pointing_error_arcmin = None
+        try:
+            alt = self.target_alt.to(u.deg).value
+        except:
+            alt = None
+        try:
+            az = self.target_az.to(u.deg).value
+        except:
+            az = None
+        try:
+            moon_sep = self.moon_sep.to(u.deg).value
+        except:
+            moon_sep = None
+        try:
+            posang = self.position_angle.to(u.deg).value
+        except:
+            posang = None
+        new_result = {
+                      'filename': self.raw_file_name,\
+                      'exposure_start': self.observation_date,\
+                      'FWHM_median_pix': str(FWHM_median_pix),\
+                      'FWHM_mode_pix': str(FWHM_mode_pix),\
+                      'FWHM_pix': str(FWHM_pix),\
+                      'ellipticity_median': str(self.ellipticity_median),\
+                      'ellipticity_mode': str(self.ellipticity_mode),\
+                      'ellipticity': str(self.ellipticity),\
+                      'n_stars': str(self.n_stars_SExtracted),\
+                      'background': str(self.SExtractor_background),\
+                      'background_rms': str(self.SExtractor_background_RMS),\
+                      'pointing_error_arcmin': str(pointing_error_arcmin),\
+                      'zero_point': str(self.zero_point),\
+                      'alt': str(alt),\
+                      'az': str(az),\
+                      'airmass': str(self.airmass),\
+                      'moon_separation': str(moon_sep),\
+                      'moon_illumination': str(self.moon_phase),\
+                      'WCS_position_angle': str(posang),\
+                      'process_time': str(self.total_process_time),\
+                      'flags': str(self.flags)
+                     }
+        result_list.append(new_result)
+        yaml_string = yaml.dump(result_list)
+        with open(summary_file, 'w') as output:
+            output.write(yaml_string)
+
+
     def add_summary_entry(self, summaryFile):
         self.logger.info("Writing Summary File Entry.")
         self.logger.debug("  Summary File: {0}".format(summaryFile))
@@ -2271,10 +2378,10 @@ class Image(object):
         ## Astropy table writer can not write None to table initialized
         ## with type.  If any outputs are None, change to some value.
         tableMask = np.zeros(12)
-        ## dateObs
-        if self.dateObs: dateObs = self.dateObs
+        ## observation_date
+        if self.observation_date: observation_date = self.observation_date
         else: 
-            dateObs = ""
+            observation_date = ""
             tableMask[0] = True
         ## FileName
         if self.raw_file_name: raw_file_name = self.raw_file_name
@@ -2312,7 +2419,7 @@ class Image(object):
             pointing_error = 0.
             tableMask[7] = True
         ## Zero Point
-        if self.zeroPoint: zeroPoint = self.zeroPoint
+        if self.zero_point: zeroPoint = self.zero_point
         else:
             zeroPoint = 0.
             tableMask[8] = True
@@ -2333,7 +2440,7 @@ class Image(object):
             tableMask[11] = True
         ## Add row to table
         self.logger.debug("  Writing new row to log table.  Filename: {0}".format(raw_file_name))
-        SummaryTable.add_row((dateObs, raw_file_name,
+        SummaryTable.add_row((observation_date, raw_file_name,
                               FWHM, ellipticity,
                               target_alt, target_az,
                               airmass, pointing_error,
