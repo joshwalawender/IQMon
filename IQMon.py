@@ -56,10 +56,86 @@ class Telescope(object):
     script which creates a telescope object and assigned values to all its
     properties (or sets them to None).
     '''
-    def __init__(self, path_temp, path_plots):
-        self.temp_file_path = path_temp
-        self.plot_file_path = path_plots
-        paths_to_check = [self.temp_file_path, self.plot_file_path]
+    def __init__(self, config_file):
+        ## System Properties
+        self.temp_file_path = None
+        self.plot_file_path = None
+        self.logs_file_path = None
+        ## Telescope Properties
+        self.name = None
+        self.focal_length = None
+        self.pixel_size = None
+        self.aperture = None
+        self.gain = None
+        self.saturation = None
+        self.site = ephem.Observer()
+        ## Preferences
+        self.threshold_FWHM = None
+        self.threshold_pointing_err = None
+        self.threshold_ellipticity = None
+        self.threshold_zeropoint = None
+        self.SCAMP_aheader = None
+        self.units_for_FWHM = None
+        self.ROI = None
+        self.PSF_measurement_radius = None
+        self.pointing_marker_size = None
+        self.SExtractor_params = None
+        self.SCAMP_params = None
+
+        ## Derived Properties
+        self.nXPix = None
+        self.nYPix = None
+        self.pixel_scale = None
+        self.f_ratio = None
+
+        ## Read YAML Config File
+        if not os.path.exists(config_file):
+            print('WARNING: Configuration file {} not found'.format(config_file))
+            raise IOError
+        with open(config_file, 'r') as yaml_string:
+            config = yaml.load(yaml_string)
+        if not isinstance(config, dict):
+            print('Configuration file {} not parsed as dict'.format(config_file))
+            sys.exit(1)
+        ## Populate Configured Properties
+        if 'name' in config.keys(): self.name = str(config['name'])
+        if 'temp_file_path' in config.keys(): self.temp_file_path = config['temp_file_path']
+        if 'plot_file_path' in config.keys(): self.plot_file_path = config['plot_file_path']
+        if 'logs_file_path' in config.keys(): self.logs_file_path = config['logs_file_path']
+        if 'focal_length' in config.keys(): self.focal_length = config['focal_length'] * u.mm
+        if 'pixel_size' in config.keys(): self.pixel_size = config['pixel_size'] * u.um
+        if 'aperture' in config.keys(): self.aperture = config['aperture'] * u.mm
+        if 'gain' in config.keys(): self.gain = config['gain'] / u.adu
+        if 'saturation' in config.keys(): self.saturation = config['saturation'] * u.adu
+        if 'threshold_FWHM' in config.keys(): self.threshold_FWHM = config['threshold_FWHM'] * u.pix
+        if 'threshold_pointing_err' in config.keys(): self.threshold_pointing_err = config['threshold_pointing_err'] * u.arcmin
+        if 'threshold_ellipticity' in config.keys(): self.threshold_ellipticity = config['threshold_ellipticity']
+        if 'threshold_zeropoint' in config.keys(): self.threshold_zeropoint = config['threshold_zeropoint']
+        if 'SCAMP_aheader' in config.keys(): self.SCAMP_aheader = config['SCAMP_aheader']
+        if 'units_for_FWHM' in config.keys(): self.units_for_FWHM = getattr(u, config['units_for_FWHM'])
+        if 'ROI' in config.keys(): self.ROI = str(config['ROI'])
+        if 'PSF_measurement_radius' in config.keys(): self.PSF_measurement_radius = config['PSF_measurement_radius'] * u.pix
+        if 'pointing_marker_size' in config.keys(): self.pointing_marker_size = config['pointing_marker_size'] * u.arcmin
+        if 'SExtractor_params' in config.keys(): self.SExtractor_params = config['SExtractor_params']
+        if 'SCAMP_params' in config.keys(): self.SCAMP_params = config['SCAMP_params']
+
+        ## Determine Pixel Scale and F-Ratio
+        assert self.pixel_size
+        assert self.focal_length
+        self.pixel_scale = self.pixel_size.to(u.mm)/self.focal_length.to(u.mm)*u.radian.to(u.arcsec)*u.arcsec/u.pix
+        self.f_ratio = self.focal_length.to(u.mm)/self.aperture.to(u.mm)
+
+        ## Define astropy.units Equivalency for Arcseconds and Pixels
+        self.pixel_scale_equivalency = [(u.pix, u.arcsec,
+             lambda pix: (pix*u.radian.to(u.arcsec) * self.pixel_size / self.focal_length).decompose().value,
+             lambda arcsec: (arcsec/u.radian.to(u.arcsec) * self.focal_length / self.pixel_size).decompose().value
+             )]
+
+        ## create paths
+        assert self.temp_file_path
+        assert self.plot_file_path
+        assert self.logs_file_path
+        paths_to_check = [self.temp_file_path, self.plot_file_path, self.logs_file_path]
         paths_to_create = []
         for path in paths_to_check:
             while not os.path.exists(path):
@@ -68,125 +144,20 @@ class Telescope(object):
         while len(paths_to_create) > 0:
             os.mkdir(paths_to_create.pop())
 
-        self.name = None
-        self.long_name = None
-        self.SCAMP_aheader = None
-        self.focal_length = None
-        self.pixel_size = None
-        self.aperture = None
-        self.gain = None
-        self.nXPix = None
-        self.nYPix = None
-        self.units_for_FWHM = None
-        self.ROI = None
-        self.threshold_FWHM = None
-        self.threshold_pointing_err = None
-        self.threshold_ellipticity = None
-        self.threshold_zeropoint = None
-        self.pixel_scale = None
-        self.fRatio = None
-        self.SExtractor_params = None
-        self.SCAMP_params = None
-        self.site = None
-        self.pointing_marker_size = 1*u.arcmin
-        self.PSF_measurement_radius = None
-        self.saturation = None
+        ## Assert required properties
+        assert self.name
+
 
 
     def __del__(self):
-        print('Deleted telescope object')
+        pass
+#         print('Deleted telescope object')
 
     def __enter__(self):
         return self
 
     def __exit__(self ,type, value, traceback):
         self.__del__()
-
-
-    def check_units(self):
-        '''
-        Checks whether the telescope properties have the right type.  If a unit
-        is expected, checks whether the input has units and whether it is
-        reducible to the expected unit.  If input has no units and they are
-        expected, then adds the default unit.
-        '''
-        ## name is a string
-        assert type(self.name) == str
-        ## long_name is a string
-        assert type(self.long_name) == str
-        ## Default focal_length units to mm
-        if type(self.focal_length) == u.quantity.Quantity:
-            assert self.focal_length.to(u.mm)
-        else:
-            self.focal_length *= u.mm
-        ## Default pixel_size units to microns
-        if type(self.pixel_size) == u.quantity.Quantity:
-            assert self.pixel_size.to(u.micron)
-        else:
-            self.pixel_size *= u.micron
-        ## Default aperture to units of mm
-        if type(self.aperture) == u.quantity.Quantity:
-            assert self.aperture.to(u.mm)
-        else:
-            self.aperture *= u.mm
-        ## Default gain to units of 1/ADU
-        if type(self.gain) == u.quantity.Quantity:
-            assert self.gain.to(1/u.adu)
-        else:
-            self.gain *= 1./u.adu
-        ## Default units_for_FWHM to units of arcsec
-        if type(self.units_for_FWHM) == u.quantity.Quantity:
-            assert self.units_for_FWHM.unit in [u.arcsec, u.pix]
-        else:
-            self.units_for_FWHM *= u.pix
-        ## ROI is string
-        if self.ROI:
-            assert type(self.ROI) == str
-        ## Default threshold_FWHM to same units as units_for_FWHM
-        if type(self.threshold_FWHM) == u.quantity.Quantity:
-            assert self.threshold_FWHM.unit in [u.arcsec, u.pix]
-        else:
-            self.threshold_FWHM *= u.pix
-        ## Default threshold_pointing_err to units of arcmin
-        if type(self.threshold_pointing_err) == u.quantity.Quantity:
-            assert self.threshold_pointing_err.to(u.arcmin)
-        else:
-            self.threshold_pointing_err *= u.arcmin
-        ## Default threshold_ellipticity to dimensionless
-        if type(self.threshold_ellipticity) == u.quantity.Quantity:
-            assert self.threshold_ellipticity.to(u.dimensionless_unscaled)
-        else:
-            assert float(self.threshold_ellipticity) >= 0
-            assert float(self.threshold_ellipticity) <= 1.
-        ## Default pixel_scale to units of arcsec per pixel
-        if type(self.pixel_scale) == u.quantity.Quantity:
-            assert self.pixel_scale.to(u.arcsec / u.pix)
-        else:
-            self.pixel_scale *= u.arcsec / u.pix
-        ## Default fRatio to dimensionless
-        if type(self.fRatio) == u.quantity.Quantity:
-            assert self.fRatio.to(u.dimensionless_unscaled)
-        else:
-            assert float(self.fRatio)
-        ## Default saturation to units of ADU
-        if self.saturation:
-            if type(self.saturation) == u.quantity.Quantity:
-                assert self.saturation.to(u.adu)
-            else:
-                self.saturation *= u.adu
-
-
-    ##-------------------------------------------------------------------------
-    ## Define astropy.units Equivalency for Arcseconds and Pixels
-    ##-------------------------------------------------------------------------
-    def define_pixel_scale(self):
-        '''
-        Equivalency for astropy.units to convert from pixels to arcseconds.
-        '''
-        self.pixel_scale_equivalency = [(u.pix, u.arcsec,
-             lambda pix: (pix*u.radian.to(u.arcsec) * self.pixel_size / self.focal_length).decompose().value,
-             lambda arcsec: (arcsec/u.radian.to(u.arcsec) * self.focal_length / self.pixel_size).decompose().value
-             )]
 
 
 ##-----------------------------------------------------------------------------
@@ -198,7 +169,7 @@ class Image(object):
 
     When defined, the image objects requires a filename to a valid fits file.
     '''
-    def __init__(self, input, tel=None):
+    def __init__(self, input, tel):
         self.start_process_time = datetime.datetime.now()
         if os.path.exists(input):
             fits_file_directory, fits_filename = os.path.split(input)
@@ -212,9 +183,8 @@ class Image(object):
             self.raw_file_directory = None
             raise IOError("File {0} does not exist".format(input))
         ## Confirm that input tel is an IQMon.Telescope object
-        if tel:
-            assert type(tel) == Telescope
-            self.tel = tel
+        assert isinstance(tel, Telescope)
+        self.tel = tel
         ## Initialize values to None
         self.logger = None
         self.working_file = None
@@ -287,17 +257,19 @@ class Image(object):
         self.logger = logger
 
 
-    def make_logger(self, IQMonLogFileName, verbose):
+    def make_logger(self, logfile=None, verbose=False):
         '''
         Create the logger object to use when processing.  Takes as input the
         full path to the file to write the log to and verboase, a boolean value
         which will increase the verbosity of the concole log (the file log will
         always be at debug level).
         '''
+        if not logfile:
+            logfile = os.path.join(self.tel.logs_file_path, 'IQMon.log')
         self.logger = logging.getLogger('IQMonLogger')
         if len(self.logger.handlers) < 1:
             self.logger.setLevel(logging.DEBUG)
-            LogFileHandler = logging.FileHandler(IQMonLogFileName)
+            LogFileHandler = logging.FileHandler(logfile)
             LogFileHandler.setLevel(logging.DEBUG)
             LogConsoleHandler = logging.StreamHandler()
             if verbose:
@@ -1094,10 +1066,10 @@ class Image(object):
                 DiagonalRadius = math.sqrt((self.nXPix/2)**2+(self.nYPix/2)**2)
                 self.tel.PSF_measurement_radius = DiagonalRadius*IQRadiusFactor
                 self.logger.info('  Using all stars in image.')
-            CentralFWHMs = [star['FWHM_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius) and (float(star['FWHM_IMAGE']) > 0.5)]
-            CentralEllipticities = [star['ELLIPTICITY'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius) and (float(star['FWHM_IMAGE']) > 0.5)]
-            CentralAs = [star['AWIN_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius) and (float(star['FWHM_IMAGE']) > 0.5)]
-            CentralBs = [star['BWIN_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius) and (float(star['FWHM_IMAGE']) > 0.5)]
+            CentralFWHMs = [star['FWHM_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius.to(u.pix).value) and (float(star['FWHM_IMAGE']) > 0.5)]
+            CentralEllipticities = [star['ELLIPTICITY'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius.to(u.pix).value) and (float(star['FWHM_IMAGE']) > 0.5)]
+            CentralAs = [star['AWIN_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius.to(u.pix).value) and (float(star['FWHM_IMAGE']) > 0.5)]
+            CentralBs = [star['BWIN_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius.to(u.pix).value) and (float(star['FWHM_IMAGE']) > 0.5)]
             if len(CentralFWHMs) > 3:
                 self.FWHM_median = np.median(CentralFWHMs) * u.pix
                 self.FWHM_mode = mode(CentralFWHMs, 0.2) * u.pix
@@ -1170,8 +1142,8 @@ class Image(object):
         star_x = [star['XWIN_IMAGE'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
         star_y = [star['YWIN_IMAGE'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
         uncorrected_diffs = [star['THETAWIN_IMAGE']-star['AngleInImage'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
-        CentralFWHMs = [star['FWHM_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius) and (float(star['FWHM_IMAGE']) > 0.5)]
-        CentralEllipticities = [star['ELLIPTICITY'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius) and (float(star['FWHM_IMAGE']) > 0.5)]
+        CentralFWHMs = [star['FWHM_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius.to(u.pix).value) and (float(star['FWHM_IMAGE']) > 0.5)]
+        CentralEllipticities = [star['ELLIPTICITY'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius.to(u.pix).value) and (float(star['FWHM_IMAGE']) > 0.5)]
         
         nstars = len(star_angles)
         self.logger.debug('  Found {} stars with ellipticity greater than {:.2f}.'.format(\
@@ -2057,7 +2029,7 @@ class Image(object):
                       '    </style>',
                       '</head>',
                       '<body>',
-                      '    <h2>IQMon Results for {}</h2>'.format(self.tel.long_name),
+                      '    <h2>IQMon Results for {}</h2>'.format(self.tel.name),
                       '    <table>',
                       '        <tr>']
             if "Date and Time" in fields:
@@ -2079,7 +2051,7 @@ class Image(object):
             if "MoonIllum" in fields:
                 header.append('        <th style="width:50px">Moon Illum. (%)</th>')
             if "FWHM" in fields:
-                header.append('        <th style="width:60px">FWHM ({})</th>'.format(str(self.tel.units_for_FWHM.unit)))
+                header.append('        <th style="width:60px">FWHM ({})</th>'.format(str(self.tel.units_for_FWHM)))
             if "ellipticity" in fields:
                 header.append('        <th style="width:50px">Ellip.</th>')
             if "Background" in fields:
@@ -2198,7 +2170,7 @@ class Image(object):
                 else:
                     colorFWHM = "#70DB70"
                 ## Convert FWHM value to appropriate units for HTML output
-                if self.tel.units_for_FWHM.unit == u.arcsec:
+                if self.tel.units_for_FWHM == u.arcsec:
                     FWHM_for_HTML = (self.FWHM * u.radian.to(u.arcsec)*self.tel.pixel_size.to(u.mm)/self.tel.focal_length.to(u.mm)).value
                 else:
                     FWHM_for_HTML = self.FWHM.value
