@@ -97,6 +97,7 @@ class Telescope(object):
         if not isinstance(config, dict):
             print('Configuration file {} not parsed as dict'.format(config_file))
             sys.exit(1)
+        self.config = config
         ## Populate Configured Properties
         if 'name' in config.keys(): self.name = str(config['name'])
         if 'temp_file_path' in config.keys(): self.temp_file_path = config['temp_file_path']
@@ -256,6 +257,11 @@ class Image(object):
         '''
         self.logger = logger
 
+        ## Print Configuration to Log
+        self.logger.debug('Using configuration:')
+        for entry in self.tel.config.keys():
+            self.logger.debug('  {} = {}'.format(entry, self.tel.config[entry]))
+
 
     def make_logger(self, logfile=None, verbose=False):
         '''
@@ -281,6 +287,11 @@ class Image(object):
             LogConsoleHandler.setFormatter(LogFormat)
             self.logger.addHandler(LogConsoleHandler)
             self.logger.addHandler(LogFileHandler)
+
+        ## Print Configuration to Log
+        self.logger.debug('Using configuration:')
+        for entry in self.tel.config.keys():
+            self.logger.debug('  {} = {}'.format(entry, self.tel.config[entry]))
 
 
     ##-------------------------------------------------------------------------
