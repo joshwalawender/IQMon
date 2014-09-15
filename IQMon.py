@@ -17,6 +17,7 @@ import shutil
 import datetime
 import subprocess
 import logging
+import yaml
 import math
 import numpy as np
 import matplotlib as mpl
@@ -37,8 +38,8 @@ import astropy.io.ascii as ascii
 ## Mode Function
 ##-----------------------------------------------------------------------------
 def mode(data, binsize):
-    pctile95 = math.ceil(np.percentile(data, 99.0))
-    hist, bins = np.histogram(data, bins=binsize*np.arange(int(pctile95/binsize)+1))
+    pctile = math.ceil(np.percentile(data, 99.0))
+    hist, bins = np.histogram(data, bins=binsize*np.arange(int(pctile/binsize)+1))
     centers = (bins[:-1] + bins[1:]) / 2
     foo = zip(hist, centers)
     return max(foo)[1]
@@ -52,20 +53,90 @@ class Telescope(object):
     '''
     Contains information about the telescope that can be passed to methods and
     functions.  The concept for operation is that the user will write a simple
-    script which creates a telescope object and assigned values to all it's
+    script which creates a telescope object and assigned values to all its
     properties (or sets them to None).
     '''
-#     _singletons = dict()
-# 
-#     def __new__(cls):
-#         if not cls in cls._singletons:
-#             cls._singletons[cls] = object.__new__(cls)
-#         return cls._singletons[cls]
+    def __init__(self, config_file):
+        ## System Properties
+        self.temp_file_path = None
+        self.plot_file_path = None
+        self.logs_file_path = None
+        ## Telescope Properties
+        self.name = None
+        self.focal_length = None
+        self.pixel_size = None
+        self.aperture = None
+        self.gain = None
+        self.saturation = None
+        self.site = ephem.Observer()
+        ## Preferences
+        self.threshold_FWHM = None
+        self.threshold_pointing_err = None
+        self.threshold_ellipticity = None
+        self.threshold_zeropoint = None
+        self.SCAMP_aheader = None
+        self.units_for_FWHM = None
+        self.ROI = None
+        self.PSF_measurement_radius = None
+        self.pointing_marker_size = None
+        self.SExtractor_params = None
+        self.SCAMP_params = None
 
-    def __init__(self, path_temp, path_plots):
-        self.temp_file_path = path_temp
-        self.plot_file_path = path_plots
-        paths_to_check = [self.temp_file_path, self.plot_file_path]
+        ## Derived Properties
+        self.nXPix = None
+        self.nYPix = None
+        self.pixel_scale = None
+        self.f_ratio = None
+
+        ## Read YAML Config File
+        if not os.path.exists(config_file):
+            print('WARNING: Configuration file {} not found'.format(config_file))
+            raise IOError
+        with open(config_file, 'r') as yaml_string:
+            config = yaml.load(yaml_string)
+        if not isinstance(config, dict):
+            print('Configuration file {} not parsed as dict'.format(config_file))
+            sys.exit(1)
+        self.config = config
+        ## Populate Configured Properties
+        if 'name' in config.keys(): self.name = str(config['name'])
+        if 'temp_file_path' in config.keys(): self.temp_file_path = config['temp_file_path']
+        if 'plot_file_path' in config.keys(): self.plot_file_path = config['plot_file_path']
+        if 'logs_file_path' in config.keys(): self.logs_file_path = config['logs_file_path']
+        if 'focal_length' in config.keys(): self.focal_length = config['focal_length'] * u.mm
+        if 'pixel_size' in config.keys(): self.pixel_size = config['pixel_size'] * u.um
+        if 'aperture' in config.keys(): self.aperture = config['aperture'] * u.mm
+        if 'gain' in config.keys(): self.gain = config['gain'] / u.adu
+        if 'saturation' in config.keys(): self.saturation = config['saturation'] * u.adu
+        if 'threshold_FWHM' in config.keys(): self.threshold_FWHM = config['threshold_FWHM'] * u.pix
+        if 'threshold_pointing_err' in config.keys(): self.threshold_pointing_err = config['threshold_pointing_err'] * u.arcmin
+        if 'threshold_ellipticity' in config.keys(): self.threshold_ellipticity = config['threshold_ellipticity']
+        if 'threshold_zeropoint' in config.keys(): self.threshold_zeropoint = config['threshold_zeropoint']
+        if 'SCAMP_aheader' in config.keys(): self.SCAMP_aheader = config['SCAMP_aheader']
+        if 'units_for_FWHM' in config.keys(): self.units_for_FWHM = getattr(u, config['units_for_FWHM'])
+        if 'ROI' in config.keys(): self.ROI = str(config['ROI'])
+        if 'PSF_measurement_radius' in config.keys(): self.PSF_measurement_radius = config['PSF_measurement_radius'] * u.pix
+        if 'pointing_marker_size' in config.keys(): self.pointing_marker_size = config['pointing_marker_size'] * u.arcmin
+        if 'SExtractor_params' in config.keys(): self.SExtractor_params = config['SExtractor_params']
+        if 'SCAMP_params' in config.keys(): self.SCAMP_params = config['SCAMP_params']
+
+        ## Determine Pixel Scale and F-Ratio
+        assert self.pixel_size
+        assert self.focal_length
+        self.pixel_scale = self.pixel_size.to(u.mm)/self.focal_length.to(u.mm)*u.radian.to(u.arcsec)*u.arcsec/u.pix
+        self.f_ratio = self.focal_length.to(u.mm)/self.aperture.to(u.mm)
+
+        ## Define astropy.units Equivalency for Arcseconds and Pixels
+        self.pixel_scale_equivalency = [(u.pix, u.arcsec,
+             lambda pix: (pix*u.radian.to(u.arcsec) * self.pixel_size / self.focal_length).decompose().value,
+             lambda arcsec: (arcsec/u.radian.to(u.arcsec) * self.focal_length / self.pixel_size).decompose().value
+             )]
+
+        ## create paths
+        assert self.temp_file_path
+        assert self.plot_file_path
+        assert self.logs_file_path
+        paths_to_check = [self.temp_file_path, self.plot_file_path, self.logs_file_path]
         paths_to_create = []
         for path in paths_to_check:
             while not os.path.exists(path):
@@ -74,106 +145,20 @@ class Telescope(object):
         while len(paths_to_create) > 0:
             os.mkdir(paths_to_create.pop())
 
-        self.name = None
-        self.long_name = None
-        self.SCAMP_aheader = None
-        self.focal_length = None
-        self.pixel_size = None
-        self.aperture = None
-        self.gain = None
-        self.nXPix = None
-        self.nYPix = None
-        self.units_for_FWHM = None
-        self.ROI = None
-        self.threshold_FWHM = None
-        self.threshold_pointing_err = None
-        self.threshold_ellipticity = None
-        self.pixel_scale = None
-        self.fRatio = None
-        self.SExtractor_params = None
-        self.distortion_order = 1
-        self.site = None
-        self.pointing_marker_size = 1*u.arcmin
-        self.PSF_measurement_radius = None
-        
-    def check_units(self):
-        '''
-        Checks whether the telescope properties have the right type.  If a unit
-        is expected, checks whether the input has units and whether it is
-        reducible to the expected unit.  If input has no units and they are
-        expected, then adds the default unit.
-        '''
-        ## name is a string
-        assert type(self.name) == str
-        ## long_name is a string
-        assert type(self.long_name) == str
-        ## Default focal_length units to mm
-        if type(self.focal_length) == u.quantity.Quantity:
-            assert self.focal_length.to(u.mm)
-        else:
-            self.focal_length *= u.mm
-        ## Default pixel_size units to microns
-        if type(self.pixel_size) == u.quantity.Quantity:
-            assert self.pixel_size.to(u.micron)
-        else:
-            self.pixel_size *= u.micron
-        ## Default aperture to units of mm
-        if type(self.aperture) == u.quantity.Quantity:
-            assert self.aperture.to(u.mm)
-        else:
-            self.aperture *= u.mm
-        ## Default gain to units of 1/ADU
-        if type(self.gain) == u.quantity.Quantity:
-            assert self.gain.to(1/u.adu)
-        else:
-            self.gain *= 1./u.adu
-        ## Default units_for_FWHM to units of arcsec
-        if type(self.units_for_FWHM) == u.quantity.Quantity:
-            assert self.units_for_FWHM.unit in [u.arcsec, u.pix]
-        else:
-            self.units_for_FWHM *= u.pix
-        ## ROI is string
-        if self.ROI:
-            assert type(self.ROI) == str
-        ## Default threshold_FWHM to same units as units_for_FWHM
-        if type(self.threshold_FWHM) == u.quantity.Quantity:
-            assert self.threshold_FWHM.unit in [u.arcsec, u.pix]
-        else:
-            self.threshold_FWHM *= u.pix
-        ## Default threshold_pointing_err to units of arcmin
-        if type(self.threshold_pointing_err) == u.quantity.Quantity:
-            assert self.threshold_pointing_err.to(u.arcmin)
-        else:
-            self.threshold_pointing_err *= u.arcmin
-        ## Default threshold_ellipticity to dimensionless
-        if type(self.threshold_ellipticity) == u.quantity.Quantity:
-            assert self.threshold_ellipticity.to(u.dimensionless_unscaled)
-        else:
-            assert float(self.threshold_ellipticity) >= 0
-            assert float(self.threshold_ellipticity) <= 1.
-        ## Default pixel_scale to units of arcsec per pixel
-        if type(self.pixel_scale) == u.quantity.Quantity:
-            assert self.pixel_scale.to(u.arcsec / u.pix)
-        else:
-            self.pixel_scale *= u.arcsec / u.pix
-        ## Default fRatio to dimensionless
-        if type(self.fRatio) == u.quantity.Quantity:
-            assert self.fRatio.to(u.dimensionless_unscaled)
-        else:
-            assert float(self.fRatio)
+        ## Assert required properties
+        assert self.name
 
 
-    ##-------------------------------------------------------------------------
-    ## Define astropy.units Equivalency for Arcseconds and Pixels
-    ##-------------------------------------------------------------------------
-    def define_pixel_scale(self):
-        '''
-        Equivalency for astropy.units to convert from pixels to arcseconds.
-        '''
-        self.pixel_scale_equivalency = [(u.pix, u.arcsec,
-             lambda pix: (pix*u.radian.to(u.arcsec) * self.pixel_size / self.focal_length).decompose().value,
-             lambda arcsec: (arcsec/u.radian.to(u.arcsec) * self.focal_length / self.pixel_size).decompose().value
-             )]
+
+    def __del__(self):
+        pass
+#         print('Deleted telescope object')
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self ,type, value, traceback):
+        self.__del__()
 
 
 ##-----------------------------------------------------------------------------
@@ -185,7 +170,7 @@ class Image(object):
 
     When defined, the image objects requires a filename to a valid fits file.
     '''
-    def __init__(self, input, tel=None):
+    def __init__(self, input, tel):
         self.start_process_time = datetime.datetime.now()
         if os.path.exists(input):
             fits_file_directory, fits_filename = os.path.split(input)
@@ -199,9 +184,8 @@ class Image(object):
             self.raw_file_directory = None
             raise IOError("File {0} does not exist".format(input))
         ## Confirm that input tel is an IQMon.Telescope object
-        if tel:
-            assert type(tel) == Telescope
-            self.tel = tel
+        assert isinstance(tel, Telescope)
+        self.tel = tel
         ## Initialize values to None
         self.logger = None
         self.working_file = None
@@ -220,8 +204,8 @@ class Image(object):
         self.SExtractor_catalog = None
         self.SExtractor_results = None
         self.position_angle = None
-        self.zeroPoint = None
-        self.zeroPoint_plotfile = None
+        self.zero_point = None
+        self.zero_point_plotfile = None
         self.total_process_time = None
         self.FWHM = None
         self.ellipticity = None
@@ -239,6 +223,29 @@ class Image(object):
         self.original_nYPix = None
         self.SCAMP_catalog = None
         self.catalog_file_path = None
+        self.flags = {
+                      'FWHM': False,\
+                      'ellipticity': False,\
+                      'pointing error': False,\
+                      'zero point': False,\
+                     }
+
+    def __del__(self):
+#         print('Deleting object referring to {}'.format(self.raw_file_name))
+        if self.logger:
+            self.logger = None
+        if self.temp_files:
+            for item in self.temp_files:
+                if os.path.exists(item):
+#                     print("  Deleting {0}".format(item))
+                    os.remove(item)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self ,type, value, traceback):
+        self.__del__()
+
 
     ##-------------------------------------------------------------------------
     ## Make Logger Object
@@ -250,28 +257,41 @@ class Image(object):
         '''
         self.logger = logger
 
+        ## Print Configuration to Log
+        self.logger.debug('Using configuration:')
+        for entry in self.tel.config.keys():
+            self.logger.debug('  {} = {}'.format(entry, self.tel.config[entry]))
 
-    def make_logger(self, IQMonLogFileName, verbose):
+
+    def make_logger(self, logfile=None, verbose=False):
         '''
         Create the logger object to use when processing.  Takes as input the
         full path to the file to write the log to and verboase, a boolean value
         which will increase the verbosity of the concole log (the file log will
         always be at debug level).
         '''
+        if not logfile:
+            logfile = os.path.join(self.tel.logs_file_path, 'IQMon.log')
         self.logger = logging.getLogger('IQMonLogger')
-        self.logger.setLevel(logging.DEBUG)
-        LogFileHandler = logging.FileHandler(IQMonLogFileName)
-        LogFileHandler.setLevel(logging.DEBUG)
-        LogConsoleHandler = logging.StreamHandler()
-        if verbose:
-            LogConsoleHandler.setLevel(logging.DEBUG)
-        else:
-            LogConsoleHandler.setLevel(logging.INFO)
-        LogFormat = logging.Formatter('%(asctime)23s %(levelname)8s: %(message)s')
-        LogFileHandler.setFormatter(LogFormat)
-        LogConsoleHandler.setFormatter(LogFormat)
-        self.logger.addHandler(LogConsoleHandler)
-        self.logger.addHandler(LogFileHandler)
+        if len(self.logger.handlers) < 1:
+            self.logger.setLevel(logging.DEBUG)
+            LogFileHandler = logging.FileHandler(logfile)
+            LogFileHandler.setLevel(logging.DEBUG)
+            LogConsoleHandler = logging.StreamHandler()
+            if verbose:
+                LogConsoleHandler.setLevel(logging.DEBUG)
+            else:
+                LogConsoleHandler.setLevel(logging.INFO)
+            LogFormat = logging.Formatter('%(asctime)23s %(levelname)8s: %(message)s')
+            LogFileHandler.setFormatter(LogFormat)
+            LogConsoleHandler.setFormatter(LogFormat)
+            self.logger.addHandler(LogConsoleHandler)
+            self.logger.addHandler(LogFileHandler)
+
+        ## Print Configuration to Log
+        self.logger.debug('Using configuration:')
+        for entry in self.tel.config.keys():
+            self.logger.debug('  {} = {}'.format(entry, self.tel.config[entry]))
 
 
     ##-------------------------------------------------------------------------
@@ -283,9 +303,15 @@ class Image(object):
         '''
         self.logger.info("Reading image header.")
 #         self.header = fits.getheader(self.working_file, ext=0)
-        hdulist = fits.open(self.working_file, ignore_missing_end=True)
-        self.header = hdulist[0].header
-        
+#         hdulist = fits.open(self.working_file, ignore_missing_end=True)
+        with fits.open(self.working_file, ignore_missing_end=True) as hdulist:
+            self.header = hdulist[0].header
+            self.nYPix, self.nXPix = hdulist[0].data.shape
+            self.logger.debug('  Image size is: {},{}'.format(\
+                                                       self.nXPix, self.nYPix))
+
+
+
         ## Get exposure time from header (assumes seconds)
         try:
             self.exptime = float(self.header['EXPTIME']) * u.s
@@ -307,12 +333,12 @@ class Image(object):
         ## Get Observation Date and Time from header
         ## (assumes YYYY-MM-DDTHH:MM:SS format)
         try:
-            self.dateObs = self.header["DATE-OBS"]
+            self.observation_date = self.header["DATE-OBS"]
         except:
-            self.dateObs = None
+            self.observation_date = None
             self.logger.debug("  No date value found in header")
         else:
-            self.logger.debug("  Header date = {0}".format(self.dateObs))
+            self.logger.debug("  Header date = {0}".format(self.observation_date))
         ## Get Site Latitude from header (assumes decimal degrees)
         try:
             self.latitude = self.header["LAT-OBS"] * u.deg
@@ -340,12 +366,6 @@ class Image(object):
         else:
             self.logger.debug("  Header altitude = {0:.0f} meters".format(\
                                               self.altitude.to(u.meter).value))
-
-
-        ## Determine Image Size in Pixels
-        self.nYPix, self.nXPix = hdulist[0].data.shape
-        self.logger.debug('  Image size is: {},{}'.format(\
-                                                       self.nXPix, self.nYPix))
 
         ## Read Header Coordinates in to astropy coordinates object
         self.coordinate_from_header = None
@@ -383,13 +403,11 @@ class Image(object):
                 if self.image_flipped:
                     self.logger.debug("  Image is mirrored.")
 
-        hdulist.close()
-
         ## Determine Alt, Az, Moon Sep, Moon Illum using ephem module
-        if self.dateObs and self.latitude and self.longitude and self.coordinate_from_header:
+        if self.observation_date and self.latitude and self.longitude and self.coordinate_from_header:
             ## Populate site object properties
-            SiteDate = "/".join(self.dateObs[0:10].split("-"))
-            SiteTime = self.dateObs[11:]        
+            SiteDate = "/".join(self.observation_date[0:10].split("-"))
+            SiteTime = self.observation_date[11:]        
             self.tel.site.date = ephem.Date(SiteDate+" "+SiteTime)
             self.tel.site.lat = str(self.latitude.to(u.deg).value)
             self.tel.site.lon = str(self.longitude.to(u.deg).value)
@@ -441,10 +459,11 @@ class Image(object):
         Edit a single keyword in the image fits header.
         '''
         self.logger.info('Editing image header: {} = {}'.format(keyword, value))
-        hdulist = fits.open(self.working_file,\
-                            ignore_missing_end=True, mode='update')
-        hdulist[0].header[keyword] = value
-        hdulist.flush()
+#         hdulist = fits.open(self.working_file,\
+#                             ignore_missing_end=True, mode='update')
+        with fits.open(self.working_file, ignore_missing_end=True, mode='update') as hdulist:
+            hdulist[0].header[keyword] = value
+            hdulist.flush()
 
 
     ##-------------------------------------------------------------------------
@@ -535,12 +554,12 @@ class Image(object):
                 self.logger.critical('PPM to fits conversion failed.  Could not find fits file.')
             ## Write new fits file with only green image
             self.logger.debug('Only keeping green channel for analysis')
-            hdulist = fits.open(self.working_file, 'update')
-            if len(hdulist) == 1:
-                data = hdulist[0].data
-                green_data = data[1]
-                hdulist[0].data = green_data
-                hdulist.flush()
+            with fits.open(self.working_file, 'update') as hdulist:
+                if len(hdulist) == 1:
+                    data = hdulist[0].data
+                    green_data = data[1]
+                    hdulist[0].data = green_data
+                    hdulist.flush()
         else:
             self.logger.warning('Unrecognixed file extension: {}'.format(\
                                                                 self.file_ext))
@@ -548,12 +567,6 @@ class Image(object):
                                              self.raw_file_name)
             sys.exit(1)
 
-
-    ##-------------------------------------------------------------------------
-    ## Flag Saturated Pixels
-    ##-------------------------------------------------------------------------
-    def flag_saturated(self):
-        pass
 
     ##-------------------------------------------------------------------------
     ## Dark Subtract Image
@@ -575,6 +588,7 @@ class Image(object):
             self.logger.debug("  Found master dark.  Opening master dark data.")
             hdulist_dark = fits.open(Darks[0])
             MasterDarkData = hdulist_dark[0].data
+            hdulist_dark.close()
         elif len(Darks) > 1:
             self.logger.info("  Median combining {0} darks.".format(len(Darks)))
             ## Combine multiple darks frames
@@ -618,6 +632,7 @@ class Image(object):
                                                     np.median(MasterDarkData)))
         self.logger.debug("  Median level of dark subtracted = {0}".format(\
                                                    np.median(DifferenceImage)))
+        hdulist_image.close()
 
 
     ##-------------------------------------------------------------------------
@@ -645,10 +660,10 @@ class Image(object):
             self.logger.debug("  Cropping Image To [{0}:{1},{2}:{3}]".format(\
                                                     self.crop_x1, self.crop_x2,\
                                                     self.crop_y1, self.crop_y2))
-            hdulist = fits.open(self.working_file, mode="update")
-            hdulist[0].data = hdulist[0].data[self.crop_y1:self.crop_y2,self.crop_x1:self.crop_x2]
-            hdulist.flush()
-            hdulist.close()
+#             hdulist = fits.open(self.working_file, mode="update")
+            with fits.open(self.working_file, mode="update") as hdulist:
+                hdulist[0].data = hdulist[0].data[self.crop_y1:self.crop_y2,self.crop_x1:self.crop_x2]
+                hdulist.flush()
             self.cropped = True
             self.original_nXPix = self.nXPix
             self.original_nYPix = self.nYPix
@@ -657,7 +672,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Solve Astrometry Using astrometry.net
     ##-------------------------------------------------------------------------
-    def solve_astrometry(self, timeout = 30):
+    def solve_astrometry(self, timeout=None):
         '''
         Solve astrometry in the working image using the astrometry.net solver.
         '''
@@ -669,19 +684,36 @@ class Image(object):
         AstrometrySTDOUT = open(os.path.join(self.tel.temp_file_path, 'astrometry_output.txt'), 'w')
         self.temp_files.append(os.path.join(self.tel.temp_file_path, 'astrometry_output.txt'))
 
-        StartTime = datetime.datetime.now()
-        astrometry_process = subprocess.Popen(AstrometryCommand, stdout=AstrometrySTDOUT, stderr=AstrometrySTDOUT)
-        EndTime = datetime.datetime.now()
-        duration = EndTime - StartTime
-        while (astrometry_process.poll() == None) and (duration.seconds < timeout):
+        if timeout:
+            StartTime = datetime.datetime.now()
+            astrometry_process = subprocess.Popen(AstrometryCommand, stdout=AstrometrySTDOUT, stderr=AstrometrySTDOUT)
             EndTime = datetime.datetime.now()
             duration = EndTime - StartTime
-            if duration.seconds > timeout:
-                astrometry_process.terminate()
-                self.logger.warning("Astrometry.net timed out.")
+
+            wait = True
+            while wait:
+                if astrometry_process.poll() == None:
+                    ## Process has not finished
+                    EndTime = datetime.datetime.now()
+                    duration = EndTime - StartTime
+                    if duration.seconds > timeout:
+                        astrometry_process.terminate()
+                        wait = False
+                        self.logger.warning("Astrometry.net timed out.")
+                else:
+                    ## Process finished
+                    wait = False
+            rtncode = astrometry_process.returncode
+        else:
+            StartTime = datetime.datetime.now()
+            rtncode = subprocess.call(AstrometryCommand, stdout=AstrometrySTDOUT, stderr=AstrometrySTDOUT)
+            EndTime = datetime.datetime.now()
+            duration = EndTime - StartTime
+
         with open(os.path.join(self.tel.temp_file_path, 'astrometry_output.txt'), 'r') as AstrometrySTDOUT:
             output = AstrometrySTDOUT.readlines()
-        if astrometry_process.returncode != 0:
+
+        if rtncode != 0:
             self.logger.warning("Astrometry.net failed.")
             for line in output:
                 self.logger.warning('  astrometry.net output: {}'.format(line.strip('\n')))
@@ -689,8 +721,7 @@ class Image(object):
             total_process_time = (EndTime - StartTime).total_seconds()
             self.logger.debug("  Astrometry.net Processing Time: {:.1f} s".format(\
                                                            total_process_time))
-
-            IsFieldCenter = re.search("Field center:\s\(RA\sH:M:S,\sDec D:M:S\)\s=\s\((\d{1,2}:\d{2}:\d{2}\.\d+,\s[+-]?\d{1,2}:\d{2}:\d{2}\.\d+)\)", output)
+            IsFieldCenter = re.search("Field center:\s\(RA\sH:M:S,\sDec D:M:S\)\s=\s\((\d{1,2}:\d{2}:\d{2}\.\d+,\s[+-]?\d{1,2}:\d{2}:\d{2}\.\d+)\)", ''.join(output))
             if IsFieldCenter:
                 self.logger.info("  Astrometry.net field center is: {}".format(\
                                                     IsFieldCenter.group(1)))
@@ -763,7 +794,7 @@ class Image(object):
                        ('CDELT2' in header.keys()):
                         ## If the wcs in header format meets all of the above
                         ## assumptions, do nothing and proceed to header analysis.
-                        pass
+                        self.logger.debug('  {}'.format(header))
                     else:
                         self.logger.warning('WCS does not match expected contents.')
                         for key in header.keys():
@@ -793,11 +824,13 @@ class Image(object):
             self.wcs_pixel_scale = pixel_scale
 
             ## Determine Position Angle
-            ang1 = math.acos(PC[0][0])
-            ang2 = math.acos(PC[0][1])
-            ang3 = math.acos(PC[1][0])
-            ang4 = math.acos(PC[1][1])
-            self.position_angle = (270 - np.mean([ang1, ang2, ang3, ang4])*180/math.pi) * u.deg
+            PCnorm = pixel_scale.to(u.deg/u.pix).value
+            angles = np.array([90*u.deg.to(u.radian) - np.arccos(PC[0][0]/PCnorm),\
+                               90*u.deg.to(u.radian) - np.arcsin(-1*PC[0][1]/PCnorm),\
+                               90*u.deg.to(u.radian) - np.arcsin(PC[1][0]/PCnorm),\
+                               90*u.deg.to(u.radian) - np.arccos(PC[1][1]/PCnorm),\
+                              ]) * u.radian
+            self.position_angle = angles[~np.isnan(angles)].mean().to(u.deg)
 
             ## Determine Flip State
             flipped = np.linalg.det(PC) > 0
@@ -836,6 +869,12 @@ class Image(object):
                                                 self.pointing_error.arcminute))
         except:
             self.logger.warning("Pointing error not calculated.")
+        ## Flag pointing error
+        try:
+            if self.pointing_error.arcminute > self.tel.threshold_pointing_err.to(u.arcmin).value:
+                self.flags['pointing error'] = True
+        except:
+            pass
 
 
     ##-------------------------------------------------------------------------
@@ -902,7 +941,7 @@ class Image(object):
                              'CHECKIMAGE_NAME': self.check_image_file,
                             }
 
-        ## Use command line sextractor params
+        ## Use optional sextractor params
         if not self.tel.SExtractor_params:
             SExtractor_params = SExtractor_default
         else:
@@ -1033,15 +1072,15 @@ class Image(object):
             if self.tel.PSF_measurement_radius:
                 self.logger.info('  Using stars in the inner {} pixels.'.format(\
                                               self.tel.PSF_measurement_radius))
-                IQRadius = self.tel.PSF_measurement_radius
             else:
                 IQRadiusFactor = 1.0
                 DiagonalRadius = math.sqrt((self.nXPix/2)**2+(self.nYPix/2)**2)
-                IQRadius = DiagonalRadius*IQRadiusFactor
-            CentralFWHMs = [star['FWHM_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= IQRadius) and (float(star['FWHM_IMAGE']) > 0.5)]
-            CentralEllipticities = [star['ELLIPTICITY'] for star in self.SExtractor_results if (star['ImageRadius'] <= IQRadius) and (float(star['FWHM_IMAGE']) > 0.5)]
-            CentralAs = [star['AWIN_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= IQRadius) and (float(star['FWHM_IMAGE']) > 0.5)]
-            CentralBs = [star['BWIN_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= IQRadius) and (float(star['FWHM_IMAGE']) > 0.5)]
+                self.tel.PSF_measurement_radius = DiagonalRadius*IQRadiusFactor
+                self.logger.info('  Using all stars in image.')
+            CentralFWHMs = [star['FWHM_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius.to(u.pix).value) and (float(star['FWHM_IMAGE']) > 0.5)]
+            CentralEllipticities = [star['ELLIPTICITY'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius.to(u.pix).value) and (float(star['FWHM_IMAGE']) > 0.5)]
+            CentralAs = [star['AWIN_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius.to(u.pix).value) and (float(star['FWHM_IMAGE']) > 0.5)]
+            CentralBs = [star['BWIN_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius.to(u.pix).value) and (float(star['FWHM_IMAGE']) > 0.5)]
             if len(CentralFWHMs) > 3:
                 self.FWHM_median = np.median(CentralFWHMs) * u.pix
                 self.FWHM_mode = mode(CentralFWHMs, 0.2) * u.pix
@@ -1051,25 +1090,43 @@ class Image(object):
                 self.ellipticity = self.ellipticity_mode
                 self.major_axis = np.median(CentralAs) * u.pix
                 self.minor_axis = np.median(CentralBs) * u.pix
+                self.logger.debug("  Using {0} stars in central region to determine PSF quality.".format(\
+                                                                len(CentralFWHMs)))
+                self.logger.info("  Median FWHM in inner region is {0:.2f} pixels".format(\
+                                                        self.FWHM_median.to(u.pix).value))
+                self.logger.info("  Mode FWHM in inner region is {0:.2f} pixels".format(\
+                                                        self.FWHM_mode.to(u.pix).value))
+                self.logger.info("  Median Minor Axis in inner region is {0:.2f}".format(\
+                                            2.355*self.minor_axis.to(u.pix).value))
+                self.logger.info("  Median Major Axis in inner region is {0:.2f}".format(\
+                                            2.355*self.major_axis.to(u.pix).value))
+                self.logger.info("  Median Ellipticity in inner region is {0:.2f}".format(\
+                                                                 self.ellipticity_median))
+                self.logger.info("  Mode Ellipticity in inner region is {0:.2f}".format(\
+                                                                 self.ellipticity_mode))
             else:
                 self.logger.warning("  Not enough stars detected in central region of image to form median FWHM.")
-            self.logger.debug("  Using {0} stars in central region to determine FWHM and ellipticity.".format(\
-                                                            len(CentralFWHMs)))
-            self.logger.info("  Median FWHM in inner region is {0:.2f} pixels".format(\
-                                                    self.FWHM_median.to(u.pix).value))
-            self.logger.info("  Mode FWHM in inner region is {0:.2f} pixels".format(\
-                                                    self.FWHM_mode.to(u.pix).value))
-            self.logger.info("  Median Minor Axis in inner region is {0:.2f}".format(\
-                                        2.355*self.minor_axis.to(u.pix).value))
-            self.logger.info("  Median Major Axis in inner region is {0:.2f}".format(\
-                                        2.355*self.major_axis.to(u.pix).value))
-            self.logger.info("  Median Ellipticity in inner region is {0:.2f}".format(\
-                                                             self.ellipticity_median))
-            self.logger.info("  Mode Ellipticity in inner region is {0:.2f}".format(\
-                                                             self.ellipticity_mode))
         else:
+            self.FWHM_median = None
+            self.FWHM_mode = None
             self.FWHM = None
+            self.ellipticity_median = None
+            self.ellipticity_mode = None
             self.ellipticity = None
+            self.major_axis = None
+            self.minor_axis = None
+        ## Flag FWHM
+        try:
+            if self.FWHM > self.tel.threshold_FWHM.to(u.pix, equivalencies=self.tel.pixel_scale_equivalency):
+                self.flags['FWHM'] = True
+        except:
+            pass
+        ## Check ellipticity
+        try:
+            if self.ellipticity > self.tel.threshold_ellipticity:
+                self.flags['ellipticity'] = True
+        except:
+            pass
 
 
     ##-------------------------------------------------------------------------
@@ -1085,7 +1142,10 @@ class Image(object):
             self.PSF_plot_filename = self.raw_file_basename+'_PSFinfo.png'
         self.PSF_plotfile = os.path.join(self.tel.plot_file_path, self.PSF_plot_filename)
 
-        self.logger.info('Generating plots of PSF staistics: {}'.format(self.PSF_plot_filename))
+        self.logger.info('Generating plots of PSF statistics: {}'.format(self.PSF_plot_filename))
+        if not self.FWHM:
+            self.logger.info('  No FWHM statistics found.  Skipping plot creation.')
+            return
 
         ellip_threshold = 0.15
         star_angles = [star['THETAWIN_IMAGE'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
@@ -1093,6 +1153,8 @@ class Image(object):
         star_x = [star['XWIN_IMAGE'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
         star_y = [star['YWIN_IMAGE'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
         uncorrected_diffs = [star['THETAWIN_IMAGE']-star['AngleInImage'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
+        CentralFWHMs = [star['FWHM_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius.to(u.pix).value) and (float(star['FWHM_IMAGE']) > 0.5)]
+        CentralEllipticities = [star['ELLIPTICITY'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius.to(u.pix).value) and (float(star['FWHM_IMAGE']) > 0.5)]
         
         nstars = len(star_angles)
         self.logger.debug('  Found {} stars with ellipticity greater than {:.2f}.'.format(\
@@ -1112,13 +1174,13 @@ class Image(object):
         angle_centers = (diff_bins[:-1] + diff_bins[1:]) / 2
 
         ellip_binsize = 0.05
-        ellip_hist, ellip_bins = np.histogram(self.SExtractor_results['ELLIPTICITY'],\
+        ellip_hist, ellip_bins = np.histogram(CentralEllipticities,\
                                               bins=ellip_binsize*np.arange(21))
         ellip_centers = (ellip_bins[:-1] + ellip_bins[1:]) / 2
 
         fwhm_binsize = 0.2
-        fwhm_95pctile = math.ceil(np.percentile(self.SExtractor_results['FWHM_IMAGE'], 95.0))
-        fwhm_hist, fwhm_bins = np.histogram(self.SExtractor_results['FWHM_IMAGE'],\
+        fwhm_95pctile = math.ceil(np.percentile(CentralFWHMs, 95.0))
+        fwhm_hist, fwhm_bins = np.histogram(CentralFWHMs,\
                                                bins=fwhm_binsize*np.arange(int(fwhm_95pctile/fwhm_binsize)+11))
         fwhm_centers = (fwhm_bins[:-1] + fwhm_bins[1:]) / 2
 
@@ -1135,11 +1197,10 @@ class Image(object):
             self.logger.debug('  Generating figure {}'.format(self.PSF_plotfile))
 
             pyplot.ioff()
-            pyplot.figure(figsize=(10,11), dpi=100)
+            fig = pyplot.figure(figsize=(10,11), dpi=100)
 
             TopLeft = pyplot.axes([0.000, 0.750, 0.465, 0.235])
             pyplot.title('Histogram of FWHM Values for {}'.format(self.raw_file_name), size=10)
-
             pyplot.bar(fwhm_centers, fwhm_hist, align='center', width=0.7*fwhm_binsize)
             pyplot.plot([self.FWHM_median.to(u.pix).value, self.FWHM_median.to(u.pix).value], [0, 1.1*max(fwhm_hist)],\
                         'ro-', linewidth=2, label='Median FWHM')
@@ -1178,7 +1239,12 @@ class Image(object):
                           mincnt=5,\
                           vmin=0.8*self.FWHM.to(u.pix).value,\
                           vmax=2.0*self.FWHM.to(u.pix).value,\
+                          alpha=0.5,\
                           cmap='Reds')
+#             center_region = pyplot.Circle((self.nXPix/2, self.nYPix/2),\
+#                                    radius=self.tel.PSF_measurement_radius/self.nXPix,\
+#                                    color='k')
+#             MiddleLeft.add_artist(center_region)
             pyplot.xlabel('X Pixels', size=10)
             pyplot.ylabel('Y Pixels', size=10)
             pyplot.xlim(0,self.nXPix)
@@ -1199,7 +1265,9 @@ class Image(object):
                           gridsize=gridsize,\
                           mincnt=5,\
                           vmin=0.25, vmax=0.75,\
+                          alpha=0.5,\
                           cmap='Reds')
+#             MiddleRight.add_artist(center_region)
             pyplot.xlabel('X Pixels', size=10)
             pyplot.ylabel('Y Pixels', size=10)
             pyplot.xlim(0,self.nXPix)
@@ -1231,12 +1299,13 @@ class Image(object):
             pyplot.yticks(30*(np.arange(7)-3), size=10)
 
             pyplot.savefig(self.PSF_plotfile, dpi=100, bbox_inches='tight', pad_inches=0.10)
+            pyplot.close(fig)
 
 
     ##-------------------------------------------------------------------------
     ## Run SCAMP
     ##-------------------------------------------------------------------------
-    def run_SCAMP(self, catalog='USNO-B1', mergedcat_name='scamp.cat', mergedcat_type='ASCII_HEAD'):
+    def run_SCAMP(self, catalog='USNO-B1', mergedcat_name='scamp.cat', mergedcat_type='ASCII_HEAD', distortion_order=1):
         '''
         Run SCAMP on SExtractor output catalog.
         '''
@@ -1245,8 +1314,9 @@ class Image(object):
             SCAMP_aheader = self.tel.SCAMP_aheader
         else:
             SCAMP_aheader = 'scamp.ahead'
-        SCAMP_params = {
-                        'DISTORT_DEGREES': self.tel.distortion_order,
+
+        SCAMP_default = {
+                        'DISTORT_DEGREES': distortion_order,
                         'SCAMP_aheader_GLOBAL': SCAMP_aheader,
                         'ASTREF_CATALOG': catalog,
                         'SAVE_REFCATALOG': 'N',
@@ -1262,12 +1332,21 @@ class Image(object):
                         'WRITE_XML': 'Y',
                         'XML_NAME': os.path.join(self.tel.temp_file_path, 'scamp.xml'),
                         }
+
+        if not self.tel.SCAMP_params:
+            SCAMP_params = SCAMP_default
+        else:
+            SCAMP_params = self.tel.SCAMP_params
+            for key in SCAMP_default.keys():
+                if not key in self.tel.SCAMP_params.keys():
+                    SCAMP_params[key] = SCAMP_default[key]
+
         SCAMPCommand = ["scamp", self.SExtractor_catalog]
         for key in SCAMP_params.keys():
             SCAMPCommand.append('-{}'.format(key))
             SCAMPCommand.append('{}'.format(SCAMP_params[key]))
         self.logger.info("Running SCAMP on {} catalog with distortion order {}.".format(\
-                                            catalog, self.tel.distortion_order))
+                                            catalog, distortion_order))
         if SCAMP_aheader:
             self.logger.info("  Using SCAMP_aheader file: {}".format(SCAMP_aheader))
         self.logger.debug("  SCAMP command: {}".format(SCAMPCommand))
@@ -1442,18 +1521,26 @@ class Image(object):
         ZeroPoint_median = np.median(self.SExtractor_results['MagDiff'])
         self.logger.debug('Mean Zero Point = {:.2f}'.format(ZeroPoint_mean))
         self.logger.info('Median Zero Point = {:.2f}'.format(ZeroPoint_median))
-        self.zeroPoint = ZeroPoint_median
+        self.zero_point = ZeroPoint_median
+
+        ## Check zero point
+        try:
+            if self.zero_point > self.tel.threshold_zeropoint:
+                self.flags['zero point'] = True
+        except:
+            pass
+
         ## Make Plot if Requested
         if plot:
             self.logger.info('Making ZeroPoint Plot')
-            self.zeroPoint_plotfile = os.path.join(self.tel.plot_file_path,\
+            self.zero_point_plotfile = os.path.join(self.tel.plot_file_path,\
                                        self.raw_file_basename+'_ZeroPoint.png')
             pyplot.ioff()
-            pyplot.figure(figsize=(9,11), dpi=100)
+            fig = pyplot.figure(figsize=(9,11), dpi=100)
 
             Fig1 = pyplot.axes([0.0, 0.5, 1.0, 0.4])
             pyplot.title('Instrumental Magnitudes vs. Calalog Magnitudes (Zero Point = {:.2f})'.format(\
-                                                               self.zeroPoint))
+                                                               self.zero_point))
             pyplot.plot(self.SExtractor_results['VECTOR_ASSOC'].data[:,2],\
                         self.SExtractor_results['MAG_AUTO'],\
                         'bo', markersize=4, markeredgewidth=0)
@@ -1476,14 +1563,14 @@ class Image(object):
             ## Plot Fitted Line
             fit_mags_cat = [math.floor(sorted_cat_mag[minmax_idx_cat_mag[0]]),\
                             math.ceil(sorted_cat_mag[minmax_idx_cat_mag[1]])]
-            fit_mags_inst = fit_mags_cat - self.zeroPoint
+            fit_mags_inst = fit_mags_cat - self.zero_point
             pyplot.plot(fit_mags_cat, fit_mags_inst, 'k-', alpha=0.5,\
-                        label='Zero Point = {:.2f}'.format(self.zeroPoint))
+                        label='Zero Point = {:.2f}'.format(self.zero_point))
 
             Fig2 = pyplot.axes([0.0, 0.0, 1.0, 0.4])
             pyplot.title('Magnitude Residuals (Zero Point = {:.2f})'.format(\
-                                                               self.zeroPoint))
-            residuals = (self.SExtractor_results['MAG_AUTO'].data + self.zeroPoint)\
+                                                               self.zero_point))
+            residuals = (self.SExtractor_results['MAG_AUTO'].data + self.zero_point)\
                          - self.SExtractor_results['VECTOR_ASSOC'].data[:,2]
             pyplot.plot(self.SExtractor_results['VECTOR_ASSOC'].data[:,2],\
                         residuals, \
@@ -1506,10 +1593,11 @@ class Image(object):
                         sorted_residuals[minmax_idx_residuals[1]]+0.1)
             ## Plot Zero Line
             pyplot.plot(fit_mags_cat, [0, 0], 'k-', alpha=0.5,\
-                        label='Zero Point = {:.2f}'.format(self.zeroPoint))
+                        label='Zero Point = {:.2f}'.format(self.zero_point))
 
-            pyplot.savefig(self.zeroPoint_plotfile, dpi=100,\
+            pyplot.savefig(self.zero_point_plotfile, dpi=100,\
                            bbox_inches='tight', pad_inches=0.10)
+            pyplot.close(fig)
 
 
     ##-------------------------------------------------------------------------
@@ -1519,6 +1607,8 @@ class Image(object):
                       mark_pointing=False,\
                       mark_detected_stars=False,\
                       mark_catalog_stars=False,\
+                      mark_saturated=False,\
+                      make_hist=False,\
                       transform=None,
                       crop=None,
                       quality=70,
@@ -1535,30 +1625,32 @@ class Image(object):
         self.logger.debug('  Opening working file')
         with fits.open(self.working_file, ignore_missing_end=True) as hdulist:
             data = hdulist[0].data
-        data_masked = np.ma.masked_equal(data, 0)
-        data_nonzero = data_masked[~data_masked.mask]
+        data_zero = np.ma.masked_equal(data, 0)
+        data_nonzero = data_zero[~data_zero.mask]
 
-#         ## Make exposure histogram (of unscaled data)
-#         self.logger.debug('  Make histogram of unscaled data.')
-#         histogram_plot_file = os.path.join(self.tel.plot_file_path, '{}_hist.png'.format(self.raw_file_basename))
-#         hist_low = np.percentile(data_nonzero.ravel(), p1)
-#         hist_high = np.percentile(data_nonzero.ravel(), 100.-p2)
-#         hist_nbins = 128
-#         hist_binsize = (hist_high-hist_low)/128
-#         hist_bins = np.arange(hist_low,hist_high,hist_binsize)
-#         self.logger.debug('  Histogram range: {} {}.'.format(hist_low, hist_high))
-#         pyplot.figure()
-#         pyplot.hist(data.ravel(), bins=hist_bins, label='binsize = {:4f}'.format(hist_binsize))
-#         pyplot.xlim(hist_low,hist_high)
-#         pyplot.legend(loc='best')
-#         pyplot.xlabel('Pixel value')
-#         pyplot.ylabel('Number of Pixels')
-#         self.logger.debug('  Saving histogram to {}.'.format(histogram_plot_file))
-#         pyplot.savefig(histogram_plot_file)
+        ## Make exposure histogram (of unscaled data)
+        if make_hist:
+            self.logger.info('  Make histogram of unscaled data.')
+            histogram_plot_file = os.path.join(self.tel.plot_file_path, '{}_hist.png'.format(self.raw_file_basename))
+            hist_low = np.percentile(data_nonzero.ravel(), p1)
+            hist_high = np.percentile(data_nonzero.ravel(), 100.-p2)
+            hist_nbins = 128
+            hist_binsize = (hist_high-hist_low)/128
+            hist_bins = np.arange(hist_low,hist_high,hist_binsize)
+            self.logger.debug('  Histogram range: {} {}.'.format(hist_low, hist_high))
+            fig = pyplot.figure()
+            pyplot.hist(data.ravel(), bins=hist_bins, label='binsize = {:4f}'.format(hist_binsize))
+            pyplot.xlim(hist_low,hist_high)
+            pyplot.legend(loc='best')
+            pyplot.xlabel('Pixel value')
+            pyplot.ylabel('Number of Pixels')
+            self.logger.info('  Saving histogram to {}.'.format(histogram_plot_file))
+            pyplot.savefig(histogram_plot_file)
+            pyplot.close(fig)
 
         ## Rescale data using arcsinh transform for jpeg
         self.logger.debug('  Rescaling image data using arcsinh')
-        rescaled_data = np.arcsinh(data_masked)
+        rescaled_data = np.arcsinh(data_zero)
         rescaled_data = rescaled_data / rescaled_data.max()
         rescaled_data_nonzero = rescaled_data[~rescaled_data.mask]
         low = np.percentile(rescaled_data_nonzero, p1)
@@ -1604,7 +1696,7 @@ class Image(object):
                 ms = max([6, 2*math.ceil(self.FWHM.to(u.pix).value)])/binning
             else:
                 ms = 6
-            circle_color = 'red'
+            circle_color = 'orange'
             self.logger.debug('  Marking detected stars with {} radius {} circles'.format(ms, circle_color))
             for star in self.SExtractor_results:
                 x = star['XWIN_IMAGE']
@@ -1631,6 +1723,16 @@ class Image(object):
                 radii = np.linspace(2*ms, 2*ms+thickness, thickness+1)
                 for r in radii:
                     draw.ellipse((x-r, y-r, x+r, y+r), outline=circle_color)
+
+        ## Flag Saturated Pixels
+        if mark_saturated and self.tel.saturation:
+            saturated_color = 'red'
+            with fits.open(self.raw_file, ignore_missing_end=True) as hdulist:
+                data_raw = hdulist[0].data
+            data_saturated = np.ma.masked_greater(data_raw, self.tel.saturation)
+            indices = np.where(data_saturated.mask == 1)
+            xy = zip(indices[1], indices[0])
+            draw.point(xy, fill=saturated_color)
 
         ## Flip jpeg
         if transform:
@@ -1662,7 +1764,7 @@ class Image(object):
             im.thumbnail(size, Image.ANTIALIAS)
 
         ## Save to JPEG
-        self.logger.debug('  Saving jpeg (binning={}, quality={:.0f}) to: {}'.format(binning, quality, jpeg_file_name))
+        self.logger.info('  Saving jpeg (p1={:.1f}, p2={:.1f}), binning={}, quality={:.0f}) to: {}'.format(p1, p2, binning, quality, jpeg_file_name))
         im.save(jpeg_file, 'JPEG', quality=quality)
         self.jpeg_file_names.append(jpeg_file_name)
 
@@ -1916,7 +2018,7 @@ class Image(object):
                                "ZeroPoint", "nStars", "ProcessTime"]
         ## If HTML file does not yet exist, create it and insert header
         ## from template file.
-        self.logger.info('Adding results to HTML table.')
+        self.logger.info('Adding results to HTML table: {}'.format(htmlImageList))
         if not os.path.exists(htmlImageList):
             self.logger.debug("  HTML file does not exist.  Creating it.")
             HTML = open(htmlImageList, 'w')
@@ -1938,7 +2040,7 @@ class Image(object):
                       '    </style>',
                       '</head>',
                       '<body>',
-                      '    <h2>IQMon Results for {}</h2>'.format(self.tel.long_name),
+                      '    <h2>IQMon Results for {}</h2>'.format(self.tel.name),
                       '    <table>',
                       '        <tr>']
             if "Date and Time" in fields:
@@ -1960,7 +2062,7 @@ class Image(object):
             if "MoonIllum" in fields:
                 header.append('        <th style="width:50px">Moon Illum. (%)</th>')
             if "FWHM" in fields:
-                header.append('        <th style="width:60px">FWHM ({})</th>'.format(str(self.tel.units_for_FWHM.unit)))
+                header.append('        <th style="width:60px">FWHM ({})</th>'.format(str(self.tel.units_for_FWHM)))
             if "ellipticity" in fields:
                 header.append('        <th style="width:50px">Ellip.</th>')
             if "Background" in fields:
@@ -2000,7 +2102,7 @@ class Image(object):
         HTML.write("    <tr>\n")
         ## Write Observation Date and Time
         if "Date and Time" in fields:
-            HTML.write("      <td style='color:black;text-align:left'>{0}</td>\n".format(self.dateObs))
+            HTML.write("      <td style='color:black;text-align:left'>{0}</td>\n".format(self.observation_date))
         ## Write Filename (and links to jpegs)
         if "Filename" in fields:
             if len(self.jpeg_file_names) == 0:
@@ -2023,8 +2125,8 @@ class Image(object):
                 PSFplot_html = " (<a href='{}'>PSF</a>)".format(os.path.join("..", "..", "Plots", self.PSF_plot_filename))
             else:
                 PSFplot_html = ""
-            if self.zeroPoint_plotfile:
-                ZPplot_html = " (<a href='{}'>ZP</a>)".format(os.path.join("..", "..", "Plots", self.zeroPoint_plotfile))
+            if self.zero_point_plotfile:
+                ZPplot_html = " (<a href='{}'>ZP</a>)".format(os.path.join("..", "..", "Plots", self.zero_point_plotfile))
             else:
                 ZPplot_html = ""
             htmlline = "      <td style='color:black;text-align:left'>" + JPEG1_html + "{}</a>".format(self.raw_file_basename) + JPEG2_html + JPEG3_html + PSFplot_html + ZPplot_html + "</td>\n"
@@ -2074,12 +2176,12 @@ class Image(object):
         if "FWHM" in fields:
             if self.FWHM:
                 ## Decide whether to flag FWHM value with red color
-                if self.FWHM > self.tel.threshold_FWHM.to(u.pix, equivalencies=self.tel.pixel_scale_equivalency):
+                if self.flags['FWHM']:
                     colorFWHM = "#FF5C33"
                 else:
                     colorFWHM = "#70DB70"
                 ## Convert FWHM value to appropriate units for HTML output
-                if self.tel.units_for_FWHM.unit == u.arcsec:
+                if self.tel.units_for_FWHM == u.arcsec:
                     FWHM_for_HTML = (self.FWHM * u.radian.to(u.arcsec)*self.tel.pixel_size.to(u.mm)/self.tel.focal_length.to(u.mm)).value
                 else:
                     FWHM_for_HTML = self.FWHM.value
@@ -2089,7 +2191,7 @@ class Image(object):
         if "ellipticity" in fields:
             if self.ellipticity:
                 ## Decide whether to flag ellipticity value with red color
-                if self.ellipticity > self.tel.threshold_ellipticity:
+                if self.flags['ellipticity']:
                     colorEllipticity = "#FF5C33"
                 else:
                     colorEllipticity = "#70DB70"
@@ -2106,7 +2208,7 @@ class Image(object):
         if "PErr" in fields:
             if self.pointing_error:
                 ## Decide whether to flag pointing error value with red color
-                if self.pointing_error.arcminute > self.tel.threshold_pointing_err.to(u.arcmin).value:
+                if self.flags['pointing error']:
                     colorpointing_error = "#FF5C33"
                 else:
                     colorpointing_error = "#70DB70"
@@ -2122,8 +2224,13 @@ class Image(object):
                 HTML.write("      <td style='color:{}'>{}</td>\n".format("black", ""))
         ## Write zero point
         if "ZeroPoint" in fields:
-            if self.zeroPoint:
-                HTML.write("      <td style='color:{}'>{:.2f}</td>\n".format("black", self.zeroPoint))
+            if self.zero_point:
+                ## Decide whether to flag pointing error value with red color
+                if self.flags['zero point']:
+                    colorzero_point = "#FF5C33"
+                else:
+                    colorzero_point = "#70DB70"
+                HTML.write("      <td style='color:{}'>{:.2f}</td>\n".format(colorzero_point, self.zero_point))
             else:
                 HTML.write("      <td style='color:{}'>{}</td>\n".format("black", ""))
         ## Write number of stars detected by SExtractor
@@ -2149,6 +2256,75 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Append Line With Image Info to Summary Text File
     ##-------------------------------------------------------------------------
+    def add_yaml_entry(self, summary_file):
+        self.logger.info("Writing YAML Summary File: {}".format(summary_file))
+        result_list = []
+        if os.path.exists(summary_file):
+            self.logger.debug('  Reading existing summary file.')
+            with open(summary_file, 'r') as yaml_string:
+                result_list = yaml.load(yaml_string)
+        ## Form dictionary with new result info
+        try:
+            FWHM_median_pix = self.FWHM_median.to(u.pix).value
+        except:
+            FWHM_median_pix = None
+        try:
+            FWHM_mode_pix = self.FWHM_mode.to(u.pix).value
+        except:
+            FWHM_mode_pix = None
+        try:
+            FWHM_pix = self.FWHM.to(u.pix).value
+        except:
+            FWHM_pix = None
+        try:
+            pointing_error_arcmin = self.pointing_error.arcminute
+        except:
+            pointing_error_arcmin = None
+        try:
+            alt = self.target_alt.to(u.deg).value
+        except:
+            alt = None
+        try:
+            az = self.target_az.to(u.deg).value
+        except:
+            az = None
+        try:
+            moon_sep = self.moon_sep.to(u.deg).value
+        except:
+            moon_sep = None
+        try:
+            posang = self.position_angle.to(u.deg).value
+        except:
+            posang = None
+        new_result = {
+                      'filename': self.raw_file_name,\
+                      'exposure_start': self.observation_date,\
+                      'FWHM_median_pix': str(FWHM_median_pix),\
+                      'FWHM_mode_pix': str(FWHM_mode_pix),\
+                      'FWHM_pix': str(FWHM_pix),\
+                      'ellipticity_median': str(self.ellipticity_median),\
+                      'ellipticity_mode': str(self.ellipticity_mode),\
+                      'ellipticity': str(self.ellipticity),\
+                      'n_stars': str(self.n_stars_SExtracted),\
+                      'background': str(self.SExtractor_background),\
+                      'background_rms': str(self.SExtractor_background_RMS),\
+                      'pointing_error_arcmin': str(pointing_error_arcmin),\
+                      'zero_point': str(self.zero_point),\
+                      'alt': str(alt),\
+                      'az': str(az),\
+                      'airmass': str(self.airmass),\
+                      'moon_separation': str(moon_sep),\
+                      'moon_illumination': str(self.moon_phase),\
+                      'WCS_position_angle': str(posang),\
+                      'process_time': str(self.total_process_time),\
+                      'flags': str(self.flags)
+                     }
+        result_list.append(new_result)
+        yaml_string = yaml.dump(result_list)
+        with open(summary_file, 'w') as output:
+            output.write(yaml_string)
+
+
     def add_summary_entry(self, summaryFile):
         self.logger.info("Writing Summary File Entry.")
         self.logger.debug("  Summary File: {0}".format(summaryFile))
@@ -2190,10 +2366,10 @@ class Image(object):
         ## Astropy table writer can not write None to table initialized
         ## with type.  If any outputs are None, change to some value.
         tableMask = np.zeros(12)
-        ## dateObs
-        if self.dateObs: dateObs = self.dateObs
+        ## observation_date
+        if self.observation_date: observation_date = self.observation_date
         else: 
-            dateObs = ""
+            observation_date = ""
             tableMask[0] = True
         ## FileName
         if self.raw_file_name: raw_file_name = self.raw_file_name
@@ -2231,7 +2407,7 @@ class Image(object):
             pointing_error = 0.
             tableMask[7] = True
         ## Zero Point
-        if self.zeroPoint: zeroPoint = self.zeroPoint
+        if self.zero_point: zeroPoint = self.zero_point
         else:
             zeroPoint = 0.
             tableMask[8] = True
@@ -2252,7 +2428,7 @@ class Image(object):
             tableMask[11] = True
         ## Add row to table
         self.logger.debug("  Writing new row to log table.  Filename: {0}".format(raw_file_name))
-        SummaryTable.add_row((dateObs, raw_file_name,
+        SummaryTable.add_row((observation_date, raw_file_name,
                               FWHM, ellipticity,
                               target_alt, target_az,
                               airmass, pointing_error,

@@ -13,7 +13,11 @@ If the image contains a WCS, the module can also compare the WCS coordinates of 
 
 In addition, the software can use SCAMP and SWarp to determine a plate solution which includes distortion parameters and compare the instrumental magnitudes determined by SExtractor to catalog magnitudes to determine the photometric zero point of the image.
 
+
+
 ## Requirements
+
+Python Modules:
 
 * python2.7.X or python3.X
 * astropy (<http://www.astropy.org>)
@@ -21,13 +25,29 @@ In addition, the software can use SCAMP and SWarp to determine a plate solution 
 * numpy
 * matplotlib
 * subprocess
+* PyYAML
+* PIL
+* skimage
+
+External Programs:
+
 * SExtractor (<http://www.astromatic.net/software/sextractor>)
 * SCAMP (<http://www.astromatic.net/software/scamp>)
 * SWarp (<http://www.astromatic.net/software/swarp>)
 * astrometry.net solver (<http://astrometry.net>)
 
+
+
 ## Version History
 
+* **v1.2**
+    * New configuration scheme.  The telescope configuration scheme is read from a YAML config file.  The config file also controls output directories for the logs, plots, and tmp files.
+    * Flags if the image FWHM, ellipticity, pointing error, or zero point are above their respective threshold values are now recorded in the YAML file and are used to color code the HTML output.
+    * New `add_yaml_entry` method (intended to replace `add_summary_entry`) stores image analysis results in YAML file.
+    * Improvements to the PSF plots to show histograms and spatial distribution of high ellipticity and high FWHM stars.
+    * The `make_JPEG` method can now flag saturated pixels
+    * Image histogram is now optional output of `make_JPEG` method.
+    * Numerous bug fixes.
 * **v1.1**
     * Added ability to solve astrometry using SCAMP and rectify the image using SWarp
     * Added ability to solve for Zero Point using the SCAMP-solved data
