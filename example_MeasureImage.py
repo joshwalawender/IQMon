@@ -46,36 +46,8 @@ def main():
     ##-------------------------------------------------------------------------
     ## Create Telescope Object
     ##-------------------------------------------------------------------------
-    path_temp = '/Users/vysosuser/IQMon/tmp'
-    path_plots = '/Users/vysosuser/IQMon/Plots'
-    tel = IQMon.Telescope(path_temp, path_plots)
-    tel.name = 'SVQ100'
-    tel.long_name = 'SVQ100'
-    tel.focal_length = 580.*u.mm
-    tel.pixel_size = 6.5*u.micron
-    tel.aperture = 100.*u.mm
-    tel.gain = 1.0 / u.adu
-    tel.units_for_FWHM = 1.*u.pix
-    tel.ROI = None
-    tel.threshold_FWHM = 3.0*u.pix
-    tel.threshold_pointing_err = 10.0*u.arcmin
-    tel.threshold_ellipticity = 0.25*u.dimensionless_unscaled
-    tel.pixel_scale = tel.pixel_size.to(u.mm)/tel.focal_length.to(u.mm)*u.radian.to(u.arcsec)*u.arcsec/u.pix
-    tel.fRatio = tel.focal_length.to(u.mm)/tel.aperture.to(u.mm)
-    tel.SExtractor_params = {'PHOT_APERTURES': '6.0',
-                            'BACK_SIZE': '32',
-                            'SEEING_FWHM': '2.5',
-                            'SATUR_LEVEL': '50000',
-                            'DETECT_MINAREA': '5',
-                            'DETECT_THRESH': '5.0',
-                            'ANALYSIS_THRESH': '5.0',
-                            'FILTER': 'N',
-                            }
-    tel.pointing_marker_size = 4*u.arcmin
-    ## Define Site (ephem site object)
-    tel.site = ephem.Observer()
-    tel.check_units()
-    tel.define_pixel_scale()
+    config_file = os.path.join(os.path.expanduser('~'), 'IQMon', 'config_VYSOS-5.yaml')
+    tel = IQMon.Telescope(config_file)
 
     ##-------------------------------------------------------------------------
     ## Create IQMon.Image Object
@@ -85,20 +57,19 @@ def main():
     ##-------------------------------------------------------------------------
     ## Create Filenames
     ##-------------------------------------------------------------------------
-    path_log = os.path.join(os.path.expanduser('~'), 'IQMon', 'Logs')
-    IQMonLogFileName = os.path.join(path_log, "IQMonLog.txt")
-    htmlImageList = os.path.join(path_log, "IQMon.html")
-    summaryFile = os.path.join(path_log, "IQMon.txt")
+    logs_file = os.path.join(tel.logs_file_path, DataNightString+"_"+telescope+"_IQMonLog.txt")
+    html_file = os.path.join(tel.logs_file_path, DataNightString+"_"+telescope+".html")
+    yaml_file = os.path.join(tel.logs_file_path, DataNightString+"_"+telescope+"_Summary.txt")
     if args.clobber:
-        if os.path.exists(IQMonLogFileName): os.remove(IQMonLogFileName)
-        if os.path.exists(htmlImageList): os.remove(htmlImageList)
-        if os.path.exists(summaryFile): os.remove(summaryFile)
+        if os.path.exists(logs_file): os.remove(logs_file)
+        if os.path.exists(html_file): os.remove(html_file)
+        if os.path.exists(yaml_file): os.remove(yaml_file)
 
     ##-------------------------------------------------------------------------
     ## Perform Actual Image Analysis
     ##-------------------------------------------------------------------------
-    image.make_logger(IQMonLogFileName, args.verbose)
-    image.logger.info("###### Processing Image:  %s ######", FitsFilename)
+    image.make_logger(logfile=logs_file, verbose=verbose)
+    image.logger.info("###### Processing Image: {} ######".format(FitsFilename))
     image.read_image()           ## Create working copy of image (don't edit raw file!)
     image.read_header()           ## Extract values from header
 
@@ -106,6 +77,7 @@ def main():
         image.solve_astrometry() ## Solve Astrometry
         image.read_header()       ## Refresh Header
     image.determine_pointing_error()            ## Calculate Pointing Error
+
     image.run_SExtractor()       ## Run SExtractor
     image.determine_FWHM()       ## Determine FWHM from SExtractor results
 
@@ -115,16 +87,36 @@ def main():
     image.get_local_UCAC4(local_UCAC_command="/Users/joshw/Data/UCAC4/access/u4test", local_UCAC_data="/Users/joshw/Data/UCAC4/u4b")
     image.run_SExtractor(assoc=True)
     image.determine_FWHM()       ## Determine FWHM from SExtractor results
-    image.make_PSF_plot()
     image.measure_zero_point(plot=True)
-    CatalogJPEG = image.rawFileBasename+"_catstars.jpg"
-    image.make_JPEG(CatalogJPEG, mark_catalog_stars=True, mark_pointing=True, binning=2)
+    image.make_PSF_plot()
+
+    small_JPEG = image.raw_file_basename+"_fullframe.jpg"
+    image.make_JPEG(small_JPEG, binning=3,\
+                    p1=0.15, p2=0.50,\
+                    make_hist=False,\
+                    mark_pointing=True,\
+                    mark_detected_stars=False,\
+                    mark_catalog_stars=False,\
+                    mark_saturated=True,\
+                    transform='rotate90')
+                    )
+    cropped_JPEG = image.raw_file_basename+"_crop.jpg"
+    image.make_JPEG(cropped_JPEG,\
+                    p1=0.15, p2=0.50,\
+                    make_hist=False,\
+                    mark_pointing=True,\
+                    mark_detected_stars=True,\
+                    mark_catalog_stars=False,\
+                    mark_saturated=True,\
+                    crop=(1024, 1024, 3072, 3072),\
+                    transform='rotate90')
+                    )
     
     image.clean_up()               ## Cleanup (delete) temporary files.
     image.calculate_process_time() ## Calculate how long it took to process this image
     fields=["Date and Time", "Filename", "Alt", "Az", "Airmass", "MoonSep", "MoonIllum", "FWHM", "ellipticity", "ZeroPoint", "PErr", "PosAng", "nStars", "ProcessTime"]
-    image.add_web_log_entry(htmlImageList, fields=fields) ## Add line for this image to HTML table
-    image.add_summary_entry(summaryFile)  ## Add line for this image to text table
+    image.add_web_log_entry(html_file, fields=fields)
+    image.add_yaml_entry(yaml_file)
     
 
 if __name__ == '__main__':
