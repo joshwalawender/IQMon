@@ -304,11 +304,18 @@ class Image(object):
         self.logger.info("Reading image header.")
 #         self.header = fits.getheader(self.working_file, ext=0)
 #         hdulist = fits.open(self.working_file, ignore_missing_end=True)
-        with fits.open(self.working_file, ignore_missing_end=True) as hdulist:
-            self.header = hdulist[0].header
-            self.nYPix, self.nXPix = hdulist[0].data.shape
-            self.logger.debug('  Image size is: {},{}'.format(\
-                                                       self.nXPix, self.nYPix))
+        if not self.working_file:
+            with fits.open(self.raw_file, ignore_missing_end=True) as hdulist:
+                self.header = hdulist[0].header
+                self.nYPix, self.nXPix = hdulist[0].data.shape
+                self.logger.debug('  Image size is: {},{}'.format(\
+                                                           self.nXPix, self.nYPix))
+        else:
+            with fits.open(self.working_file, ignore_missing_end=True) as hdulist:
+                self.header = hdulist[0].header
+                self.nYPix, self.nXPix = hdulist[0].data.shape
+                self.logger.debug('  Image size is: {},{}'.format(\
+                                                           self.nXPix, self.nYPix))
 
 
 
