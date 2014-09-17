@@ -1524,88 +1524,93 @@ class Image(object):
         '''
         assert 'VECTOR_ASSOC' in self.SExtractor_results.keys()
         assert 'MagDiff' in self.SExtractor_results.keys()
-        ZeroPoint_mean = np.mean(self.SExtractor_results['MagDiff'])
-        ZeroPoint_median = np.median(self.SExtractor_results['MagDiff'])
-        self.logger.debug('Mean Zero Point = {:.2f}'.format(ZeroPoint_mean))
-        self.logger.info('Median Zero Point = {:.2f}'.format(ZeroPoint_median))
-        self.zero_point = ZeroPoint_median
+        min_stars = 100
+        if len(self.SExtractor_results['MagDiff']) < min_stars:
+            self.logger.info('Zero point not calculated.  Only {} catalog stars found.'.format(\
+                             len(self.SExtractor_results['MagDiff'])))
+        else:
+            ZeroPoint_mean = np.mean(self.SExtractor_results['MagDiff'])
+            ZeroPoint_median = np.median(self.SExtractor_results['MagDiff'])
+            self.logger.debug('Mean Zero Point = {:.2f}'.format(ZeroPoint_mean))
+            self.logger.info('Median Zero Point = {:.2f}'.format(ZeroPoint_median))
+            self.zero_point = ZeroPoint_median
 
-        ## Check zero point
-        try:
-            if self.zero_point > self.tel.threshold_zeropoint:
-                self.flags['zero point'] = True
-        except:
-            pass
+            ## Check zero point
+            try:
+                if self.zero_point > self.tel.threshold_zeropoint:
+                    self.flags['zero point'] = True
+            except:
+                pass
 
-        ## Make Plot if Requested
-        if plot:
-            self.logger.info('Making ZeroPoint Plot')
-            self.zero_point_plotfilename = self.raw_file_basename+'_ZeroPoint.png'
-            self.zero_point_plotfile = os.path.join(self.tel.plot_file_path,\
-                                                    self.zero_point_plotfilename)
-            pyplot.ioff()
-            fig = pyplot.figure(figsize=(9,11), dpi=100)
+            ## Make Plot if Requested
+            if plot:
+                self.logger.info('Making ZeroPoint Plot')
+                self.zero_point_plotfilename = self.raw_file_basename+'_ZeroPoint.png'
+                self.zero_point_plotfile = os.path.join(self.tel.plot_file_path,\
+                                                        self.zero_point_plotfilename)
+                pyplot.ioff()
+                fig = pyplot.figure(figsize=(9,11), dpi=100)
 
-            Fig1 = pyplot.axes([0.0, 0.5, 1.0, 0.4])
-            pyplot.title('Instrumental Magnitudes vs. Calalog Magnitudes (Zero Point = {:.2f})'.format(\
-                                                               self.zero_point))
-            pyplot.plot(self.SExtractor_results['VECTOR_ASSOC'].data[:,2],\
-                        self.SExtractor_results['MAG_AUTO'],\
-                        'bo', markersize=4, markeredgewidth=0)
-            pyplot.xlabel('UCAC4 {} Magnitude'.format(self.catalog_filter))
-            pyplot.ylabel('Instrumental Magnitude')
-            pyplot.grid()
-            reject_fraction = 0.01
-            ## Set Limits to XXth percentile of magnitudes in Y axis
-            sorted_inst_mag = sorted(self.SExtractor_results['MAG_AUTO'])
-            minmax_idx_inst_mag = [int(reject_fraction*len(sorted_inst_mag)),\
-                                   int((1.0-reject_fraction)*len(sorted_inst_mag))]
-            pyplot.ylim(math.floor(sorted_inst_mag[minmax_idx_inst_mag[0]]),\
-                        math.ceil(sorted_inst_mag[minmax_idx_inst_mag[1]]))
-            ## Set Limits to XXth percentile of magnitudes in X axis
-            sorted_cat_mag = sorted(self.SExtractor_results['VECTOR_ASSOC'].data[:,2])
-            minmax_idx_cat_mag = [int(reject_fraction*len(sorted_cat_mag)),\
-                                  int((1.0-reject_fraction)*len(sorted_cat_mag))]
-            pyplot.xlim(math.floor(sorted_cat_mag[minmax_idx_cat_mag[0]]),\
-                        math.ceil(sorted_cat_mag[minmax_idx_cat_mag[1]]))
-            ## Plot Fitted Line
-            fit_mags_cat = [math.floor(sorted_cat_mag[minmax_idx_cat_mag[0]]),\
-                            math.ceil(sorted_cat_mag[minmax_idx_cat_mag[1]])]
-            fit_mags_inst = fit_mags_cat - self.zero_point
-            pyplot.plot(fit_mags_cat, fit_mags_inst, 'k-', alpha=0.5,\
-                        label='Zero Point = {:.2f}'.format(self.zero_point))
+                Fig1 = pyplot.axes([0.0, 0.5, 1.0, 0.4])
+                pyplot.title('Instrumental Magnitudes vs. Calalog Magnitudes (Zero Point = {:.2f})'.format(\
+                                                                   self.zero_point))
+                pyplot.plot(self.SExtractor_results['VECTOR_ASSOC'].data[:,2],\
+                            self.SExtractor_results['MAG_AUTO'],\
+                            'bo', markersize=4, markeredgewidth=0)
+                pyplot.xlabel('UCAC4 {} Magnitude'.format(self.catalog_filter))
+                pyplot.ylabel('Instrumental Magnitude')
+                pyplot.grid()
+                reject_fraction = 0.01
+                ## Set Limits to XXth percentile of magnitudes in Y axis
+                sorted_inst_mag = sorted(self.SExtractor_results['MAG_AUTO'])
+                minmax_idx_inst_mag = [int(reject_fraction*len(sorted_inst_mag)),\
+                                       int((1.0-reject_fraction)*len(sorted_inst_mag))]
+                pyplot.ylim(math.floor(sorted_inst_mag[minmax_idx_inst_mag[0]]),\
+                            math.ceil(sorted_inst_mag[minmax_idx_inst_mag[1]]))
+                ## Set Limits to XXth percentile of magnitudes in X axis
+                sorted_cat_mag = sorted(self.SExtractor_results['VECTOR_ASSOC'].data[:,2])
+                minmax_idx_cat_mag = [int(reject_fraction*len(sorted_cat_mag)),\
+                                      int((1.0-reject_fraction)*len(sorted_cat_mag))]
+                pyplot.xlim(math.floor(sorted_cat_mag[minmax_idx_cat_mag[0]]),\
+                            math.ceil(sorted_cat_mag[minmax_idx_cat_mag[1]]))
+                ## Plot Fitted Line
+                fit_mags_cat = [math.floor(sorted_cat_mag[minmax_idx_cat_mag[0]]),\
+                                math.ceil(sorted_cat_mag[minmax_idx_cat_mag[1]])]
+                fit_mags_inst = fit_mags_cat - self.zero_point
+                pyplot.plot(fit_mags_cat, fit_mags_inst, 'k-', alpha=0.5,\
+                            label='Zero Point = {:.2f}'.format(self.zero_point))
 
-            Fig2 = pyplot.axes([0.0, 0.0, 1.0, 0.4])
-            pyplot.title('Magnitude Residuals (Zero Point = {:.2f})'.format(\
-                                                               self.zero_point))
-            residuals = (self.SExtractor_results['MAG_AUTO'].data + self.zero_point)\
-                         - self.SExtractor_results['VECTOR_ASSOC'].data[:,2]
-            pyplot.plot(self.SExtractor_results['VECTOR_ASSOC'].data[:,2],\
-                        residuals, \
-                        'bo', markersize=4, markeredgewidth=0)
-            pyplot.xlabel('UCAC4 {} Magnitude'.format(self.catalog_filter))
-            pyplot.ylabel('Magnitude Residual')
-            pyplot.grid()
-            ## Set Limits to XXth percentile of magnitudes in X axis
-            reject_fraction = 0.01
-            sorted_cat_mag = sorted(self.SExtractor_results['VECTOR_ASSOC'].data[:,2])
-            minmax_idx_cat_mag = [int(reject_fraction*len(sorted_cat_mag)),\
-                                  int((1.0-reject_fraction)*len(sorted_cat_mag))]
-            pyplot.xlim(math.floor(sorted_cat_mag[minmax_idx_cat_mag[0]]),\
-                        math.ceil(sorted_cat_mag[minmax_idx_cat_mag[1]]))
-            ## Set Limits to XXth percentile of magnitudes in Y axis
-            sorted_residuals = sorted(residuals)
-            minmax_idx_residuals = [int(reject_fraction*len(sorted_residuals)),\
-                                    int((1.0-reject_fraction)*len(sorted_residuals))]
-            pyplot.ylim(sorted_residuals[minmax_idx_residuals[0]]-0.1,\
-                        sorted_residuals[minmax_idx_residuals[1]]+0.1)
-            ## Plot Zero Line
-            pyplot.plot(fit_mags_cat, [0, 0], 'k-', alpha=0.5,\
-                        label='Zero Point = {:.2f}'.format(self.zero_point))
+                Fig2 = pyplot.axes([0.0, 0.0, 1.0, 0.4])
+                pyplot.title('Magnitude Residuals (Zero Point = {:.2f})'.format(\
+                                                                   self.zero_point))
+                residuals = (self.SExtractor_results['MAG_AUTO'].data + self.zero_point)\
+                             - self.SExtractor_results['VECTOR_ASSOC'].data[:,2]
+                pyplot.plot(self.SExtractor_results['VECTOR_ASSOC'].data[:,2],\
+                            residuals, \
+                            'bo', markersize=4, markeredgewidth=0)
+                pyplot.xlabel('UCAC4 {} Magnitude'.format(self.catalog_filter))
+                pyplot.ylabel('Magnitude Residual')
+                pyplot.grid()
+                ## Set Limits to XXth percentile of magnitudes in X axis
+                reject_fraction = 0.01
+                sorted_cat_mag = sorted(self.SExtractor_results['VECTOR_ASSOC'].data[:,2])
+                minmax_idx_cat_mag = [int(reject_fraction*len(sorted_cat_mag)),\
+                                      int((1.0-reject_fraction)*len(sorted_cat_mag))]
+                pyplot.xlim(math.floor(sorted_cat_mag[minmax_idx_cat_mag[0]]),\
+                            math.ceil(sorted_cat_mag[minmax_idx_cat_mag[1]]))
+                ## Set Limits to XXth percentile of magnitudes in Y axis
+                sorted_residuals = sorted(residuals)
+                minmax_idx_residuals = [int(reject_fraction*len(sorted_residuals)),\
+                                        int((1.0-reject_fraction)*len(sorted_residuals))]
+                pyplot.ylim(sorted_residuals[minmax_idx_residuals[0]]-0.1,\
+                            sorted_residuals[minmax_idx_residuals[1]]+0.1)
+                ## Plot Zero Line
+                pyplot.plot(fit_mags_cat, [0, 0], 'k-', alpha=0.5,\
+                            label='Zero Point = {:.2f}'.format(self.zero_point))
 
-            pyplot.savefig(self.zero_point_plotfile, dpi=100,\
-                           bbox_inches='tight', pad_inches=0.10)
-            pyplot.close(fig)
+                pyplot.savefig(self.zero_point_plotfile, dpi=100,\
+                               bbox_inches='tight', pad_inches=0.10)
+                pyplot.close(fig)
 
 
     ##-------------------------------------------------------------------------
