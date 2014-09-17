@@ -1710,9 +1710,9 @@ class Image(object):
         ## Mark Catalog Stars
         if mark_catalog_stars and self.catalog:
             if self.FWHM:
-                ms = max([6, 2*math.ceil(self.FWHM.to(u.pix).value)])/binning
+                ms = max([7, 2.1*math.ceil(self.FWHM.to(u.pix).value)])/binning
             else:
-                ms = 6
+                ms = 7
             circle_color = 'blue'
             self.logger.debug('  Marking catalog stars with {} radius {} circles'.format(ms, circle_color))
 
@@ -1721,7 +1721,7 @@ class Image(object):
                 x = int(xy[0])
                 y = int(xy[1])
                 thickness = 1
-                radii = np.linspace(2*ms, 2*ms+thickness, thickness+1)
+                radii = np.linspace(ms, ms+thickness, thickness)
                 for r in radii:
                     draw.ellipse((x-r, y-r, x+r, y+r), outline=circle_color)
 
