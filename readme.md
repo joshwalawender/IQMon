@@ -34,6 +34,7 @@ External Programs:
 * SExtractor (<http://www.astromatic.net/software/sextractor>)
 * SCAMP (<http://www.astromatic.net/software/scamp>)
 * SWarp (<http://www.astromatic.net/software/swarp>)
+* MissFITS (<http://www.astromatic.net/software/missfits>)
 * astrometry.net solver (<http://astrometry.net>)
 
 
