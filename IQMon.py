@@ -2233,7 +2233,7 @@ class Image(object):
                     colorzero_point = "#70DB70"
                 HTML.write("      <td style='background-color:{}'>{:.2f}</td>\n".format(colorzero_point, self.zero_point))
             else:
-                HTML.write("      <td style='background-color:{}'>{}</td>\n".format("black", ""))
+                HTML.write("      <td style='background-color:{}'>{}</td>\n".format("white", ""))
         ## Write number of stars detected by SExtractor
         if "nStars" in fields:
             if self.n_stars_SExtracted:
