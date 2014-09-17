@@ -1533,8 +1533,9 @@ class Image(object):
         ## Make Plot if Requested
         if plot:
             self.logger.info('Making ZeroPoint Plot')
+            self.zero_point_plotfilename = self.raw_file_basename+'_ZeroPoint.png'
             self.zero_point_plotfile = os.path.join(self.tel.plot_file_path,\
-                                       self.raw_file_basename+'_ZeroPoint.png')
+                                                    self.zero_point_plotfilename)
             pyplot.ioff()
             fig = pyplot.figure(figsize=(9,11), dpi=100)
 
@@ -2126,7 +2127,7 @@ class Image(object):
             else:
                 PSFplot_html = ""
             if self.zero_point_plotfile:
-                ZPplot_html = " (<a href='{}'>ZP</a>)".format(os.path.join("..", "..", "Plots", self.zero_point_plotfile))
+                ZPplot_html = " (<a href='{}'>ZP</a>)".format(os.path.join("..", "..", "Plots", self.zero_point_plotfilename))
             else:
                 ZPplot_html = ""
             htmlline = "      <td style='color:black;text-align:left'>" + JPEG1_html + "{}</a>".format(self.raw_file_basename) + JPEG2_html + JPEG3_html + PSFplot_html + ZPplot_html + "</td>\n"
@@ -2230,9 +2231,9 @@ class Image(object):
                     colorzero_point = "#FF5C33"
                 else:
                     colorzero_point = "#70DB70"
-                HTML.write("      <td style='color:{}'>{:.2f}</td>\n".format(colorzero_point, self.zero_point))
+                HTML.write("      <td style='background-color:{}'>{:.2f}</td>\n".format(colorzero_point, self.zero_point))
             else:
-                HTML.write("      <td style='color:{}'>{}</td>\n".format("black", ""))
+                HTML.write("      <td style='background-color:{}'>{}</td>\n".format("black", ""))
         ## Write number of stars detected by SExtractor
         if "nStars" in fields:
             if self.n_stars_SExtracted:
