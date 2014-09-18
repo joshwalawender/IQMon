@@ -1696,20 +1696,21 @@ class Image(object):
             except:
                 pass
 
-            ## Make Plot if Requested
-            if plot:
-                self.make_zero_point_plot()
-
         end_time = datetime.datetime.now()
         elapzed_time = end_time - start_time
         self.logger.info('  Done measuring zero point in {:.1f} s'.format(elapzed_time.total_seconds()))
+
+        ## Make Plot if Requested
+        if len(zero_points) < min_stars and plot:
+            self.make_zero_point_plot()
 
 
     ##-------------------------------------------------------------------------
     ## Make Zero Point Plot
     ##-------------------------------------------------------------------------
     def make_zero_point_plot(self):
-        self.logger.info('  Making ZeroPoint Plot')
+        start_time = datetime.datetime.now()
+        self.logger.info('Making ZeroPoint Plot')
         self.zero_point_plotfilename = self.raw_file_basename+'_ZeroPoint.png'
         self.zero_point_plotfile = os.path.join(self.tel.plot_file_path,\
                                                 self.zero_point_plotfilename)
@@ -1805,6 +1806,11 @@ class Image(object):
         pyplot.savefig(self.zero_point_plotfile, dpi=100,\
                        bbox_inches='tight', pad_inches=0.10)
         pyplot.close(fig)
+
+        end_time = datetime.datetime.now()
+        elapzed_time = end_time - start_time
+        self.logger.info('  Done making zero point plot in {:.1f} s'.format(elapzed_time.total_seconds()))
+
 
 
     ##-------------------------------------------------------------------------
