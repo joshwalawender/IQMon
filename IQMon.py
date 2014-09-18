@@ -227,6 +227,8 @@ class Image(object):
         self.original_nYPix = None
         self.SCAMP_catalog = None
         self.catalog_file_path = None
+        self.catalog = None
+        self.catalog_data = None
         self.flags = {
                       'FWHM': False,\
                       'ellipticity': False,\
@@ -1468,6 +1470,59 @@ class Image(object):
 
 
     ##-------------------------------------------------------------------------
+    ## Get Vizier Catalog
+    ##-------------------------------------------------------------------------
+    def get_catalog(self, catalog='USNO-B1.0', max_stars=1000):
+        '''
+        Get a catalog using astroquery
+        '''
+        import astroquery
+        import astroquery.vizier
+        viz = astroquery.vizier.Vizier
+        viz.ROW_LIMIT = max_stars
+
+        if self.image_WCS:
+            self.logger.info("Querying Vizier for {} stars.".format(catalog))
+            footprint = self.image_WCS.calc_footprint()
+            RAs = [val[0] for val in footprint]
+            DECs = [val[1] for val in footprint]
+            dRA = max(RAs) - min(RAs)
+            dDEC = max(DECs) - min(DECs)
+            if not self.coordinate_of_center_pixel:
+                center_from_WCS = self.image_WCS.wcs_pix2world([[self.nXPix/2, self.nYPix/2]], 1)
+                self.logger.debug("  Using coordinates of center point: {0} {1}".format(\
+                                     center_from_WCS[0][0], center_from_WCS[0][1]))
+                self.coordinate_of_center_pixel = coords.SkyCoord(\
+                                                  ra=center_from_WCS[0][0],\
+                                                  dec=center_from_WCS[0][1],\
+                                                  unit=(u.degree, u.degree),\
+                                                  frame='icrs')
+            USNO = viz.query_region(coordinates=self.coordinate_of_center_pixel,\
+                                    width=dRA/2*u.deg, height=dDEC/2*u.deg,\
+                                    catalog=catalog)
+            n_stars = len(USNO[0])
+            self.logger.info("  Retrieved {} lines from {} catalog.".format(n_stars, catalog))
+            self.catalog = catalog
+            self.catalog_data = USNO[0]
+            ## Standardize Column Names
+            if catalog == 'USNO-B1.0':
+                self.catalog_data.remove_columns(['_RAJ2000', '_DEJ2000',\
+                                                  'e_RAJ2000', 'e_DEJ2000',\
+                                                  'B1mag', 'R1mag',\
+                                                  'pmRA', 'pmDE', 'Ndet'])
+                self.catalog_data.rename_column('USNO-B1.0', 'ID')
+                self.catalog_data.rename_column('RAJ2000', 'RA')
+                self.catalog_data.rename_column('DEJ2000', 'Dec')
+                self.catalog_data.rename_column('B2mag', 'B')
+                self.catalog_data.rename_column('R2mag', 'R')
+                self.catalog_data.rename_column('Imag', 'I')
+        else:
+            self.logger.info("No image WCS, so catalog query skipped")
+            self.catalog = None
+            self.catalog_data = None
+
+
+    ##-------------------------------------------------------------------------
     ## Get UCAC4 Catalog for Image from Local File
     ##-------------------------------------------------------------------------
     def get_local_UCAC4(self,\
@@ -1515,13 +1570,19 @@ class Image(object):
             colends =   (9, 22, 35, 42, 49, 53, 56, 59, 67, 75, 79, 83, 86, 89,\
                          92, 99, 106, 110, 114, 125, 132, 139, 146, 158, 167,\
                          174, 181, 188, 195, 202)
-            self.catalog = ascii.read(self.catalog_file_path,\
-                                      Reader=ascii.FixedWidthNoHeader,\
-                                      data_start=1, guess=False,\
-                                      names=colnames,\
-                                      col_starts=colstarts,\
-                                      col_ends=colends,\
-                                     )
+            self.catalog = 'UCAC4(local)'
+            self.catalog_data = ascii.read(self.catalog_file_path,\
+                                           Reader=ascii.FixedWidthNoHeader,\
+                                           data_start=1, guess=False,\
+                                           names=colnames,\
+                                           col_starts=colstarts,\
+                                           col_ends=colends,\
+                                          )
+            ## Standardize Column Names
+            self.catalog_data.remove_columns(['smag', 'ot', 'dsf',\
+                                              'e2mphos', 'icq_flag'])
+            self.catalog_data.rename_column('id', 'ID')
+
             nUCACStars = len(self.catalog)
             self.logger.info("  Retrieved {} lines from UCAC catalog.".format(nUCACStars))
 
