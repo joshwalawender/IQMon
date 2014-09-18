@@ -893,7 +893,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Run SExtractor
     ##-------------------------------------------------------------------------
-    def run_SExtractor(self, assoc=False):
+    def run_SExtractor(self, assoc=False, filter=None):
         '''
         Run SExtractor on image.
         '''
@@ -901,20 +901,25 @@ class Image(object):
         assert type(self.tel.pixel_scale) == u.quantity.Quantity
 
         if assoc and self.catalog:
-            if self.header['FILTER']:
+            self.catalog_filter = None
+            if filter:
+                if filter in self.catalog.keys():
+                    self.catalog_filter = filter
+                else:
+                    self.logger.warning('  Filter ({}), not found in catalog table.'.format(filter))
+                    self.logger.info('  Using r filter for catalog magnitudes.')
+                    self.catalog_filter = 'r'
+            elif self.header['FILTER']:
                 if self.header['FILTER'] in self.catalog.keys():
                     self.catalog_filter = self.header['FILTER']
                 else:
-                    self.logger.warning('  Filter from header ({}), not found in UCAC catalog table.'.format(\
+                    self.logger.warning('  Filter in header ({}), not found in catalog table.'.format(\
                                                         self.header['FILTER']))
                     self.logger.info('  Using r filter for catalog magnitudes.')
                     self.catalog_filter = 'r'
             else:
-                self.logger.warning('  Filter from header ({}), not found in UCAC catalog table.'.format(\
-                                                        self.header['FILTER']))
                 self.logger.info('  Using r filter for catalog magnitudes.')
                 self.catalog_filter = 'r'
-
         ## Set up file names
         self.SExtractor_catalog = os.path.join(self.tel.temp_file_path,\
                                                self.raw_file_basename+".cat")
