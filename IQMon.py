@@ -1067,14 +1067,21 @@ class Image(object):
             self.SExtractor_results = table.Table(hdu[2].data)
             SExImageRadius = []
             SExAngleInImage = []
-            zp_diff = []
+#             zp_diff = []
+            assoc_x = []
+            assoc_y = []
+            assoc_catmag = []
             for star in self.SExtractor_results:
                 SExImageRadius.append(math.sqrt((self.nXPix/2-star['XWIN_IMAGE'])**2 +\
                                                 (self.nYPix/2-star['YWIN_IMAGE'])**2))
                 SExAngleInImage.append(math.atan((star['XWIN_IMAGE']-self.nXPix/2) /\
                                                  (self.nYPix/2-star['YWIN_IMAGE']))*180.0/math.pi)
                 if assoc:
-                    zp_diff.append(star['VECTOR_ASSOC'][2] - star['MAG_AUTO'])
+                    assoc_x.append(star['VECTOR_ASSOC'][0])
+                    assoc_y.append(star['VECTOR_ASSOC'][1])
+                    assoc_catmag.append(star['VECTOR_ASSOC'][2])
+#                     zp_diff.append(star['VECTOR_ASSOC'][2] - star['MAG_AUTO'])
+                    
             self.SExtractor_results.add_column(table.Column(\
                                     data=SExImageRadius, name='ImageRadius'))
             self.SExtractor_results.add_column(table.Column(\
@@ -1084,7 +1091,13 @@ class Image(object):
                                                       self.n_stars_SExtracted))
         if assoc:
             self.SExtractor_results.add_column(table.Column(\
-                                               data=zp_diff, name='MagDiff'))
+                                               data=assoc_x, name='assoc_x'))
+            self.SExtractor_results.add_column(table.Column(\
+                                               data=assoc_y, name='assoc_y'))
+            self.SExtractor_results.add_column(table.Column(\
+                                               data=assoc_catmag, name='assoc_catmag'))
+#             self.SExtractor_results.add_column(table.Column(\
+#                                                data=zp_diff, name='MagDiff'))
             self.tel.SExtractor_params = original_params
 
 
@@ -1609,15 +1622,18 @@ class Image(object):
         Estimate the zero point of the image by comparing the instrumental
         magnitudes as determined by SExtractor to the catalog magnitues.
         '''
-        assert 'VECTOR_ASSOC' in self.SExtractor_results.keys()
-        assert 'MagDiff' in self.SExtractor_results.keys()
+        assert 'assoc_catmag' in self.SExtractor_results.keys()
+        assert 'MAG_AUTO' in self.SExtractor_results.keys()
         min_stars = 100
-        if len(self.SExtractor_results['MagDiff']) < min_stars:
+
+        zero_points = [(entry['assoc_catmag'] - entry['MAG_AUTO']) for entry in self.SExtractor_results if entry['FLAGS'] == 0]
+
+        if len(zero_points) < min_stars:
             self.logger.info('Zero point not calculated.  Only {} catalog stars found.'.format(\
-                             len(self.SExtractor_results['MagDiff'])))
+                             len(catalog_mags)))
         else:
-            self.zero_point_mode = mode(self.SExtractor_results['MagDiff'], 0.1)
-            self.zero_point_median = np.median(self.SExtractor_results['MagDiff'])
+            self.zero_point_mode = mode(zero_points, 0.1)
+            self.zero_point_median = np.median(zero_points)
             self.logger.info('Mode Zero Point = {:.2f}'.format(self.zero_point_mode))
             self.logger.info('Median Zero Point = {:.2f}'.format(self.zero_point_median))
             self.zero_point = self.zero_point_mode
@@ -1645,9 +1661,12 @@ class Image(object):
         self.zero_point_plotfile = os.path.join(self.tel.plot_file_path,\
                                                 self.zero_point_plotfilename)
 
-        catalog_mags = self.SExtractor_results['VECTOR_ASSOC'].data[:,2]
-        instrumental_mags = self.SExtractor_results['MAG_AUTO']
-        zero_points = self.SExtractor_results['MagDiff']
+        catalog_mags = [entry['assoc_catmag'] for entry in self.SExtractor_results if entry['FLAGS'] == 0]
+        instrumental_mags = [entry['MAG_AUTO'] for entry in self.SExtractor_results if entry['FLAGS'] == 0]
+        zero_points = [(entry['assoc_catmag'] - entry['MAG_AUTO']) for entry in self.SExtractor_results if entry['FLAGS'] == 0]
+        xpix = [entry['XWIN_IMAGE'] for entry in self.SExtractor_results if entry['FLAGS'] == 0]
+        ypix = [entry['YWIN_IMAGE'] for entry in self.SExtractor_results if entry['FLAGS'] == 0]
+        residuals = [(entry['assoc_catmag'] - entry['MAG_AUTO'] - self.zero_point) for entry in self.SExtractor_results if entry['FLAGS'] == 0]
 
         zp_binsize = 0.10
         zp_95pctile = math.ceil(np.percentile(zero_points, 95.0))
@@ -1655,23 +1674,24 @@ class Image(object):
                               bins=zp_binsize*np.arange(int(zp_95pctile/zp_binsize)+11))
         zp_centers = (zp_bins[:-1] + zp_bins[1:]) / 2
 
-
         pyplot.ioff()
         fig = pyplot.figure(figsize=(10,11), dpi=100)
 
+        reject_percent = 1.0
+        padding = 0.5
+
         ## Plot Instrumental Magnitude vs. Catalog Magnitude
         TopLeft = pyplot.axes([0.000, 0.750, 0.465, 0.235])
-        pyplot.title('Instrumental Magnitudes vs. Calalog Magnitudes (Zero Point = {:.2f})'.format(\
+        pyplot.title('Instrumental vs. Calalog Magnitudes (Zero Point = {:.2f})'.format(\
                                                            self.zero_point), size=10)
         pyplot.plot(catalog_mags, instrumental_mags, 'bo', ms=3, mew=0)
         pyplot.xlabel('{} {} Magnitude'.format(self.catalog_name, self.catalog_filter), size=10)
         pyplot.ylabel('Instrumental Magnitude', size=10)
         pyplot.grid()
-        reject_percent = 1.0
-        pyplot.ylim(np.percentile(instrumental_mags, reject_percent),\
-                    np.percentile(instrumental_mags, 100.-reject_percent))
-        pyplot.xlim(np.percentile(catalog_mags, reject_percent),\
-                    np.percentile(catalog_mags, 100.-reject_percent))
+        pyplot.ylim(np.percentile(instrumental_mags, reject_percent)-padding,\
+                    np.percentile(instrumental_mags, 100.-reject_percent)+padding)
+        pyplot.xlim(np.percentile(catalog_mags, reject_percent)-padding,\
+                    np.percentile(catalog_mags, 100.-reject_percent)+padding)
         ## Overplot Line of Zero Point
         catmag = [-5,30]
         fitmag = [(val-self.zero_point) for val in catmag]
@@ -1688,37 +1708,46 @@ class Image(object):
         pyplot.bar(zp_centers, zp_hist, align='center', width=0.7*zp_binsize)
         pyplot.xlabel('Zero Point', size=10)
         pyplot.ylabel('N Stars', size=10)
-        reject_percent = 1.0
-        pyplot.xlim(np.percentile(zero_points, reject_percent),\
-                    np.percentile(zero_points, 100.-reject_percent))
+        pyplot.xlim(np.percentile(zero_points, reject_percent)-padding,\
+                    np.percentile(zero_points, 100.-reject_percent)+padding)
         pyplot.yticks(size=10)
 
+        ## Plot Residuals
+        MiddleLeft = pyplot.axes([0.000, 0.375, 0.465, 0.320])
+        pyplot.plot(catalog_mags, residuals, 'bo', ms=3, mew=0)
+        pyplot.xlabel('{} {} Magnitude'.format(self.catalog_name, self.catalog_filter), size=10)
+        pyplot.ylabel('Magnitude Residuals', size=10)
+        pyplot.grid()
+        pyplot.ylim(np.percentile(residuals, reject_percent)-padding,\
+                    np.percentile(residuals, 100.-reject_percent)+padding)
+        pyplot.xlim(np.percentile(catalog_mags, reject_percent)-padding,\
+                    np.percentile(catalog_mags, 100.-reject_percent)+padding)
+        ## Overplot Line of Zero Point
+        catmag = [-5,30]
+        fitmag = [0, 0]
+        pyplot.plot(catmag, fitmag, 'k-')
 
-#                 ## Plot Fitted Line
-#                 fit_mags_cat = [np.percentile(self.SExtractor_results['MAG_AUTO'], reject_percent),\
-#                                 np.percentile(self.SExtractor_results['MAG_AUTO'], 100.-reject_percent)]
-#                 fit_mags_inst = [(val + self.zero_point) for val in fit_mags_cat]
-#                 pyplot.plot(fit_mags_cat, fit_mags_inst, 'k-', alpha=0.5,\
-#                             label='Zero Point = {:.2f}'.format(self.zero_point))
-# 
-#                 Fig2 = pyplot.axes([0.0, 0.0, 1.0, 0.4])
-#                 pyplot.title('Magnitude Residuals (Zero Point = {:.2f})'.format(\
-#                                                                    self.zero_point))
-#                 residuals = (self.SExtractor_results['MAG_AUTO'].data + self.zero_point)\
-#                              - self.SExtractor_results['VECTOR_ASSOC'].data[:,2]
-#                 pyplot.plot(self.SExtractor_results['VECTOR_ASSOC'].data[:,2],\
-#                             residuals, \
-#                             'bo', markersize=4, markeredgewidth=0)
-#                 pyplot.xlabel('{} {} Magnitude'.format(self.catalog_name, self.catalog_filter))
-#                 pyplot.ylabel('Magnitude Residual')
-#                 pyplot.grid()
-#                 pyplot.ylim(np.percentile(residuals, reject_percent),\
-#                             np.percentile(residuals, 100.-reject_percent))
-#                 pyplot.xlim(np.percentile(self.SExtractor_results['VECTOR_ASSOC'].data[:,2], reject_percent),\
-#                             np.percentile(self.SExtractor_results['VECTOR_ASSOC'].data[:,2], 100.-reject_percent))
-#                 ## Plot Zero Line
-#                 pyplot.plot(fit_mags_cat, [0, 0], 'k-', alpha=0.5,\
-#                             label='Zero Point = {:.2f}'.format(self.zero_point))
+        ## Plot Spatial Distribution of Residuals
+        range = [-0.5, 0.5]
+        MiddleRight = pyplot.axes([0.535, 0.375, 0.465, 0.320])
+        MiddleRight.set_aspect('equal')
+        pyplot.title('Average residual scaled from {:+.1f} to {:+.1f}'.format(range[0], range[1]), size=10)
+        if len(residuals) > 20000:
+            gridsize = 20
+        else:
+            gridsize = 10
+        pyplot.hexbin(xpix, ypix, residuals,\
+                      gridsize=gridsize,\
+                      mincnt=5,\
+                      vmin=range[0], vmax=range[1],\
+                      alpha=0.5,\
+                      cmap='Reds')
+        pyplot.xlabel('X Pixels', size=10)
+        pyplot.ylabel('Y Pixels', size=10)
+        pyplot.xlim(0,self.nXPix)
+        pyplot.ylim(0,self.nYPix)
+        pyplot.xticks(size=10)
+        pyplot.yticks(size=10)
 
         pyplot.savefig(self.zero_point_plotfile, dpi=100,\
                        bbox_inches='tight', pad_inches=0.10)
