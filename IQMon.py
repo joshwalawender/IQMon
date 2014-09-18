@@ -1495,7 +1495,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Get Vizier Catalog
     ##-------------------------------------------------------------------------
-    def get_catalog(self, catalog='USNO-B1.0', max_stars=5000):
+    def get_catalog(self, catalog='USNO-B1.0', max_stars=10000):
         '''
         Get a catalog using astroquery
         '''
@@ -1521,7 +1521,7 @@ class Image(object):
                                                   unit=(u.degree, u.degree),\
                                                   frame='icrs')
             USNO = viz.query_region(coordinates=self.coordinate_of_center_pixel,\
-                                    width=dRA/2*u.deg, height=dDEC/2*u.deg,\
+                                    width=dRA*u.deg, height=dDEC*u.deg,\
                                     catalog=catalog)
             n_stars = len(USNO[0])
             self.logger.info("  Retrieved {} lines from {} catalog.".format(n_stars, catalog))
