@@ -307,9 +307,8 @@ class Image(object):
         '''
         Read information from the image fits header.
         '''
+        start_time = datetime.datetime.now()
         self.logger.info("Reading image header.")
-#         self.header = fits.getheader(self.working_file, ext=0)
-#         hdulist = fits.open(self.working_file, ignore_missing_end=True)
         if not self.working_file:
             with fits.open(self.raw_file, ignore_missing_end=True) as hdulist:
                 self.header = hdulist[0].header
@@ -463,6 +462,10 @@ class Image(object):
             self.airmass = None
             self.logger.warning("Object and Moon positions not calculated.")
 
+        end_time = datetime.datetime.now()
+        elapzed_time = end_time - start_time
+        self.logger.info('  Done reading image header in {:.1f} s'.format(elapzed_time.total_seconds()))
+
 
     ##-------------------------------------------------------------------------
     ## Edit Header
@@ -503,6 +506,7 @@ class Image(object):
         * -D makes totally raw file (Without -D option, color interpolation is
              done.  Without -D option, get raw pixel values).
         '''
+        start_time = datetime.datetime.now()
         chmod_code = stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH | stat.S_IWOTH
         if self.working_file:
             if os.path.exists(self.working_file): os.remove(self.working_file)
@@ -580,6 +584,10 @@ class Image(object):
                                              self.raw_file_name)
             sys.exit(1)
 
+        end_time = datetime.datetime.now()
+        elapzed_time = end_time - start_time
+        self.logger.info('  Done making working copy of image in {:.1f} s'.format(elapzed_time.total_seconds()))
+
 
     ##-------------------------------------------------------------------------
     ## Dark Subtract Image
@@ -592,6 +600,7 @@ class Image(object):
         which will be median combined to make the master dark.
         
         '''
+        start_time = datetime.datetime.now()
         self.logger.info("Dark subtracting image.")
         self.logger.debug("  Opening image data.")
         hdulist_image = fits.open(self.working_file, mode='update')
@@ -646,6 +655,9 @@ class Image(object):
         self.logger.debug("  Median level of dark subtracted = {0}".format(\
                                                    np.median(DifferenceImage)))
         hdulist_image.close()
+        end_time = datetime.datetime.now()
+        elapzed_time = end_time - start_time
+        self.logger.info('  Done with dark subtraction in {:.1f} s'.format(elapzed_time.total_seconds()))
 
 
     ##-------------------------------------------------------------------------
@@ -689,6 +701,7 @@ class Image(object):
         '''
         Solve astrometry in the working image using the astrometry.net solver.
         '''
+        start_time = datetime.datetime.now()
         self.logger.info("Attempting to solve WCS using Astrometry.net solver.")
         AstrometryCommand = ["solve-field", "-l", "5", "-O", "-p", "-T",
                              "-L", str(self.tel.pixel_scale.value*0.75),
@@ -772,6 +785,10 @@ class Image(object):
                                       self.raw_file_basename+".new.fits"))
             self.temp_files.append(os.path.join(self.tel.temp_file_path,\
                                       self.raw_file_basename+"-indx.xyls"))
+
+        end_time = datetime.datetime.now()
+        elapzed_time = end_time - start_time
+        self.logger.info('  Done with astrometry.net in {:.1f} s'.format(elapzed_time.total_seconds()))
 
 
     ##-----------------------------------------------------------------------------
@@ -899,6 +916,7 @@ class Image(object):
         '''
         Run SExtractor on image.
         '''
+        start_time = datetime.datetime.now()
         assert type(self.tel.gain) == u.quantity.Quantity
         assert type(self.tel.pixel_scale) == u.quantity.Quantity
 
@@ -1100,6 +1118,10 @@ class Image(object):
 #                                                data=zp_diff, name='MagDiff'))
             self.tel.SExtractor_params = original_params
 
+        end_time = datetime.datetime.now()
+        elapzed_time = end_time - start_time
+        self.logger.info('  Done running SExtractor in {:.1f} s'.format(elapzed_time.total_seconds()))
+
 
     ##-------------------------------------------------------------------------
     ## Determine Image FWHM from SExtractor Catalog
@@ -1181,6 +1203,7 @@ class Image(object):
         '''
         Make various plots for analysis of image quality.
         '''
+        start_time = datetime.datetime.now()
         if filename:
             self.PSF_plot_filename = filename
         else:
@@ -1346,6 +1369,10 @@ class Image(object):
             pyplot.savefig(self.PSF_plotfile, dpi=100, bbox_inches='tight', pad_inches=0.10)
             pyplot.close(fig)
 
+        end_time = datetime.datetime.now()
+        elapzed_time = end_time - start_time
+        self.logger.info('  Done making PSF plot in {:.1f} s'.format(elapzed_time.total_seconds()))
+
 
     ##-------------------------------------------------------------------------
     ## Run SCAMP
@@ -1354,6 +1381,7 @@ class Image(object):
         '''
         Run SCAMP on SExtractor output catalog.
         '''
+        start_time = datetime.datetime.now()
         ## Parameters for SCAMP
         if self.tel.SCAMP_aheader:
             SCAMP_aheader = self.tel.SCAMP_aheader
@@ -1443,6 +1471,10 @@ class Image(object):
             self.SCAMP_done = False
             sys.exit(1)
 
+        end_time = datetime.datetime.now()
+        elapzed_time = end_time - start_time
+        self.logger.info('  Done running SCAMP in {:.1f} s'.format(elapzed_time.total_seconds()))
+
 
     ##-------------------------------------------------------------------------
     ## Run SWarp
@@ -1451,6 +1483,7 @@ class Image(object):
     Run SWarp on the image (after SCAMP distortion solution) to de-distort it.
     '''
     def run_SWarp(self):
+        start_time = datetime.datetime.now()
         ## Parameters for SWarp
         swarp_file = os.path.join(self.tel.temp_file_path, 'swarpped.fits')
         if os.path.exists(swarp_file): os.remove(swarp_file)
@@ -1491,6 +1524,10 @@ class Image(object):
             os.rename(swarp_file, self.working_file)
             assert os.path.exists(self.working_file)
 
+        end_time = datetime.datetime.now()
+        elapzed_time = end_time - start_time
+        self.logger.info('  Done running SWarp in {:.1f} s'.format(elapzed_time.total_seconds()))
+
 
     ##-------------------------------------------------------------------------
     ## Get Vizier Catalog
@@ -1499,6 +1536,7 @@ class Image(object):
         '''
         Get a catalog using astroquery
         '''
+        start_time = datetime.datetime.now()
         import astroquery
         import astroquery.vizier
         viz = astroquery.vizier.Vizier
@@ -1544,6 +1582,10 @@ class Image(object):
             self.catalog_name = None
             self.catalog_data = None
 
+        end_time = datetime.datetime.now()
+        elapzed_time = end_time - start_time
+        self.logger.info('  Done retrieving Vizier catalog in {:.1f} s'.format(elapzed_time.total_seconds()))
+
 
     ##-------------------------------------------------------------------------
     ## Get UCAC4 Catalog for Image from Local File
@@ -1554,6 +1596,7 @@ class Image(object):
         '''
         Get a list of stars which are in the image from a local UCAC catalog.
         '''
+        start_time = datetime.datetime.now()
         assert type(self.coordinate_of_center_pixel) == coords.SkyCoord
 
         if not os.path.exists(local_UCAC_command):
@@ -1613,6 +1656,10 @@ class Image(object):
             nUCACStars = len(self.catalog_data)
             self.logger.info("  Retrieved {} lines from UCAC catalog.".format(nUCACStars))
 
+        end_time = datetime.datetime.now()
+        elapzed_time = end_time - start_time
+        self.logger.info('  Done retrieving local UCAC4 catalog in {:.1f} s'.format(elapzed_time.total_seconds()))
+
 
     ##-------------------------------------------------------------------------
     ## Measure Zero Point
@@ -1622,6 +1669,8 @@ class Image(object):
         Estimate the zero point of the image by comparing the instrumental
         magnitudes as determined by SExtractor to the catalog magnitues.
         '''
+        start_time = datetime.datetime.now()
+        self.logger.info('Analyzing SExtractor results to determine photometric zero point')
         assert 'assoc_catmag' in self.SExtractor_results.keys()
         assert 'MAG_AUTO' in self.SExtractor_results.keys()
         min_stars = 100
@@ -1634,8 +1683,8 @@ class Image(object):
         else:
             self.zero_point_mode = mode(zero_points, 0.1)
             self.zero_point_median = np.median(zero_points)
-            self.logger.info('Mode Zero Point = {:.2f}'.format(self.zero_point_mode))
-            self.logger.info('Median Zero Point = {:.2f}'.format(self.zero_point_median))
+            self.logger.info('  Mode Zero Point = {:.2f}'.format(self.zero_point_mode))
+            self.logger.info('  Median Zero Point = {:.2f}'.format(self.zero_point_median))
             self.zero_point = self.zero_point_mode
 
             ## Check zero point
@@ -1651,12 +1700,16 @@ class Image(object):
             if plot:
                 self.make_zero_point_plot()
 
+        end_time = datetime.datetime.now()
+        elapzed_time = end_time - start_time
+        self.logger.info('  Done measuring zero point in {:.1f} s'.format(elapzed_time.total_seconds()))
+
 
     ##-------------------------------------------------------------------------
     ## Make Zero Point Plot
     ##-------------------------------------------------------------------------
     def make_zero_point_plot(self):
-        self.logger.info('Making ZeroPoint Plot')
+        self.logger.info('  Making ZeroPoint Plot')
         self.zero_point_plotfilename = self.raw_file_basename+'_ZeroPoint.png'
         self.zero_point_plotfile = os.path.join(self.tel.plot_file_path,\
                                                 self.zero_point_plotfilename)
@@ -1677,7 +1730,7 @@ class Image(object):
         pyplot.ioff()
         fig = pyplot.figure(figsize=(10,11), dpi=100)
 
-        reject_percent = 1.0
+        reject_percent = 3.0
         padding = 0.5
 
         ## Plot Instrumental Magnitude vs. Catalog Magnitude
@@ -1770,6 +1823,7 @@ class Image(object):
         '''
         Make jpegs of image.
         '''
+        start_time = datetime.datetime.now()
         self.logger.info('Making jpeg: {}'.format(jpeg_file_name))
         jpeg_file = os.path.join(self.tel.plot_file_path, jpeg_file_name)
 
@@ -1922,226 +1976,9 @@ class Image(object):
         im.save(jpeg_file, 'JPEG', quality=quality)
         self.jpeg_file_names.append(jpeg_file_name)
 
-
-
-
-
-    ##-------------------------------------------------------------------------
-    ## Make JPEG of Image (using convert tool in ImageMagick)
-    ##-------------------------------------------------------------------------
-    def make_JPEG_ImageMagick(self, jpegFileName, binning=1, markCatalogStars=False,\
-                 markDetectedStars=False, markPointing=False,\
-                 backgroundSubtracted=False, p1=0.2, p2=1.0):
-        '''
-        Make jpegs of image.
-        '''
-        nStarsLimit = 5000
-        jpegFile = os.path.join(self.tel.plot_file_path, jpegFileName)
-        self.logger.info("Making jpeg (binning = {0}): {1}.".format(binning, jpegFileName))
-        if os.path.exists(jpegFile): os.remove(jpegFile)
-        binningString = str(1./binning*100)+"%"
-        JPEGcommand = ["convert", "-contrast-stretch", "{}%,{}%".format(p1, p2),\
-                       "-compress", "JPEG", "-quality", "70", "-resize",
-                       binningString]
-        self.logger.debug('  Base convert command: {}'.format(' '.join(JPEGcommand)))
-        ## Mark Intended Pointing Coordinates as read from header
-        if markPointing and self.coordinate_from_header:
-            self.logger.debug("  Marking target pointing in jpeg.")
-            markSize = (self.tel.pointing_marker_size.to(u.arcsec)/self.tel.pixel_scale).value/binning
-            ## Mark Central Pixel with a White Cross
-            JPEGcommand.append("-stroke")
-            JPEGcommand.append("white")
-            JPEGcommand.append("-strokewidth")
-            JPEGcommand.append("3")
-            JPEGcommand.append("-fill")
-            JPEGcommand.append("none")
-            pixelCenter = [self.nXPix/2/binning, self.nYPix/2/binning]
-            self.logger.debug("  Marking central pixel of JPEG: {:.1f},{:.1f}".format(\
-                                                pixelCenter[0], pixelCenter[1]))
-            JPEGcommand.append('-draw')
-            JPEGcommand.append("line %d,%d %d,%d" % (pixelCenter[0], pixelCenter[1]+markSize,
-                               pixelCenter[0], pixelCenter[1]+markSize*0.3))
-            JPEGcommand.append('-draw')
-            JPEGcommand.append("line %d,%d %d,%d" % (pixelCenter[0]+markSize, pixelCenter[1],
-                               pixelCenter[0]+markSize*0.3, pixelCenter[1]))
-            JPEGcommand.append('-draw')
-            JPEGcommand.append("line %d,%d %d,%d" % (pixelCenter[0], pixelCenter[1]-markSize,
-                               pixelCenter[0], pixelCenter[1]-markSize*0.3))
-            JPEGcommand.append('-draw')
-            JPEGcommand.append("line %d,%d %d,%d" % (pixelCenter[0]-markSize, pixelCenter[1],
-                               pixelCenter[0]-markSize*0.3, pixelCenter[1]))
-            ## Mark Coordinates of Target with a blue Circle
-            JPEGcommand.append("-stroke")
-            JPEGcommand.append("blue")
-            JPEGcommand.append("-strokewidth")
-            JPEGcommand.append("3")
-            JPEGcommand.append("-fill")
-            JPEGcommand.append("none")
-            ## This next block of code seems to make the call to wcs_world2pix
-            ## happy, but I'm not sure I understand why.
-            foo = np.array([[self.coordinate_from_header.ra.hour*15.,\
-                             self.coordinate_from_header.dec.radian*180./math.pi],\
-                            [self.coordinate_from_header.ra.hour*15.,\
-                             self.coordinate_from_header.dec.radian*180./math.pi]])
-            targetPixel = (self.image_WCS.wcs_world2pix(foo, 1)[0])
-            self.logger.debug("  Pixel of target on raw image: {:.1f},{:.1f}".format(\
-                                               targetPixel[0], targetPixel[1]))
-            ## Adjust target pixel value for different origin in ImageMagick
-            TargetXPos = targetPixel[0]
-            if not self.cropped:
-                TargetYPos = self.nYPix - targetPixel[1]
-            else:
-                TargetYPos = self.original_nYPix - targetPixel[1]
-            ## Adjust target pixel value for cropping
-            if self.cropped:
-                TargetXPos = TargetXPos - self.crop_x1
-                TargetYPos = TargetYPos - self.crop_y1
-            ## Adjust target pixel value for binning
-            TargetXPos = TargetXPos/binning
-            TargetYPos = TargetYPos/binning
-            self.logger.debug("  Marking pixel of target on JPEG: {:.1f},{:.1f}".format(\
-                                                       TargetXPos, TargetYPos))
-            JPEGcommand.append('-draw')
-            JPEGcommand.append("circle %d,%d %d,%d" % (TargetXPos, TargetYPos,
-                               TargetXPos+markSize/2, TargetYPos))
-            ## Write label describing marking of pointing
-            JPEGcommand.append("-stroke")
-            JPEGcommand.append("none")
-            JPEGcommand.append("-fill")
-            JPEGcommand.append("white")
-            JPEGcommand.append("-pointsize")
-            JPEGcommand.append("28")
-            JPEGcommand.append('-font')
-            JPEGcommand.append('fixed')
-            JPEGcommand.append('-draw')
-            JPEGcommand.append("text 200,40 'Blue circle centered on target is {:.1f} arcmin diameter.'".format(self.tel.pointing_marker_size.to(u.arcmin).value))
-
-
-        ## Mark Stars Detected by SExtractor
-        if markDetectedStars and self.SExtractor_results:
-            nStarsMarked = 0
-            self.logger.debug("  Marking stars found by SExtractor in jpeg.")
-            JPEGcommand.append("-stroke")
-            JPEGcommand.append("red")
-            JPEGcommand.append("-strokewidth")
-            JPEGcommand.append("1")
-            JPEGcommand.append("-fill")
-            JPEGcommand.append("none")
-            if self.FWHM:
-                MarkRadius=max([6, 2*math.ceil(self.FWHM.value)])/binning
-            else:
-                MarkRadius = 6
-            sortedSExtractor_results = np.sort(self.SExtractor_results,\
-                                               order=['MAG_AUTO'])
-            for star in sortedSExtractor_results:
-                nStarsMarked += 1
-                if nStarsMarked <= nStarsLimit:
-                    MarkXPos = star['XWIN_IMAGE']/binning
-                    MarkYPos = (self.nYPix - star['YWIN_IMAGE'])/binning
-                    JPEGcommand.append('-draw')
-                    JPEGcommand.append("circle %d,%d %d,%d" % (MarkXPos, MarkYPos,\
-                                       MarkXPos+MarkRadius, MarkYPos))
-                else:
-                    self.logger.info("  Only marked brightest {} stars found in image.".format(\
-                                                                  nStarsLimit))
-                    break
-            JPEGcommand.append("-stroke")
-            JPEGcommand.append("none")
-            JPEGcommand.append("-fill")
-            JPEGcommand.append("white")
-            JPEGcommand.append("-pointsize")
-            JPEGcommand.append("28")
-            JPEGcommand.append('-font')
-            JPEGcommand.append('fixed')
-            JPEGcommand.append('-draw')
-            if nStarsMarked > nStarsLimit:
-                JPEGcommand.append("text 200,80 'Red circles mark {} detected stars out of {}.'".format(\
-                                   nStarsLimit, self.n_stars_SExtracted))
-            else:
-                JPEGcommand.append("text 200,80 'Red circles mark {} detected stars.'".format(\
-                                   self.n_stars_SExtracted))
-        ## Mark Catalog Stars
-        if markCatalogStars and self.image_WCS:
-            ## Need to check if header includes distortion terms
-            nStarsMarked = 0
-            self.logger.debug("  Marking stars from catalog in jpeg.")
-            JPEGcommand.append("-stroke")
-            JPEGcommand.append("green")
-            JPEGcommand.append("-strokewidth")
-            JPEGcommand.append("1")
-            JPEGcommand.append("-fill")
-            JPEGcommand.append("none")
-            if self.FWHM:
-                MarkRadius=max([6, 2*math.ceil(self.FWHM.value)])/binning
-            else:
-                MarkRadius = 6
-            sorted_catalog = np.sort(self.catalog_data, order=['mag1'])
-            for star in sorted_catalog:
-                nStarsMarked += 1
-                if nStarsMarked <= nStarsLimit:
-                    pix = self.image_WCS.wcs_world2pix([[star['RA'], star['Dec']]], 1)
-                    MarkXPos = pix[0][0]/binning
-                    MarkYPos = (self.nYPix - pix[0][1])/binning
-                    JPEGcommand.append('-draw')
-                    JPEGcommand.append("circle %d,%d %d,%d" % (MarkXPos, MarkYPos,\
-                                       MarkXPos+MarkRadius, MarkYPos))
-                else:
-                    self.logger.info("  Only marked brightest {} stars found in image.".format(\
-                                     nStarsLimit))
-                    break
-            JPEGcommand.append("-stroke")
-            JPEGcommand.append("none")
-            JPEGcommand.append("-fill")
-            JPEGcommand.append("white")
-            JPEGcommand.append("-pointsize")
-            JPEGcommand.append("28")
-            JPEGcommand.append('-font')
-            JPEGcommand.append('fixed')
-            JPEGcommand.append('-draw')
-            if nStarsMarked > nStarsLimit:
-                JPEGcommand.append("text 200,120 'Green circles mark {} catalog stars out of {}.'".format(\
-                                   nStarsLimit, len(self.catalog_data)))
-            else:
-                JPEGcommand.append("text 200,120 'Green circles mark {} catalog stars.'".format(\
-                                   self.n_stars_SExtracted))
-        ## Use background subtracted image generated by SExtractor
-        if not backgroundSubtracted:
-            JPEGcommand.append(self.working_file)
-        else:
-            JPEGcommand.append("-stroke")
-            JPEGcommand.append("none")
-            JPEGcommand.append("-fill")
-            JPEGcommand.append("white")
-            JPEGcommand.append("-pointsize")
-            JPEGcommand.append("28")
-            JPEGcommand.append('-font')
-            JPEGcommand.append('fixed')
-            JPEGcommand.append('-draw')
-            JPEGcommand.append("text 200,120 'Background Subtracted Image'")
-            JPEGcommand.append(self.check_image_file)
-        JPEGcommand.append(jpegFile)
-        self.logger.debug("  Issuing command to create jpeg from {}.".format(\
-                                                            self.working_file))
-        try:
-            ConvertSTDOUT = subprocess.check_output(JPEGcommand,\
-                                                    stderr=subprocess.STDOUT,\
-                                                    universal_newlines=True)
-        except subprocess.CalledProcessError as e:
-            self.logger.error("Failed to create jpeg.")
-            for line in e.output.split("\n"):
-                self.logger.error(line)
-        except OSError as e:
-            self.logger.error("Failed to create jpeg.")
-            for line in e.strerror.split("\n"):
-                self.logger.error(line)
-        except:
-            self.logger.error("Convert process failed: {0} {1} {2}".format(\
-                              sys.exc_info()[0], sys.exc_info()[1], sys.exc_info()[2]))
-        else:
-            for line in ConvertSTDOUT.split("\n"):
-                if len(line) > 0:
-                    self.logger.debug(line)
-            self.jpeg_file_names.append(jpegFileName)
+        end_time = datetime.datetime.now()
+        elapzed_time = end_time - start_time
+        self.logger.info('  Done making JPEG in {:.1f} s'.format(elapzed_time.total_seconds()))
 
 
     ##-------------------------------------------------------------------------
@@ -2408,7 +2245,7 @@ class Image(object):
 
 
     ##-------------------------------------------------------------------------
-    ## Append Line With Image Info to Summary Text File
+    ## Append Line With Image Info to YAML Text File
     ##-------------------------------------------------------------------------
     def add_yaml_entry(self, summary_file):
         self.logger.info("Writing YAML Summary File: {}".format(summary_file))
@@ -2479,6 +2316,9 @@ class Image(object):
             output.write(yaml_string)
 
 
+    ##-------------------------------------------------------------------------
+    ## Append Line With Image Info to Summary Text File
+    ##-------------------------------------------------------------------------
     def add_summary_entry(self, summaryFile):
         self.logger.info("Writing Summary File Entry.")
         self.logger.debug("  Summary File: {0}".format(summaryFile))
