@@ -208,7 +208,11 @@ class Image(object):
         self.zero_point_plotfile = None
         self.total_process_time = None
         self.FWHM = None
+        self.FWHM_median = None
+        self.FWHM_mode = None
         self.ellipticity = None
+        self.ellipticity_median = None
+        self.ellipticity_mode = None
         self.PSF_plotfile = None
         self.pointing_error = None
         self.image_flipped = None
@@ -880,6 +884,8 @@ class Image(object):
         try:
             if self.pointing_error.arcminute > self.tel.threshold_pointing_err.to(u.arcmin).value:
                 self.flags['pointing error'] = True
+            else:
+                self.flags['pointing error'] = False
         except:
             pass
 
@@ -1126,12 +1132,16 @@ class Image(object):
         try:
             if self.FWHM > self.tel.threshold_FWHM.to(u.pix, equivalencies=self.tel.pixel_scale_equivalency):
                 self.flags['FWHM'] = True
+            else:
+                self.flags['FWHM'] = False
         except:
             pass
         ## Check ellipticity
         try:
             if self.ellipticity > self.tel.threshold_ellipticity:
                 self.flags['ellipticity'] = True
+            else:
+                self.flags['ellipticity'] = False
         except:
             pass
 
@@ -1539,6 +1549,8 @@ class Image(object):
             try:
                 if self.zero_point > self.tel.threshold_zeropoint:
                     self.flags['zero point'] = True
+                else:
+                    self.flags['zero point'] = False
             except:
                 pass
 
