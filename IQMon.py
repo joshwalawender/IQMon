@@ -226,8 +226,8 @@ class Image(object):
         self.original_nXPix = None
         self.original_nYPix = None
         self.SCAMP_catalog = None
-        self.catalog_file_path = None
-        self.catalog = None
+        self.SCAMP_done = False
+        self.catalog_name = None
         self.catalog_data = None
         self.flags = {
                       'FWHM': False,\
@@ -902,26 +902,38 @@ class Image(object):
         assert type(self.tel.gain) == u.quantity.Quantity
         assert type(self.tel.pixel_scale) == u.quantity.Quantity
 
-        if assoc and self.catalog:
+        if assoc and self.catalog_data:
             self.catalog_filter = None
             if filter:
-                if filter in self.catalog.keys():
+                if filter in self.catalog_data.keys():
                     self.catalog_filter = filter
                 else:
                     self.logger.warning('  Filter ({}), not found in catalog table.'.format(filter))
-                    self.logger.info('  Using r filter for catalog magnitudes.')
-                    self.catalog_filter = 'r'
+                    self.catalog_filter = None
             elif self.header['FILTER']:
-                if self.header['FILTER'] in self.catalog.keys():
+                if self.header['FILTER'] in self.catalog_data.keys():
                     self.catalog_filter = self.header['FILTER']
                 else:
                     self.logger.warning('  Filter in header ({}), not found in catalog table.'.format(\
                                                         self.header['FILTER']))
-                    self.logger.info('  Using r filter for catalog magnitudes.')
-                    self.catalog_filter = 'r'
+                    self.catalog_filter = None
             else:
                 self.logger.info('  Using r filter for catalog magnitudes.')
-                self.catalog_filter = 'r'
+                self.catalog_filter = None
+            ## Find Filter to Use
+            if not self.catalog_filter:
+                filters = ['r', 'R', 'i', 'I', 'g', 'V', 'B']
+                for filt in filters:
+                    if not self.catalog_filter and (filt in self.catalog_data.keys()):
+                        self.logger.info('  Using {} filter for catalog magnitudes.'.format(filt))
+                        self.catalog_filter = filt
+                if not self.catalog_filter:
+                    ## Choose whatever is in catalog
+                    self.catalog_data.keys().remove('ID')
+                    self.catalog_data.keys().remove('RA')
+                    self.catalog_data.keys().remove('Dec')
+                    self.catalog_filter = self.catalog_data.keys()[0]
+
         ## Set up file names
         self.SExtractor_catalog = os.path.join(self.tel.temp_file_path,\
                                                self.raw_file_basename+".cat")
@@ -971,16 +983,12 @@ class Image(object):
                     SExtractor_params[key] = SExtractor_default[key]
 
         if assoc:
-            assert os.path.exists(self.catalog_file_path)
-            assert os.path.exists(os.path.join(self.tel.temp_file_path, 'scamp.xml'))
-            assert self.catalog_filter in self.catalog.keys()
-
             ## Create Assoc file with pixel coordinates of catalog stars
             assoc_file = os.path.join(self.tel.temp_file_path, 'assoc.txt')
             self.temp_files.append(assoc_file)
             if os.path.exists(assoc_file): os.remove(assoc_file)
             assocFO = open(assoc_file, 'w')
-            for star in self.catalog:
+            for star in self.catalog_data:
                 pix = self.image_WCS.wcs_world2pix([[star['RA'], star['Dec']]], 1)
                 try:
                     assocFO.write('{:8.1f} {:8.1f} {:8.1f}\n'.format(\
@@ -1416,8 +1424,10 @@ class Image(object):
             output = str(output)
             for line in output.splitlines():
                 self.logger.debug(line)
+            self.SCAMP_done = True
         else:
             self.logger.critical('No .head file found from SCAMP.')
+            self.SCAMP_done = False
             sys.exit(1)
 
 
@@ -1472,7 +1482,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Get Vizier Catalog
     ##-------------------------------------------------------------------------
-    def get_catalog(self, catalog='USNO-B1.0', max_stars=1000):
+    def get_catalog(self, catalog='USNO-B1.0', max_stars=5000):
         '''
         Get a catalog using astroquery
         '''
@@ -1482,7 +1492,7 @@ class Image(object):
         viz.ROW_LIMIT = max_stars
 
         if self.image_WCS:
-            self.logger.info("Querying Vizier for {} stars.".format(catalog))
+            self.logger.info("Querying Vizier for {} catalog.".format(catalog))
             footprint = self.image_WCS.calc_footprint()
             RAs = [val[0] for val in footprint]
             DECs = [val[1] for val in footprint]
@@ -1502,13 +1512,13 @@ class Image(object):
                                     catalog=catalog)
             n_stars = len(USNO[0])
             self.logger.info("  Retrieved {} lines from {} catalog.".format(n_stars, catalog))
-            self.catalog = catalog
+            self.catalog_name = catalog
             self.catalog_data = USNO[0]
             ## Standardize Column Names
             if catalog == 'USNO-B1.0':
                 self.catalog_data.remove_columns(['_RAJ2000', '_DEJ2000',\
                                                   'e_RAJ2000', 'e_DEJ2000',\
-                                                  'B1mag', 'R1mag',\
+                                                  'B1mag', 'R1mag', 'Epoch',\
                                                   'pmRA', 'pmDE', 'Ndet'])
                 self.catalog_data.rename_column('USNO-B1.0', 'ID')
                 self.catalog_data.rename_column('RAJ2000', 'RA')
@@ -1518,7 +1528,7 @@ class Image(object):
                 self.catalog_data.rename_column('Imag', 'I')
         else:
             self.logger.info("No image WCS, so catalog query skipped")
-            self.catalog = None
+            self.catalog_name = None
             self.catalog_data = None
 
 
@@ -1554,10 +1564,10 @@ class Image(object):
             if os.path.exists("ucac4.txt"): os.remove("ucac4.txt")
             result = subprocess.call(UCACcommand)
             if os.path.exists('ucac4.txt'):
-                self.catalog_file_path = os.path.join(self.tel.temp_file_path,\
+                catalog_file_path = os.path.join(self.tel.temp_file_path,\
                                                       'ucac4.txt')
-                shutil.move('ucac4.txt', self.catalog_file_path)
-                self.temp_files.append(self.catalog_file_path)
+                shutil.move('ucac4.txt', catalog_file_path)
+                self.temp_files.append(catalog_file_path)
 
             ## Read in UCAC catalog
             colnames = ('id', 'RA', 'Dec', 'mag1', 'mag2', 'smag', 'ot', 'dsf',\
@@ -1570,8 +1580,8 @@ class Image(object):
             colends =   (9, 22, 35, 42, 49, 53, 56, 59, 67, 75, 79, 83, 86, 89,\
                          92, 99, 106, 110, 114, 125, 132, 139, 146, 158, 167,\
                          174, 181, 188, 195, 202)
-            self.catalog = 'UCAC4(local)'
-            self.catalog_data = ascii.read(self.catalog_file_path,\
+            self.catalog_name = 'UCAC4(local)'
+            self.catalog_data = ascii.read(catalog_file_path,\
                                            Reader=ascii.FixedWidthNoHeader,\
                                            data_start=1, guess=False,\
                                            names=colnames,\
@@ -1580,10 +1590,14 @@ class Image(object):
                                           )
             ## Standardize Column Names
             self.catalog_data.remove_columns(['smag', 'ot', 'dsf',\
+                                              'mag1', 'mag2', 'dRA', 'dde',\
+                                              'nt', 'nu', 'nc',\
+                                              'pmRA', 'pmDec', 'sRA', 'sDec',\
+                                              '2mass', 'RAepoch', 'Decepoch',\
                                               'e2mphos', 'icq_flag'])
             self.catalog_data.rename_column('id', 'ID')
 
-            nUCACStars = len(self.catalog)
+            nUCACStars = len(self.catalog_data)
             self.logger.info("  Retrieved {} lines from UCAC catalog.".format(nUCACStars))
 
 
@@ -1594,9 +1608,6 @@ class Image(object):
         '''
         Estimate the zero point of the image by comparing the instrumental
         magnitudes as determined by SExtractor to the catalog magnitues.
-        
-        Currently this only uses the UCAC4 catalog as extracted by the
-        get_local_UCAC4() method.
         '''
         assert 'VECTOR_ASSOC' in self.SExtractor_results.keys()
         assert 'MagDiff' in self.SExtractor_results.keys()
@@ -1605,11 +1616,11 @@ class Image(object):
             self.logger.info('Zero point not calculated.  Only {} catalog stars found.'.format(\
                              len(self.SExtractor_results['MagDiff'])))
         else:
-            ZeroPoint_mean = np.mean(self.SExtractor_results['MagDiff'])
-            ZeroPoint_median = np.median(self.SExtractor_results['MagDiff'])
-            self.logger.debug('Mean Zero Point = {:.2f}'.format(ZeroPoint_mean))
-            self.logger.info('Median Zero Point = {:.2f}'.format(ZeroPoint_median))
-            self.zero_point = ZeroPoint_median
+            self.zero_point_mode = mode(self.SExtractor_results['MagDiff'], 0.1)
+            self.zero_point_median = np.median(self.SExtractor_results['MagDiff'])
+            self.logger.info('Mode Zero Point = {:.2f}'.format(self.zero_point_mode))
+            self.logger.info('Median Zero Point = {:.2f}'.format(self.zero_point_median))
+            self.zero_point = self.zero_point_mode
 
             ## Check zero point
             try:
@@ -1622,73 +1633,96 @@ class Image(object):
 
             ## Make Plot if Requested
             if plot:
-                self.logger.info('Making ZeroPoint Plot')
-                self.zero_point_plotfilename = self.raw_file_basename+'_ZeroPoint.png'
-                self.zero_point_plotfile = os.path.join(self.tel.plot_file_path,\
-                                                        self.zero_point_plotfilename)
-                pyplot.ioff()
-                fig = pyplot.figure(figsize=(9,11), dpi=100)
+                self.make_zero_point_plot()
 
-                Fig1 = pyplot.axes([0.0, 0.5, 1.0, 0.4])
-                pyplot.title('Instrumental Magnitudes vs. Calalog Magnitudes (Zero Point = {:.2f})'.format(\
-                                                                   self.zero_point))
-                pyplot.plot(self.SExtractor_results['VECTOR_ASSOC'].data[:,2],\
-                            self.SExtractor_results['MAG_AUTO'],\
-                            'bo', markersize=4, markeredgewidth=0)
-                pyplot.xlabel('UCAC4 {} Magnitude'.format(self.catalog_filter))
-                pyplot.ylabel('Instrumental Magnitude')
-                pyplot.grid()
-                reject_fraction = 0.01
-                ## Set Limits to XXth percentile of magnitudes in Y axis
-                sorted_inst_mag = sorted(self.SExtractor_results['MAG_AUTO'])
-                minmax_idx_inst_mag = [int(reject_fraction*len(sorted_inst_mag)),\
-                                       int((1.0-reject_fraction)*len(sorted_inst_mag))]
-                pyplot.ylim(math.floor(sorted_inst_mag[minmax_idx_inst_mag[0]]),\
-                            math.ceil(sorted_inst_mag[minmax_idx_inst_mag[1]]))
-                ## Set Limits to XXth percentile of magnitudes in X axis
-                sorted_cat_mag = sorted(self.SExtractor_results['VECTOR_ASSOC'].data[:,2])
-                minmax_idx_cat_mag = [int(reject_fraction*len(sorted_cat_mag)),\
-                                      int((1.0-reject_fraction)*len(sorted_cat_mag))]
-                pyplot.xlim(math.floor(sorted_cat_mag[minmax_idx_cat_mag[0]]),\
-                            math.ceil(sorted_cat_mag[minmax_idx_cat_mag[1]]))
-                ## Plot Fitted Line
-                fit_mags_cat = [math.floor(sorted_cat_mag[minmax_idx_cat_mag[0]]),\
-                                math.ceil(sorted_cat_mag[minmax_idx_cat_mag[1]])]
-                fit_mags_inst = fit_mags_cat - self.zero_point
-                pyplot.plot(fit_mags_cat, fit_mags_inst, 'k-', alpha=0.5,\
-                            label='Zero Point = {:.2f}'.format(self.zero_point))
 
-                Fig2 = pyplot.axes([0.0, 0.0, 1.0, 0.4])
-                pyplot.title('Magnitude Residuals (Zero Point = {:.2f})'.format(\
-                                                                   self.zero_point))
-                residuals = (self.SExtractor_results['MAG_AUTO'].data + self.zero_point)\
-                             - self.SExtractor_results['VECTOR_ASSOC'].data[:,2]
-                pyplot.plot(self.SExtractor_results['VECTOR_ASSOC'].data[:,2],\
-                            residuals, \
-                            'bo', markersize=4, markeredgewidth=0)
-                pyplot.xlabel('UCAC4 {} Magnitude'.format(self.catalog_filter))
-                pyplot.ylabel('Magnitude Residual')
-                pyplot.grid()
-                ## Set Limits to XXth percentile of magnitudes in X axis
-                reject_fraction = 0.01
-                sorted_cat_mag = sorted(self.SExtractor_results['VECTOR_ASSOC'].data[:,2])
-                minmax_idx_cat_mag = [int(reject_fraction*len(sorted_cat_mag)),\
-                                      int((1.0-reject_fraction)*len(sorted_cat_mag))]
-                pyplot.xlim(math.floor(sorted_cat_mag[minmax_idx_cat_mag[0]]),\
-                            math.ceil(sorted_cat_mag[minmax_idx_cat_mag[1]]))
-                ## Set Limits to XXth percentile of magnitudes in Y axis
-                sorted_residuals = sorted(residuals)
-                minmax_idx_residuals = [int(reject_fraction*len(sorted_residuals)),\
-                                        int((1.0-reject_fraction)*len(sorted_residuals))]
-                pyplot.ylim(sorted_residuals[minmax_idx_residuals[0]]-0.1,\
-                            sorted_residuals[minmax_idx_residuals[1]]+0.1)
-                ## Plot Zero Line
-                pyplot.plot(fit_mags_cat, [0, 0], 'k-', alpha=0.5,\
-                            label='Zero Point = {:.2f}'.format(self.zero_point))
+    ##-------------------------------------------------------------------------
+    ## Make Zero Point Plot
+    ##-------------------------------------------------------------------------
+    def make_zero_point_plot(self):
+        self.logger.info('Making ZeroPoint Plot')
+        self.zero_point_plotfilename = self.raw_file_basename+'_ZeroPoint.png'
+        self.zero_point_plotfile = os.path.join(self.tel.plot_file_path,\
+                                                self.zero_point_plotfilename)
 
-                pyplot.savefig(self.zero_point_plotfile, dpi=100,\
-                               bbox_inches='tight', pad_inches=0.10)
-                pyplot.close(fig)
+        catalog_mags = self.SExtractor_results['VECTOR_ASSOC'].data[:,2]
+        instrumental_mags = self.SExtractor_results['MAG_AUTO']
+        zero_points = self.SExtractor_results['MagDiff']
+
+        zp_binsize = 0.10
+        zp_95pctile = math.ceil(np.percentile(zero_points, 95.0))
+        zp_hist, zp_bins = np.histogram(zero_points,\
+                              bins=zp_binsize*np.arange(int(zp_95pctile/zp_binsize)+11))
+        zp_centers = (zp_bins[:-1] + zp_bins[1:]) / 2
+
+
+        pyplot.ioff()
+        fig = pyplot.figure(figsize=(10,11), dpi=100)
+
+        ## Plot Instrumental Magnitude vs. Catalog Magnitude
+        TopLeft = pyplot.axes([0.000, 0.750, 0.465, 0.235])
+        pyplot.title('Instrumental Magnitudes vs. Calalog Magnitudes (Zero Point = {:.2f})'.format(\
+                                                           self.zero_point), size=10)
+        pyplot.plot(catalog_mags, instrumental_mags, 'bo', ms=3, mew=0)
+        pyplot.xlabel('{} {} Magnitude'.format(self.catalog_name, self.catalog_filter), size=10)
+        pyplot.ylabel('Instrumental Magnitude', size=10)
+        pyplot.grid()
+        reject_percent = 1.0
+        pyplot.ylim(np.percentile(instrumental_mags, reject_percent),\
+                    np.percentile(instrumental_mags, 100.-reject_percent))
+        pyplot.xlim(np.percentile(catalog_mags, reject_percent),\
+                    np.percentile(catalog_mags, 100.-reject_percent))
+        ## Overplot Line of Zero Point
+        catmag = [-5,30]
+        fitmag = [(val-self.zero_point) for val in catmag]
+        pyplot.plot(catmag, fitmag, 'k-')
+
+
+        ## Plot Histogram of Zero Point Values
+        TopRight = pyplot.axes([0.535, 0.750, 0.465, 0.235])
+        pyplot.title('Histogram of Zero Point Values for {}'.format(self.raw_file_name), size=10)
+        pyplot.plot([self.zero_point_median, self.zero_point_median], [0, 1.1*max(zp_hist)],\
+                    'ro-', linewidth=2, label='Median Zero Point')
+        pyplot.plot([self.zero_point_mode, self.zero_point_mode], [0, 1.1*max(zp_hist)],\
+                    'ro-', linewidth=2, label='Mode Zero Point')
+        pyplot.bar(zp_centers, zp_hist, align='center', width=0.7*zp_binsize)
+        pyplot.xlabel('Zero Point', size=10)
+        pyplot.ylabel('N Stars', size=10)
+        reject_percent = 1.0
+        pyplot.xlim(np.percentile(zero_points, reject_percent),\
+                    np.percentile(zero_points, 100.-reject_percent))
+        pyplot.yticks(size=10)
+
+
+#                 ## Plot Fitted Line
+#                 fit_mags_cat = [np.percentile(self.SExtractor_results['MAG_AUTO'], reject_percent),\
+#                                 np.percentile(self.SExtractor_results['MAG_AUTO'], 100.-reject_percent)]
+#                 fit_mags_inst = [(val + self.zero_point) for val in fit_mags_cat]
+#                 pyplot.plot(fit_mags_cat, fit_mags_inst, 'k-', alpha=0.5,\
+#                             label='Zero Point = {:.2f}'.format(self.zero_point))
+# 
+#                 Fig2 = pyplot.axes([0.0, 0.0, 1.0, 0.4])
+#                 pyplot.title('Magnitude Residuals (Zero Point = {:.2f})'.format(\
+#                                                                    self.zero_point))
+#                 residuals = (self.SExtractor_results['MAG_AUTO'].data + self.zero_point)\
+#                              - self.SExtractor_results['VECTOR_ASSOC'].data[:,2]
+#                 pyplot.plot(self.SExtractor_results['VECTOR_ASSOC'].data[:,2],\
+#                             residuals, \
+#                             'bo', markersize=4, markeredgewidth=0)
+#                 pyplot.xlabel('{} {} Magnitude'.format(self.catalog_name, self.catalog_filter))
+#                 pyplot.ylabel('Magnitude Residual')
+#                 pyplot.grid()
+#                 pyplot.ylim(np.percentile(residuals, reject_percent),\
+#                             np.percentile(residuals, 100.-reject_percent))
+#                 pyplot.xlim(np.percentile(self.SExtractor_results['VECTOR_ASSOC'].data[:,2], reject_percent),\
+#                             np.percentile(self.SExtractor_results['VECTOR_ASSOC'].data[:,2], 100.-reject_percent))
+#                 ## Plot Zero Line
+#                 pyplot.plot(fit_mags_cat, [0, 0], 'k-', alpha=0.5,\
+#                             label='Zero Point = {:.2f}'.format(self.zero_point))
+
+        pyplot.savefig(self.zero_point_plotfile, dpi=100,\
+                       bbox_inches='tight', pad_inches=0.10)
+        pyplot.close(fig)
 
 
     ##-------------------------------------------------------------------------
@@ -1798,7 +1832,7 @@ class Image(object):
                     draw.ellipse((x-r, y-r, x+r, y+r), outline=circle_color)
 
         ## Mark Catalog Stars
-        if mark_catalog_stars and self.catalog:
+        if mark_catalog_stars and self.catalog_data:
             if self.FWHM:
                 ms = max([7, 2.1*math.ceil(self.FWHM.to(u.pix).value)])/binning
             else:
@@ -1806,7 +1840,7 @@ class Image(object):
             circle_color = 'blue'
             self.logger.debug('  Marking catalog stars with {} radius {} circles'.format(ms, circle_color))
 
-            for star in self.catalog:
+            for star in self.catalog_data:
                 xy = self.image_WCS.wcs_world2pix([[float(star['RA']), float(star['Dec'])]], 1)[0]
                 x = int(xy[0])
                 y = int(xy[1])
@@ -2012,7 +2046,7 @@ class Image(object):
                 MarkRadius=max([6, 2*math.ceil(self.FWHM.value)])/binning
             else:
                 MarkRadius = 6
-            sorted_catalog = np.sort(self.catalog, order=['mag1'])
+            sorted_catalog = np.sort(self.catalog_data, order=['mag1'])
             for star in sorted_catalog:
                 nStarsMarked += 1
                 if nStarsMarked <= nStarsLimit:
@@ -2037,7 +2071,7 @@ class Image(object):
             JPEGcommand.append('-draw')
             if nStarsMarked > nStarsLimit:
                 JPEGcommand.append("text 200,120 'Green circles mark {} catalog stars out of {}.'".format(\
-                                   nStarsLimit, len(self.catalog)))
+                                   nStarsLimit, len(self.catalog_data)))
             else:
                 JPEGcommand.append("text 200,120 'Green circles mark {} catalog stars.'".format(\
                                    self.n_stars_SExtracted))
