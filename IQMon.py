@@ -1696,13 +1696,13 @@ class Image(object):
             except:
                 pass
 
-        end_time = datetime.datetime.now()
-        elapzed_time = end_time - start_time
-        self.logger.info('  Done measuring zero point in {:.1f} s'.format(elapzed_time.total_seconds()))
+            end_time = datetime.datetime.now()
+            elapzed_time = end_time - start_time
+            self.logger.info('  Done measuring zero point in {:.1f} s'.format(elapzed_time.total_seconds()))
 
-        ## Make Plot if Requested
-        if len(zero_points) < min_stars and plot:
-            self.make_zero_point_plot()
+            ## Make Plot if Requested
+            if plot:
+                self.make_zero_point_plot()
 
 
     ##-------------------------------------------------------------------------
@@ -1734,18 +1734,22 @@ class Image(object):
         reject_percent = 3.0
         padding = 0.5
 
-        ## Plot Instrumental Magnitude vs. Catalog Magnitude
-        TopLeft = pyplot.axes([0.000, 0.750, 0.465, 0.235])
-        pyplot.title('Instrumental vs. Calalog Magnitudes (Zero Point = {:.2f})'.format(\
-                                                           self.zero_point), size=10)
-        pyplot.plot(catalog_mags, instrumental_mags, 'bo', ms=3, mew=0)
+        ## Correlation of Instrumental Magnitude with Catalog Magnitude
+        TopLeft = pyplot.axes([0.000, 0.650, 0.465, 0.335])
+        TopLeft.set_aspect('equal')
+        xmin = math.floor( ( (np.percentile(catalog_mags, reject_percent)-padding)*4))/4.
+        xmax = math.ceil( ( (np.percentile(catalog_mags, 100.-reject_percent)+padding)*4))/4.
+        ymin = math.floor( ( (np.percentile(instrumental_mags, reject_percent)-padding)*4))/4.
+        ymax = math.ceil( ( (np.percentile(instrumental_mags, 100.-reject_percent)+padding)*4))/4.
+        xbins = list(np.arange(xmin,xmax+0.25,0.25))
+        ybins = list(np.arange(ymin,ymax+0.25,0.25))
+        pyplot.title('Correlation of Instrumental and Calalog Magnitudes', size=10)
+        pyplot.hist2d(catalog_mags, instrumental_mags, bins=[xbins, ybins], cmap='binary')
         pyplot.xlabel('{} {} Magnitude'.format(self.catalog_name, self.catalog_filter), size=10)
         pyplot.ylabel('Instrumental Magnitude', size=10)
         pyplot.grid()
-        pyplot.ylim(np.percentile(instrumental_mags, reject_percent)-padding,\
-                    np.percentile(instrumental_mags, 100.-reject_percent)+padding)
-        pyplot.xlim(np.percentile(catalog_mags, reject_percent)-padding,\
-                    np.percentile(catalog_mags, 100.-reject_percent)+padding)
+        pyplot.ylim(ymin,ymax)
+        pyplot.xlim(xmin,xmax)
         ## Overplot Line of Zero Point
         catmag = [-5,30]
         fitmag = [(val-self.zero_point) for val in catmag]
@@ -1753,7 +1757,7 @@ class Image(object):
 
 
         ## Plot Histogram of Zero Point Values
-        TopRight = pyplot.axes([0.535, 0.750, 0.465, 0.235])
+        TopRight = pyplot.axes([0.535, 0.650, 0.465, 0.335])
         pyplot.title('Histogram of Zero Point Values for {}'.format(self.raw_file_name), size=10)
         pyplot.plot([self.zero_point_median, self.zero_point_median], [0, 1.1*max(zp_hist)],\
                     'ro-', linewidth=2, label='Median Zero Point')
@@ -1767,15 +1771,19 @@ class Image(object):
         pyplot.yticks(size=10)
 
         ## Plot Residuals
-        MiddleLeft = pyplot.axes([0.000, 0.375, 0.465, 0.320])
-        pyplot.plot(catalog_mags, residuals, 'bo', ms=3, mew=0)
+        MiddleLeft = pyplot.axes([0.000, 0.275, 0.465, 0.320])
+        xmin = math.floor( ( (np.percentile(catalog_mags, reject_percent)-padding)*4))/4.
+        xmax = math.ceil( ( (np.percentile(catalog_mags, 100.-reject_percent)+padding)*4))/4.
+        ymin = math.floor( ( (np.percentile(residuals, reject_percent)-padding)*4))/4.
+        ymax = math.ceil( ( (np.percentile(residuals, 100.-reject_percent)+padding)*4))/4.
+        xbins = list(np.arange(xmin,xmax+0.25,0.25))
+        ybins = list(np.arange(ymin,ymax+0.25,0.25))
+        pyplot.hist2d(catalog_mags, residuals, bins=[xbins, ybins], cmap='binary')
         pyplot.xlabel('{} {} Magnitude'.format(self.catalog_name, self.catalog_filter), size=10)
         pyplot.ylabel('Magnitude Residuals', size=10)
         pyplot.grid()
-        pyplot.ylim(np.percentile(residuals, reject_percent)-padding,\
-                    np.percentile(residuals, 100.-reject_percent)+padding)
-        pyplot.xlim(np.percentile(catalog_mags, reject_percent)-padding,\
-                    np.percentile(catalog_mags, 100.-reject_percent)+padding)
+        pyplot.ylim(ymin,ymax)
+        pyplot.xlim(xmin,xmax)
         ## Overplot Line of Zero Point
         catmag = [-5,30]
         fitmag = [0, 0]
@@ -1783,7 +1791,7 @@ class Image(object):
 
         ## Plot Spatial Distribution of Residuals
         range = [-0.5, 0.5]
-        MiddleRight = pyplot.axes([0.535, 0.375, 0.465, 0.320])
+        MiddleRight = pyplot.axes([0.535, 0.275, 0.465, 0.320])
         MiddleRight.set_aspect('equal')
         pyplot.title('Average residual scaled from {:+.1f} to {:+.1f}'.format(range[0], range[1]), size=10)
         if len(residuals) > 20000:
