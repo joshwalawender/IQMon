@@ -38,7 +38,6 @@ import astropy.io.ascii as ascii
 ## Mode Function
 ##-----------------------------------------------------------------------------
 def mode(data, binsize):
-    pctile = math.ceil(np.percentile(data, 99.0))
     bmin = math.floor(min(data)/binsize)*binsize - binsize/2.
     bmax = math.ceil(max(data)/binsize)*binsize + binsize/2.
     bins = np.arange(bmin,bmax,binsize)
@@ -1245,14 +1244,17 @@ class Image(object):
         angle_centers = (diff_bins[:-1] + diff_bins[1:]) / 2
 
         ellip_binsize = 0.05
-        ellip_hist, ellip_bins = np.histogram(CentralEllipticities,\
-                                              bins=ellip_binsize*np.arange(21))
+        ellip_bmin = math.floor(min(CentralEllipticities)/ellip_binsize)*ellip_binsize - ellip_binsize/2.
+        ellip_bmax = math.ceil(max(CentralEllipticities)/ellip_binsize)*ellip_binsize + ellip_binsize/2.
+        ellip_bins = np.arange(ellip_bmin,ellip_bmax,ellip_binsize)
+        ellip_hist, ellip_bins = np.histogram(CentralEllipticities, bins=ellip_bins)
         ellip_centers = (ellip_bins[:-1] + ellip_bins[1:]) / 2
 
         fwhm_binsize = 0.2
-        fwhm_95pctile = math.ceil(np.percentile(CentralFWHMs, 95.0))
-        fwhm_hist, fwhm_bins = np.histogram(CentralFWHMs,\
-                                               bins=fwhm_binsize*np.arange(int(fwhm_95pctile/fwhm_binsize)+11))
+        fwhm_bmin = math.floor(min(CentralFWHMs)/fwhm_binsize)*fwhm_binsize - fwhm_binsize/2.
+        fwhm_bmax = math.ceil(max(CentralFWHMs)/fwhm_binsize)*fwhm_binsize + fwhm_binsize/2.
+        fwhm_bins = np.arange(fwhm_bmin,fwhm_bmax,fwhm_binsize)
+        fwhm_hist, fwhm_bins = np.histogram(CentralFWHMs, bins=fwhm_bins)
         fwhm_centers = (fwhm_bins[:-1] + fwhm_bins[1:]) / 2
 
         star_angle_mean = np.mean(star_angles)
@@ -1279,7 +1281,7 @@ class Image(object):
                         'ro-', linewidth=2, label='Mode FWHM')
             pyplot.xlabel('FWHM (pixels)', size=10)
             pyplot.ylabel('N Stars', size=10)
-            pyplot.xlim(0,fwhm_95pctile+1)
+            pyplot.xlim(0,np.percentile(CentralFWHMs, 95)+1)
             pyplot.xticks(size=10)
             pyplot.yticks(size=10)
 
@@ -1725,12 +1727,11 @@ class Image(object):
         ypix = [entry['YWIN_IMAGE'] for entry in self.SExtractor_results if entry['FLAGS'] == 0]
         residuals = [(entry['assoc_catmag'] - entry['MAG_AUTO'] - self.zero_point) for entry in self.SExtractor_results if entry['FLAGS'] == 0]
 
-        bmin = math.floor(min(data)/binsize)*binsize - binsize/2.
-        bmax = math.ceil(max(data)/binsize)*binsize + binsize/2.
-        zp_bins = np.arange(bmin,bmax,binsize)
+        zp_binsize = 0.1
+        bmin = math.floor(min(zero_points)/zp_binsize)*zp_binsize - zp_binsize/2.
+        bmax = math.ceil(max(zero_points)/zp_binsize)*zp_binsize + zp_binsize/2.
+        zp_bins = np.arange(bmin,bmax,zp_binsize)
         zp_hist, zp_bins = np.histogram(zero_points, bins=zp_bins)
-#         zp_hist, zp_bins = np.histogram(zero_points,\
-#                               bins=zp_binsize*np.arange(int(zp_95pctile/zp_binsize)+11))
         zp_centers = (zp_bins[:-1] + zp_bins[1:]) / 2
 
         pyplot.ioff()
