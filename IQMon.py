@@ -1689,7 +1689,7 @@ class Image(object):
 
             ## Check zero point
             try:
-                if self.zero_point > self.tel.threshold_zeropoint:
+                if self.zero_point < self.tel.threshold_zeropoint:
                     self.flags['zero point'] = True
                 else:
                     self.flags['zero point'] = False
