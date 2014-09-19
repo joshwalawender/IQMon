@@ -39,7 +39,10 @@ import astropy.io.ascii as ascii
 ##-----------------------------------------------------------------------------
 def mode(data, binsize):
     pctile = math.ceil(np.percentile(data, 99.0))
-    hist, bins = np.histogram(data, bins=binsize*np.arange(int(pctile/binsize)+1))
+    bmin = math.floor(min(data)/binsize)*binsize - binsize/2.
+    bmax = math.ceil(max(data)/binsize)*binsize + binsize/2.
+    bins = np.arange(bmin,bmax,binsize)
+    hist, bins = np.histogram(data, bins=bins)
     centers = (bins[:-1] + bins[1:]) / 2
     foo = zip(hist, centers)
     return max(foo)[1]
@@ -1722,10 +1725,12 @@ class Image(object):
         ypix = [entry['YWIN_IMAGE'] for entry in self.SExtractor_results if entry['FLAGS'] == 0]
         residuals = [(entry['assoc_catmag'] - entry['MAG_AUTO'] - self.zero_point) for entry in self.SExtractor_results if entry['FLAGS'] == 0]
 
-        zp_binsize = 0.10
-        zp_95pctile = math.ceil(np.percentile(zero_points, 95.0))
-        zp_hist, zp_bins = np.histogram(zero_points,\
-                              bins=zp_binsize*np.arange(int(zp_95pctile/zp_binsize)+11))
+        bmin = math.floor(min(data)/binsize)*binsize - binsize/2.
+        bmax = math.ceil(max(data)/binsize)*binsize + binsize/2.
+        zp_bins = np.arange(bmin,bmax,binsize)
+        zp_hist, zp_bins = np.histogram(zero_points, bins=zp_bins)
+#         zp_hist, zp_bins = np.histogram(zero_points,\
+#                               bins=zp_binsize*np.arange(int(zp_95pctile/zp_binsize)+11))
         zp_centers = (zp_bins[:-1] + zp_bins[1:]) / 2
 
         pyplot.ioff()
@@ -1915,10 +1920,10 @@ class Image(object):
         ## Mark Detected Stars
         if mark_detected_stars and self.SExtractor_results:
             if self.FWHM:
-                ms = max([6, 2*math.ceil(self.FWHM.to(u.pix).value)])/binning
+                ms = max([6, 2*math.ceil(self.FWHM.to(u.pix).value)])
             else:
                 ms = 6
-            circle_color = 'orange'
+            circle_color = 'green'
             self.logger.debug('  Marking detected stars with {} radius {} circles'.format(ms, circle_color))
             for star in self.SExtractor_results:
                 x = star['XWIN_IMAGE']
@@ -1931,10 +1936,10 @@ class Image(object):
         ## Mark Catalog Stars
         if mark_catalog_stars and self.catalog_data:
             if self.FWHM:
-                ms = max([7, 2.1*math.ceil(self.FWHM.to(u.pix).value)])/binning
+                ms = max([7, 2.1*math.ceil(self.FWHM.to(u.pix).value)])
             else:
                 ms = 7
-            circle_color = 'blue'
+            circle_color = 'yellow'
             self.logger.debug('  Marking catalog stars with {} radius {} circles'.format(ms, circle_color))
 
             for star in self.catalog_data:
@@ -1949,12 +1954,13 @@ class Image(object):
         ## Flag Saturated Pixels
         if mark_saturated and self.tel.saturation:
             saturated_color = 'red'
-            with fits.open(self.raw_file, ignore_missing_end=True) as hdulist:
+            with fits.open(self.working_file, ignore_missing_end=True) as hdulist:
                 data_raw = hdulist[0].data
             data_saturated = np.ma.masked_greater(data_raw, self.tel.saturation)
             indices = np.where(data_saturated.mask == 1)
-            xy = zip(indices[1], indices[0])
-            draw.point(xy, fill=saturated_color)
+            if len(indices) > 4:
+                xy = zip(indices[1], indices[0])
+                draw.point(xy, fill=saturated_color)
 
         ## Flip jpeg
         if transform:
