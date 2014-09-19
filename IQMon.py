@@ -1087,7 +1087,6 @@ class Image(object):
             self.SExtractor_results = table.Table(hdu[2].data)
             SExImageRadius = []
             SExAngleInImage = []
-#             zp_diff = []
             assoc_x = []
             assoc_y = []
             assoc_catmag = []
@@ -1100,8 +1099,6 @@ class Image(object):
                     assoc_x.append(star['VECTOR_ASSOC'][0])
                     assoc_y.append(star['VECTOR_ASSOC'][1])
                     assoc_catmag.append(star['VECTOR_ASSOC'][2])
-#                     zp_diff.append(star['VECTOR_ASSOC'][2] - star['MAG_AUTO'])
-                    
             self.SExtractor_results.add_column(table.Column(\
                                     data=SExImageRadius, name='ImageRadius'))
             self.SExtractor_results.add_column(table.Column(\
@@ -1109,16 +1106,14 @@ class Image(object):
             self.n_stars_SExtracted = len(self.SExtractor_results)
             self.logger.info("  Read in {0} stars from SExtractor catalog.".format(\
                                                       self.n_stars_SExtracted))
-        if assoc:
-            self.SExtractor_results.add_column(table.Column(\
-                                               data=assoc_x, name='assoc_x'))
-            self.SExtractor_results.add_column(table.Column(\
-                                               data=assoc_y, name='assoc_y'))
-            self.SExtractor_results.add_column(table.Column(\
-                                               data=assoc_catmag, name='assoc_catmag'))
-#             self.SExtractor_results.add_column(table.Column(\
-#                                                data=zp_diff, name='MagDiff'))
-            self.tel.SExtractor_params = original_params
+            if assoc:
+                self.SExtractor_results.add_column(table.Column(\
+                                                   data=assoc_x, name='assoc_x'))
+                self.SExtractor_results.add_column(table.Column(\
+                                                   data=assoc_y, name='assoc_y'))
+                self.SExtractor_results.add_column(table.Column(\
+                                                   data=assoc_catmag, name='assoc_catmag'))
+                self.tel.SExtractor_params = original_params
 
         end_time = datetime.datetime.now()
         elapzed_time = end_time - start_time
