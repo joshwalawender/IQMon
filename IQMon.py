@@ -1682,7 +1682,7 @@ class Image(object):
 
         if len(zero_points) < min_stars:
             self.logger.info('Zero point not calculated.  Only {} catalog stars found.'.format(\
-                             len(catalog_mags)))
+                             len(zero_points)))
         else:
             self.zero_point_mode = mode(zero_points, 0.1)
             self.zero_point_median = np.median(zero_points)
