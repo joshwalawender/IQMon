@@ -995,6 +995,7 @@ class Image(object):
                              'PIXEL_SCALE': '{:.3f}'.format(self.tel.pixel_scale.value),
                              'CHECKIMAGE_TYPE': '-BACKGROUND',
                              'CHECKIMAGE_NAME': self.check_image_file,
+                             'ASSOCSELEC_TYPE': 'MATCHED',
                             }
 
         ## Use optional sextractor params
@@ -1393,7 +1394,7 @@ class Image(object):
             SCAMP_aheader = 'scamp.ahead'
 
         SCAMP_default = {
-                        'SCAMP_aheader_GLOBAL': SCAMP_aheader,
+                        'SCAMP_AHEADER_GLOBAL': SCAMP_aheader,
                         'ASTREF_CATALOG': catalog,
                         'SAVE_REFCATALOG': 'N',
                         'REFOUT_CATPATH': self.tel.temp_file_path,
@@ -1421,8 +1422,7 @@ class Image(object):
         for key in SCAMP_params.keys():
             SCAMPCommand.append('-{}'.format(key))
             SCAMPCommand.append('{}'.format(SCAMP_params[key]))
-        self.logger.info("Running SCAMP on {} catalog with distortion order {}.".format(\
-                                            catalog, distortion_order))
+        self.logger.info("Running SCAMP on {} catalog.".format(catalog))
         if SCAMP_aheader:
             self.logger.info("  Using SCAMP_aheader file: {}".format(SCAMP_aheader))
         self.logger.debug("  SCAMP command: {}".format(SCAMPCommand))
@@ -1938,7 +1938,7 @@ class Image(object):
                 ms = max([7, 2.1*math.ceil(self.FWHM.to(u.pix).value)])
             else:
                 ms = 7
-            circle_color = 'yellow'
+            circle_color = 'red'
             self.logger.debug('  Marking catalog stars with {} radius {} circles'.format(ms, circle_color))
 
             for star in self.catalog_data:
