@@ -83,7 +83,7 @@ class Telescope(object):
         self.pointing_marker_size = None
         self.SExtractor_params = None
         self.SCAMP_params = None
-
+        self.catalog_info = None
         ## Derived Properties
         self.nXPix = None
         self.nYPix = None
@@ -125,6 +125,7 @@ class Telescope(object):
         if 'pointing_marker_size' in config.keys(): self.pointing_marker_size = config['pointing_marker_size'] * u.arcmin
         if 'SExtractor_params' in config.keys(): self.SExtractor_params = config['SExtractor_params']
         if 'SCAMP_params' in config.keys(): self.SCAMP_params = config['SCAMP_params']
+        if 'catalog' in config.keys(): self.catalog_info = config['catalog']
 
         ## Determine Pixel Scale and F-Ratio
         assert self.pixel_size
@@ -338,6 +339,14 @@ class Image(object):
         else:
             self.logger.debug("  Exposure time = {0:.1f} s".format(\
                                                    self.exptime.to(u.s).value))
+        ## Get filter from header
+        try:
+            self.filter = str(self.header['FILTER'])
+        except:
+            self.filter = None
+            self.logger.debug("  No filter value found in header")
+        else:
+            self.logger.debug("  filter = {}".format(self.filter))
         ## Get object name from header
         try:
             self.object_name = self.header["OBJECT"]
@@ -918,7 +927,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Run SExtractor
     ##-------------------------------------------------------------------------
-    def run_SExtractor(self, assoc=False, filter=None):
+    def run_SExtractor(self, assoc=False):
         '''
         Run SExtractor on image.
         '''
@@ -928,25 +937,20 @@ class Image(object):
 
         if assoc and self.catalog_data:
             self.catalog_filter = None
-            if filter:
-                if filter in self.catalog_data.keys():
-                    self.catalog_filter = filter
-                else:
-                    self.logger.warning('  Filter ({}), not found in catalog table.'.format(filter))
-                    self.catalog_filter = None
-            elif self.header['FILTER']:
+            if self.header['FILTER']:
                 if self.header['FILTER'] in self.catalog_data.keys():
                     self.catalog_filter = self.header['FILTER']
+                elif self.tel.config['catalog'][self.filter] in self.catalog_data.keys():
+                    self.catalog_filter = self.tel.config['catalog'][self.filter]
                 else:
                     self.logger.warning('  Filter in header ({}), not found in catalog table.'.format(\
                                                         self.header['FILTER']))
                     self.catalog_filter = None
             else:
-                self.logger.info('  Using r filter for catalog magnitudes.')
                 self.catalog_filter = None
             ## Find Filter to Use
             if not self.catalog_filter:
-                filters = ['r', 'R', 'i', 'I', 'g', 'V', 'B']
+                filters = ['r', 'R2mag', 'i', 'Imag', 'g', 'V', 'B', 'B2mag']
                 for filt in filters:
                     if not self.catalog_filter and (filt in self.catalog_data.keys()):
                         self.logger.info('  Using {} filter for catalog magnitudes.'.format(filt))
@@ -957,6 +961,7 @@ class Image(object):
                     self.catalog_data.keys().remove('RA')
                     self.catalog_data.keys().remove('Dec')
                     self.catalog_filter = self.catalog_data.keys()[0]
+            self.logger.info('  Using {} filter for catalog magnitudes.'.format(self.catalog_filter))
 
         ## Set up file names
         self.SExtractor_catalog = os.path.join(self.tel.temp_file_path,\
@@ -1525,18 +1530,27 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Get Vizier Catalog
     ##-------------------------------------------------------------------------
-    def get_catalog(self, catalog='USNO-B1.0', max_stars=10000):
+    def get_catalog(self, max_stars=10000):
         '''
         Get a catalog using astroquery
         '''
         start_time = datetime.datetime.now()
-        import astroquery
-        import astroquery.vizier
-        viz = astroquery.vizier.Vizier
-        viz.ROW_LIMIT = max_stars
-
         if self.image_WCS:
+            import astroquery
+            import astroquery.vizier
+            catalog = self.tel.catalog_info['name']
             self.logger.info("Querying Vizier for {} catalog.".format(catalog))
+            if catalog == 'USNO-B1.0':
+                columns = ['_RAJ2000', '_DEJ2000', 'USNO-B1.0', 'B1mag', 'B2mag', 'R1mag', 'R2mag', 'Imag']
+                catfilt = str(self.tel.catalog_info[self.filter])
+                upperlimit = '<{:.1f}'.format(self.tel.catalog_info['magmax'])
+                column_filters = {catfilt:upperlimit}
+                self.logger.debug('  Using column_filters: {}'.format(column_filters))
+
+            viz = astroquery.vizier.Vizier(columns=columns,\
+                                           column_filters=column_filters)
+            viz.ROW_LIMIT = max_stars
+
             footprint = self.image_WCS.calc_footprint()
             RAs = [val[0] for val in footprint]
             DECs = [val[1] for val in footprint]
@@ -1559,16 +1573,9 @@ class Image(object):
             self.catalog_data = USNO[0]
             ## Standardize Column Names
             if catalog == 'USNO-B1.0':
-                self.catalog_data.remove_columns(['_RAJ2000', '_DEJ2000',\
-                                                  'e_RAJ2000', 'e_DEJ2000',\
-                                                  'B1mag', 'R1mag', 'Epoch',\
-                                                  'pmRA', 'pmDE', 'Ndet'])
                 self.catalog_data.rename_column('USNO-B1.0', 'ID')
-                self.catalog_data.rename_column('RAJ2000', 'RA')
-                self.catalog_data.rename_column('DEJ2000', 'Dec')
-                self.catalog_data.rename_column('B2mag', 'B')
-                self.catalog_data.rename_column('R2mag', 'R')
-                self.catalog_data.rename_column('Imag', 'I')
+                self.catalog_data.rename_column('_RAJ2000', 'RA')
+                self.catalog_data.rename_column('_DEJ2000', 'Dec')
         else:
             self.logger.info("No image WCS, so catalog query skipped")
             self.catalog_name = None
@@ -1665,7 +1672,7 @@ class Image(object):
         self.logger.info('Analyzing SExtractor results to determine photometric zero point')
         assert 'assoc_catmag' in self.SExtractor_results.keys()
         assert 'MAG_AUTO' in self.SExtractor_results.keys()
-        min_stars = 100
+        min_stars = 50
 
         zero_points = [(entry['assoc_catmag'] - entry['MAG_AUTO']) for entry in self.SExtractor_results if entry['FLAGS'] == 0]
 
@@ -1686,7 +1693,7 @@ class Image(object):
                 else:
                     self.flags['zero point'] = False
             except:
-                pass
+                self.flags['zero point'] = False
 
             end_time = datetime.datetime.now()
             elapzed_time = end_time - start_time
