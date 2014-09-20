@@ -102,9 +102,12 @@ class Telescope(object):
         self.config = config
         ## Populate Configured Properties
         if 'name' in config.keys(): self.name = str(config['name'])
-        if 'temp_file_path' in config.keys(): self.temp_file_path = config['temp_file_path']
-        if 'plot_file_path' in config.keys(): self.plot_file_path = config['plot_file_path']
-        if 'logs_file_path' in config.keys(): self.logs_file_path = config['logs_file_path']
+        if 'temp_file_path' in config.keys():
+            self.temp_file_path = os.path.expanduser(config['temp_file_path'])
+        if 'plot_file_path' in config.keys():
+            self.plot_file_path = os.path.expanduser(config['plot_file_path'])
+        if 'logs_file_path' in config.keys():
+            self.logs_file_path = os.path.expanduser(config['logs_file_path'])
         if 'focal_length' in config.keys(): self.focal_length = config['focal_length'] * u.mm
         if 'pixel_size' in config.keys(): self.pixel_size = config['pixel_size'] * u.um
         if 'aperture' in config.keys(): self.aperture = config['aperture'] * u.mm
@@ -114,7 +117,8 @@ class Telescope(object):
         if 'threshold_pointing_err' in config.keys(): self.threshold_pointing_err = config['threshold_pointing_err'] * u.arcmin
         if 'threshold_ellipticity' in config.keys(): self.threshold_ellipticity = config['threshold_ellipticity']
         if 'threshold_zeropoint' in config.keys(): self.threshold_zeropoint = config['threshold_zeropoint']
-        if 'SCAMP_aheader' in config.keys(): self.SCAMP_aheader = config['SCAMP_aheader']
+        if 'SCAMP_aheader' in config.keys():
+            self.SCAMP_aheader = os.path.expanduser(config['SCAMP_aheader'])
         if 'units_for_FWHM' in config.keys(): self.units_for_FWHM = getattr(u, config['units_for_FWHM'])
         if 'ROI' in config.keys(): self.ROI = str(config['ROI'])
         if 'PSF_measurement_radius' in config.keys(): self.PSF_measurement_radius = config['PSF_measurement_radius'] * u.pix
@@ -1377,7 +1381,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Run SCAMP
     ##-------------------------------------------------------------------------
-    def run_SCAMP(self, catalog='USNO-B1', mergedcat_name='scamp.cat', mergedcat_type='ASCII_HEAD', distortion_order=1):
+    def run_SCAMP(self, catalog='USNO-B1', mergedcat_name='scamp.cat', mergedcat_type='ASCII_HEAD'):
         '''
         Run SCAMP on SExtractor output catalog.
         '''
@@ -1389,7 +1393,6 @@ class Image(object):
             SCAMP_aheader = 'scamp.ahead'
 
         SCAMP_default = {
-                        'DISTORT_DEGREES': distortion_order,
                         'SCAMP_aheader_GLOBAL': SCAMP_aheader,
                         'ASTREF_CATALOG': catalog,
                         'SAVE_REFCATALOG': 'N',
@@ -1794,7 +1797,7 @@ class Image(object):
         range = [-0.5, 0.5]
         MiddleRight = pyplot.axes([0.535, 0.275, 0.465, 0.320])
         MiddleRight.set_aspect('equal')
-        pyplot.title('Average residual scaled from {:+.1f} to {:+.1f}'.format(range[0], range[1]), size=10)
+        pyplot.title('Residuals scaled from {:+.1f} to {:+.1f}'.format(range[0], range[1]), size=10)
         if len(residuals) > 20000:
             gridsize = 20
         else:
