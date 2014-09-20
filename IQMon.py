@@ -219,11 +219,10 @@ class Image(object):
         self.ellipticity = None
         self.ellipticity_median = None
         self.ellipticity_mode = None
-        self.PSF_plotfile = None
+        self.PSF_plot_file = None
         self.pointing_error = None
         self.image_flipped = None
         self.jpeg_file_names = []
-        self.check_image_file = None
         self.cropped = False
         self.crop_x1 = None
         self.crop_x2 = None
@@ -411,6 +410,8 @@ class Image(object):
             self.logger.info("  No WCS found in image header")
         else:
             self.logger.debug("  Found WCS in image header.")
+            for item in self.image_WCS.to_header().cards:
+                self.logger.debug('    {}'.format(item))
 
         ## Determine PA of Image
         if self.image_WCS:
@@ -830,7 +831,8 @@ class Image(object):
                        ('CDELT2' in header.keys()):
                         ## If the wcs in header format meets all of the above
                         ## assumptions, do nothing and proceed to header analysis.
-                        self.logger.debug('  {}'.format(header))
+                        self.logger.debug('  Header has expected keywords')
+#                         self.logger.debug('  {}'.format(header))
                     else:
                         self.logger.warning('WCS does not match expected contents.')
                         for key in header.keys():
@@ -897,10 +899,8 @@ class Image(object):
                                               frame='icrs')
             self.pointing_error = self.coordinate_of_center_pixel.separation(\
                                                    self.coordinate_from_header)
-            self.logger.debug("  Target Coordinates are:  {}".format(
-                              self.coordinate_from_header.to_string(sep=":", precision=1, alwayssign=True))),
-            self.logger.debug("  WCS of Central Pixel is: {}".format(
-                              self.coordinate_of_center_pixel.to_string(sep=":", precision=1, alwayssign=True)))
+            self.logger.debug("  Header Coordinate: {}".format(self.coordinate_from_header.to_string(style='hmsdms', precision=1)))
+            self.logger.debug("  Center Coordinate: {}".format(self.coordinate_of_center_pixel.to_string(style='hmsdms', precision=1)))
             self.logger.info("  Pointing Error is {:.2f} arcmin".format(\
                                                 self.pointing_error.arcminute))
         except:
@@ -982,9 +982,6 @@ class Image(object):
         defaultparamsFO.close()
         self.temp_files.append(sextractor_output_param_file)
 
-        self.check_image_file = os.path.join(self.tel.temp_file_path,\
-                                        self.raw_file_basename+"_bksub.fits")
-        self.temp_files.append(self.check_image_file)
         ## Compare input parameters dict to default
         SExtractor_default = {
                              'CATALOG_NAME': self.SExtractor_catalog,
@@ -993,9 +990,7 @@ class Image(object):
                              'GAIN': self.tel.gain.value,
                              'GAIN_KEY': 'GAIN',
                              'PIXEL_SCALE': '{:.3f}'.format(self.tel.pixel_scale.value),
-                             'CHECKIMAGE_TYPE': '-BACKGROUND',
-                             'CHECKIMAGE_NAME': self.check_image_file,
-                             'ASSOCSELEC_TYPE': 'MATCHED',
+                             'CHECKIMAGE_TYPE': 'NONE',
                             }
 
         ## Use optional sextractor params
@@ -1009,7 +1004,7 @@ class Image(object):
 
         if assoc:
             ## Create Assoc file with pixel coordinates of catalog stars
-            assoc_file = os.path.join(self.tel.temp_file_path, 'assoc.txt')
+            assoc_file = os.path.join(self.tel.temp_file_path, self.raw_file_basename+'_assoc.txt')
             self.temp_files.append(assoc_file)
             if os.path.exists(assoc_file): os.remove(assoc_file)
             assocFO = open(assoc_file, 'w')
@@ -1018,7 +1013,8 @@ class Image(object):
                 try:
                     assocFO.write('{:8.1f} {:8.1f} {:8.1f}\n'.format(\
                                                     pix[0][0], pix[0][1],\
-                                                    star[self.catalog_filter]))
+                                                    star[self.catalog_filter],\
+                                                    ))
                 except:
                     pass
             assocFO.close()
@@ -1135,7 +1131,7 @@ class Image(object):
         if self.n_stars_SExtracted > 1:
             self.logger.info('Analyzing SExtractor results to determine typical image quality.')
             if self.tel.PSF_measurement_radius:
-                self.logger.info('  Using stars in the inner {} pixels.'.format(\
+                self.logger.info('  Using stars in the inner {}.'.format(\
                                               self.tel.PSF_measurement_radius))
             else:
                 IQRadiusFactor = 1.0
@@ -1206,183 +1202,185 @@ class Image(object):
         Make various plots for analysis of image quality.
         '''
         start_time = datetime.datetime.now()
-        if filename:
-            self.PSF_plot_filename = filename
-        else:
-            self.PSF_plot_filename = self.raw_file_basename+'_PSFinfo.png'
-        self.PSF_plotfile = os.path.join(self.tel.plot_file_path, self.PSF_plot_filename)
 
-        self.logger.info('Generating plots of PSF statistics: {}'.format(self.PSF_plot_filename))
         if not self.FWHM:
-            self.logger.info('  No FWHM statistics found.  Skipping plot creation.')
+            self.logger.warning('No FWHM statistics found.  Skipping PSF plot creation.')
+            self.PSF_plot_filename = None
+            self.PSF_plot_file = None
             return
-
-        ellip_threshold = 0.15
-        star_angles = [star['THETAWIN_IMAGE'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
-        image_angles = [star['AngleInImage'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
-        star_x = [star['XWIN_IMAGE'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
-        star_y = [star['YWIN_IMAGE'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
-        uncorrected_diffs = [star['THETAWIN_IMAGE']-star['AngleInImage'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
-        CentralFWHMs = [star['FWHM_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius.to(u.pix).value) and (float(star['FWHM_IMAGE']) > 0.5)]
-        CentralEllipticities = [star['ELLIPTICITY'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius.to(u.pix).value) and (float(star['FWHM_IMAGE']) > 0.5)]
+        else:
+            if filename:
+                self.PSF_plot_filename = filename
+            else:
+                self.PSF_plot_filename = self.raw_file_basename+'_PSFinfo.png'
+            self.logger.info('Generating plots of PSF statistics: {}'.format(self.PSF_plot_filename))
+            self.PSF_plot_file = os.path.join(self.tel.plot_file_path, self.PSF_plot_filename)
+            ellip_threshold = 0.15
+            star_angles = [star['THETAWIN_IMAGE'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
+            image_angles = [star['AngleInImage'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
+            star_x = [star['XWIN_IMAGE'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
+            star_y = [star['YWIN_IMAGE'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
+            uncorrected_diffs = [star['THETAWIN_IMAGE']-star['AngleInImage'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
+            CentralFWHMs = [star['FWHM_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius.to(u.pix).value) and (float(star['FWHM_IMAGE']) > 0.5)]
+            CentralEllipticities = [star['ELLIPTICITY'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius.to(u.pix).value) and (float(star['FWHM_IMAGE']) > 0.5)]
         
-        nstars = len(star_angles)
-        self.logger.debug('  Found {} stars with ellipticity greater than {:.2f}.'.format(\
-                                                      nstars, ellip_threshold))
+            nstars = len(star_angles)
+            self.logger.debug('  Found {} stars with ellipticity greater than {:.2f}.'.format(\
+                                                          nstars, ellip_threshold))
         
-        angle_diffs = []
-        for angle in uncorrected_diffs:
-            if angle < -90:
-                angle_diffs.append(angle + 90.)
-            elif angle > 90:
-                angle_diffs.append(angle - 90.)
-            else:
-                angle_diffs.append(angle)
-        angle_binsize = 10
-        diff_hist, diff_bins = np.histogram(angle_diffs, bins=angle_binsize*(np.arange(37)-18))
-        angle_hist, angle_bins = np.histogram(star_angles, bins=angle_binsize*(np.arange(37)-18))
-        angle_centers = (diff_bins[:-1] + diff_bins[1:]) / 2
+            angle_diffs = []
+            for angle in uncorrected_diffs:
+                if angle < -90:
+                    angle_diffs.append(angle + 90.)
+                elif angle > 90:
+                    angle_diffs.append(angle - 90.)
+                else:
+                    angle_diffs.append(angle)
+            angle_binsize = 10
+            diff_hist, diff_bins = np.histogram(angle_diffs, bins=angle_binsize*(np.arange(37)-18))
+            angle_hist, angle_bins = np.histogram(star_angles, bins=angle_binsize*(np.arange(37)-18))
+            angle_centers = (diff_bins[:-1] + diff_bins[1:]) / 2
 
-        ellip_binsize = 0.05
-        ellip_bmin = math.floor(min(CentralEllipticities)/ellip_binsize)*ellip_binsize - ellip_binsize/2.
-        ellip_bmax = math.ceil(max(CentralEllipticities)/ellip_binsize)*ellip_binsize + ellip_binsize/2.
-        ellip_bins = np.arange(ellip_bmin,ellip_bmax,ellip_binsize)
-        ellip_hist, ellip_bins = np.histogram(CentralEllipticities, bins=ellip_bins)
-        ellip_centers = (ellip_bins[:-1] + ellip_bins[1:]) / 2
+            ellip_binsize = 0.05
+            ellip_bmin = math.floor(min(CentralEllipticities)/ellip_binsize)*ellip_binsize - ellip_binsize/2.
+            ellip_bmax = math.ceil(max(CentralEllipticities)/ellip_binsize)*ellip_binsize + ellip_binsize/2.
+            ellip_bins = np.arange(ellip_bmin,ellip_bmax,ellip_binsize)
+            ellip_hist, ellip_bins = np.histogram(CentralEllipticities, bins=ellip_bins)
+            ellip_centers = (ellip_bins[:-1] + ellip_bins[1:]) / 2
 
-        fwhm_binsize = 0.2
-        fwhm_bmin = math.floor(min(CentralFWHMs)/fwhm_binsize)*fwhm_binsize - fwhm_binsize/2.
-        fwhm_bmax = math.ceil(max(CentralFWHMs)/fwhm_binsize)*fwhm_binsize + fwhm_binsize/2.
-        fwhm_bins = np.arange(fwhm_bmin,fwhm_bmax,fwhm_binsize)
-        fwhm_hist, fwhm_bins = np.histogram(CentralFWHMs, bins=fwhm_bins)
-        fwhm_centers = (fwhm_bins[:-1] + fwhm_bins[1:]) / 2
+            fwhm_binsize = 0.2
+            fwhm_bmin = math.floor(min(CentralFWHMs)/fwhm_binsize)*fwhm_binsize - fwhm_binsize/2.
+            fwhm_bmax = math.ceil(max(CentralFWHMs)/fwhm_binsize)*fwhm_binsize + fwhm_binsize/2.
+            fwhm_bins = np.arange(fwhm_bmin,fwhm_bmax,fwhm_binsize)
+            fwhm_hist, fwhm_bins = np.histogram(CentralFWHMs, bins=fwhm_bins)
+            fwhm_centers = (fwhm_bins[:-1] + fwhm_bins[1:]) / 2
 
-        star_angle_mean = np.mean(star_angles)
-        star_angle_median = np.median(star_angles)
-        angle_diff_mean = np.mean(angle_diffs)
-        angle_diff_median = np.median(angle_diffs)
-        self.logger.debug('  Mean Stellar PA = {:.0f}'.format(star_angle_mean))
-        self.logger.debug('  Median Stellar PA = {:.0f}'.format(star_angle_median))
-        self.logger.debug('  Mean Difference Angle = {:.0f}'.format(angle_diff_mean))
-        self.logger.debug('  Median Difference Angle = {:.0f}'.format(angle_diff_median))
+            star_angle_mean = np.mean(star_angles)
+            star_angle_median = np.median(star_angles)
+            angle_diff_mean = np.mean(angle_diffs)
+            angle_diff_median = np.median(angle_diffs)
+            self.logger.debug('  Mean Stellar PA = {:.0f}'.format(star_angle_mean))
+            self.logger.debug('  Median Stellar PA = {:.0f}'.format(star_angle_median))
+            self.logger.debug('  Mean Difference Angle = {:.0f}'.format(angle_diff_mean))
+            self.logger.debug('  Median Difference Angle = {:.0f}'.format(angle_diff_median))
 
-        if self.PSF_plotfile:
-            self.logger.debug('  Generating figure {}'.format(self.PSF_plotfile))
+            if self.PSF_plot_file:
+                self.logger.debug('  Generating figure {}'.format(self.PSF_plot_file))
 
-            pyplot.ioff()
-            fig = pyplot.figure(figsize=(10,11), dpi=100)
+                pyplot.ioff()
+                fig = pyplot.figure(figsize=(10,11), dpi=100)
 
-            TopLeft = pyplot.axes([0.000, 0.750, 0.465, 0.235])
-            pyplot.title('Histogram of FWHM Values for {}'.format(self.raw_file_name), size=10)
-            pyplot.bar(fwhm_centers, fwhm_hist, align='center', width=0.7*fwhm_binsize)
-            pyplot.plot([self.FWHM_median.to(u.pix).value, self.FWHM_median.to(u.pix).value], [0, 1.1*max(fwhm_hist)],\
-                        'ro-', linewidth=2, label='Median FWHM')
-            pyplot.plot([self.FWHM_mode.to(u.pix).value, self.FWHM_mode.to(u.pix).value], [0, 1.1*max(fwhm_hist)],\
-                        'ro-', linewidth=2, label='Mode FWHM')
-            pyplot.xlabel('FWHM (pixels)', size=10)
-            pyplot.ylabel('N Stars', size=10)
-            pyplot.xlim(0,np.percentile(CentralFWHMs, 95)+1)
-            pyplot.xticks(size=10)
-            pyplot.yticks(size=10)
+                TopLeft = pyplot.axes([0.000, 0.750, 0.465, 0.235])
+                pyplot.title('Histogram of FWHM Values for {}'.format(self.raw_file_name), size=10)
+                pyplot.bar(fwhm_centers, fwhm_hist, align='center', width=0.7*fwhm_binsize)
+                pyplot.plot([self.FWHM_median.to(u.pix).value, self.FWHM_median.to(u.pix).value], [0, 1.1*max(fwhm_hist)],\
+                            'ro-', linewidth=2, label='Median FWHM')
+                pyplot.plot([self.FWHM_mode.to(u.pix).value, self.FWHM_mode.to(u.pix).value], [0, 1.1*max(fwhm_hist)],\
+                            'ro-', linewidth=2, label='Mode FWHM')
+                pyplot.xlabel('FWHM (pixels)', size=10)
+                pyplot.ylabel('N Stars', size=10)
+                pyplot.xlim(0,np.percentile(CentralFWHMs, 95)+1)
+                pyplot.xticks(size=10)
+                pyplot.yticks(size=10)
 
-            TopRight = pyplot.axes([0.535, 0.750, 0.465, 0.235])
-            pyplot.title('Histogram of Elliptiticty Values for {}'.format(self.raw_file_name), size=10)
-            pyplot.plot([self.ellipticity_median, self.ellipticity_median], [0, 1.1*max(ellip_hist)],\
-                        'ro-', linewidth=2, label='Median Ellipticity')
-            pyplot.plot([self.ellipticity_mode, self.ellipticity_mode], [0, 1.1*max(ellip_hist)],\
-                        'ro-', linewidth=2, label='Mode Ellipticity')
-            pyplot.bar(ellip_centers, ellip_hist, align='center', width=0.7*ellip_binsize)
-            pyplot.xlabel('Ellipticity', size=10)
-            pyplot.ylabel('N Stars', size=10)
-            pyplot.xlim(0,1)
-            pyplot.xticks(0.1*np.arange(11), size=10)
-            pyplot.yticks(size=10)
+                TopRight = pyplot.axes([0.535, 0.750, 0.465, 0.235])
+                pyplot.title('Histogram of Elliptiticty Values for {}'.format(self.raw_file_name), size=10)
+                pyplot.plot([self.ellipticity_median, self.ellipticity_median], [0, 1.1*max(ellip_hist)],\
+                            'ro-', linewidth=2, label='Median Ellipticity')
+                pyplot.plot([self.ellipticity_mode, self.ellipticity_mode], [0, 1.1*max(ellip_hist)],\
+                            'ro-', linewidth=2, label='Mode Ellipticity')
+                pyplot.bar(ellip_centers, ellip_hist, align='center', width=0.7*ellip_binsize)
+                pyplot.xlabel('Ellipticity', size=10)
+                pyplot.ylabel('N Stars', size=10)
+                pyplot.xlim(0,1)
+                pyplot.xticks(0.1*np.arange(11), size=10)
+                pyplot.yticks(size=10)
 
-            MiddleLeft = pyplot.axes([0.000, 0.375, 0.465, 0.320])
-            MiddleLeft.set_aspect('equal')
-            pyplot.title('Average FWHM scaled from {:.1f} pix to {:.1f} pix'.format(0.8*self.FWHM.to(u.pix).value, 2.0*self.FWHM.to(u.pix).value), size=10)
-            if self.n_stars_SExtracted > 20000:
-                gridsize = 20
-            else:
-                gridsize = 10
-            pyplot.hexbin(self.SExtractor_results['XWIN_IMAGE'].data,\
-                          self.SExtractor_results['YWIN_IMAGE'].data,\
-                          self.SExtractor_results['FWHM_IMAGE'].data,\
-                          gridsize=gridsize,\
-                          mincnt=5,\
-                          vmin=0.8*self.FWHM.to(u.pix).value,\
-                          vmax=2.0*self.FWHM.to(u.pix).value,\
-                          alpha=0.5,\
-                          cmap='Reds')
-#             center_region = pyplot.Circle((self.nXPix/2, self.nYPix/2),\
-#                                    radius=self.tel.PSF_measurement_radius/self.nXPix,\
-#                                    color='k')
-#             MiddleLeft.add_artist(center_region)
-            pyplot.xlabel('X Pixels', size=10)
-            pyplot.ylabel('Y Pixels', size=10)
-            pyplot.xlim(0,self.nXPix)
-            pyplot.ylim(0,self.nYPix)
-            pyplot.xticks(size=10)
-            pyplot.yticks(size=10)
+                MiddleLeft = pyplot.axes([0.000, 0.375, 0.465, 0.320])
+                MiddleLeft.set_aspect('equal')
+                pyplot.title('Average FWHM scaled from {:.1f} pix to {:.1f} pix'.format(0.8*self.FWHM.to(u.pix).value, 2.0*self.FWHM.to(u.pix).value), size=10)
+                if self.n_stars_SExtracted > 20000:
+                    gridsize = 20
+                else:
+                    gridsize = 10
+                pyplot.hexbin(self.SExtractor_results['XWIN_IMAGE'].data,\
+                              self.SExtractor_results['YWIN_IMAGE'].data,\
+                              self.SExtractor_results['FWHM_IMAGE'].data,\
+                              gridsize=gridsize,\
+                              mincnt=5,\
+                              vmin=0.8*self.FWHM.to(u.pix).value,\
+                              vmax=2.0*self.FWHM.to(u.pix).value,\
+                              alpha=0.5,\
+                              cmap='Reds')
+    #             center_region = pyplot.Circle((self.nXPix/2, self.nYPix/2),\
+    #                                    radius=self.tel.PSF_measurement_radius/self.nXPix,\
+    #                                    color='k')
+    #             MiddleLeft.add_artist(center_region)
+                pyplot.xlabel('X Pixels', size=10)
+                pyplot.ylabel('Y Pixels', size=10)
+                pyplot.xlim(0,self.nXPix)
+                pyplot.ylim(0,self.nYPix)
+                pyplot.xticks(size=10)
+                pyplot.yticks(size=10)
 
-            MiddleRight = pyplot.axes([0.535, 0.375, 0.465, 0.320])
-            MiddleRight.set_aspect('equal')
-            pyplot.title('Average Ellipticity scaled from 0.25 to 0.75', size=10)
-            if self.n_stars_SExtracted > 20000:
-                gridsize = 20
-            else:
-                gridsize = 10
-            pyplot.hexbin(self.SExtractor_results['XWIN_IMAGE'].data,\
-                          self.SExtractor_results['YWIN_IMAGE'].data,\
-                          self.SExtractor_results['ELLIPTICITY'].data,\
-                          gridsize=gridsize,\
-                          mincnt=5,\
-                          vmin=0.25, vmax=0.75,\
-                          alpha=0.5,\
-                          cmap='Reds')
-#             MiddleRight.add_artist(center_region)
-            pyplot.xlabel('X Pixels', size=10)
-            pyplot.ylabel('Y Pixels', size=10)
-            pyplot.xlim(0,self.nXPix)
-            pyplot.ylim(0,self.nYPix)
-            pyplot.xticks(size=10)
-            pyplot.yticks(size=10)
+                MiddleRight = pyplot.axes([0.535, 0.375, 0.465, 0.320])
+                MiddleRight.set_aspect('equal')
+                pyplot.title('Average Ellipticity scaled from 0.25 to 0.75', size=10)
+                if self.n_stars_SExtracted > 20000:
+                    gridsize = 20
+                else:
+                    gridsize = 10
+                pyplot.hexbin(self.SExtractor_results['XWIN_IMAGE'].data,\
+                              self.SExtractor_results['YWIN_IMAGE'].data,\
+                              self.SExtractor_results['ELLIPTICITY'].data,\
+                              gridsize=gridsize,\
+                              mincnt=5,\
+                              vmin=0.25, vmax=0.75,\
+                              alpha=0.5,\
+                              cmap='Reds')
+    #             MiddleRight.add_artist(center_region)
+                pyplot.xlabel('X Pixels', size=10)
+                pyplot.ylabel('Y Pixels', size=10)
+                pyplot.xlim(0,self.nXPix)
+                pyplot.ylim(0,self.nYPix)
+                pyplot.xticks(size=10)
+                pyplot.yticks(size=10)
 
-            BottomLeft = pyplot.axes([0.000, 0.0, 0.465, 0.320])
-            pyplot.title('Correlation of Ellipticity with Image Radius', size=10)
-            pyplot.hist2d(self.SExtractor_results['ImageRadius'],\
-                          self.SExtractor_results['ELLIPTICITY'],\
-                          bins=40, cmap='binary')
-            pyplot.xlabel('r (pixels)', size=10)
-            pyplot.ylabel('Ellipticity', size=10)
-            pyplot.xlim(0, math.sqrt(self.nXPix**2 + self.nYPix**2)/2.)
-            pyplot.ylim(0, 1.0)
-            pyplot.xticks(size=10)
-            pyplot.yticks(size=10)
+                BottomLeft = pyplot.axes([0.000, 0.0, 0.465, 0.320])
+                pyplot.title('Correlation of Ellipticity with Image Radius', size=10)
+                pyplot.hist2d(self.SExtractor_results['ImageRadius'],\
+                              self.SExtractor_results['ELLIPTICITY'],\
+                              bins=40, cmap='binary')
+                pyplot.xlabel('r (pixels)', size=10)
+                pyplot.ylabel('Ellipticity', size=10)
+                pyplot.xlim(0, math.sqrt(self.nXPix**2 + self.nYPix**2)/2.)
+                pyplot.ylim(0, 1.0)
+                pyplot.xticks(size=10)
+                pyplot.yticks(size=10)
 
-            BottomRight = pyplot.axes([0.535, 0.0, 0.465, 0.320])
-            BottomRight.set_aspect('equal')
-            pyplot.title('Correlation Between PSF Angle and Position in Image', size=10)
-            pyplot.hist2d(star_angles, image_angles, bins=36, cmap='binary')
-            pyplot.xlabel('Stellar PSF PA', size=10)
-            pyplot.ylabel('Image PA', size=10)
-            pyplot.xlim(-100,100)
-            pyplot.xticks(30*(np.arange(7)-3), size=10)
-            pyplot.ylim(-100,100)
-            pyplot.yticks(30*(np.arange(7)-3), size=10)
+                BottomRight = pyplot.axes([0.535, 0.0, 0.465, 0.320])
+                BottomRight.set_aspect('equal')
+                pyplot.title('Correlation Between PSF Angle and Position in Image', size=10)
+                pyplot.hist2d(star_angles, image_angles, bins=36, cmap='binary')
+                pyplot.xlabel('Stellar PSF PA', size=10)
+                pyplot.ylabel('Image PA', size=10)
+                pyplot.xlim(-100,100)
+                pyplot.xticks(30*(np.arange(7)-3), size=10)
+                pyplot.ylim(-100,100)
+                pyplot.yticks(30*(np.arange(7)-3), size=10)
 
-            pyplot.savefig(self.PSF_plotfile, dpi=100, bbox_inches='tight', pad_inches=0.10)
-            pyplot.close(fig)
+                pyplot.savefig(self.PSF_plot_file, dpi=100, bbox_inches='tight', pad_inches=0.10)
+                pyplot.close(fig)
 
-        end_time = datetime.datetime.now()
-        elapzed_time = end_time - start_time
-        self.logger.info('  Done making PSF plot in {:.1f} s'.format(elapzed_time.total_seconds()))
+            end_time = datetime.datetime.now()
+            elapzed_time = end_time - start_time
+            self.logger.info('  Done making PSF plot in {:.1f} s'.format(elapzed_time.total_seconds()))
 
 
     ##-------------------------------------------------------------------------
     ## Run SCAMP
     ##-------------------------------------------------------------------------
-    def run_SCAMP(self, catalog='USNO-B1', mergedcat_name='scamp.cat', mergedcat_type='ASCII_HEAD'):
+    def run_SCAMP(self):
         '''
         Run SCAMP on SExtractor output catalog.
         '''
@@ -1395,18 +1393,15 @@ class Image(object):
 
         SCAMP_default = {
                         'AHEADER_GLOBAL': SCAMP_aheader,
-                        'ASTREF_CATALOG': catalog,
                         'SAVE_REFCATALOG': 'N',
                         'REFOUT_CATPATH': self.tel.temp_file_path,
-                        'MERGEDOUTCAT_NAME': mergedcat_name,
-                        'MERGEDOUTCAT_TYPE': mergedcat_type,
+                        'MERGEDOUTCAT_NAME': os.path.join(self.tel.temp_file_path, 'scamp.cat'),
+                        'MERGEDOUTCAT_TYPE': 'FITS_LDAC',
                         'CHECKPLOT_RES': '1200,1200',
-                        'CHECKPLOT_TYPE': 'FGROUPS,DISTORTION,ASTR_REFERROR2D,ASTR_REFERROR1D,PHOT_ZPCORR,ASTR_REFSYSMAP',
-                        'CHECKPLOT_NAME': 'fgroups,distortion,astr_referror2d,astr_referror1d,phot_zpcorr,astr_refsysmap',
-                        'CROSSID_RADIUS': 6.0,
+                        'CHECKPLOT_TYPE': 'NONE',
                         'SOLVE_PHOTOM': 'Y',
                         'ASTRINSTRU_KEY': 'QRUNID',
-                        'WRITE_XML': 'Y',
+                        'WRITE_XML': 'N',
                         'XML_NAME': os.path.join(self.tel.temp_file_path, 'scamp.xml'),
                         }
 
@@ -1422,14 +1417,13 @@ class Image(object):
         for key in SCAMP_params.keys():
             SCAMPCommand.append('-{}'.format(key))
             SCAMPCommand.append('{}'.format(SCAMP_params[key]))
-        self.logger.info("Running SCAMP on {} catalog.".format(catalog))
+        self.logger.info("Running SCAMP")
         if SCAMP_aheader:
             self.logger.info("  Using SCAMP_aheader file: {}".format(SCAMP_aheader))
         self.logger.debug("  SCAMP command: {}".format(SCAMPCommand))
         try:
             SCAMP_STDOUT = subprocess.check_output(SCAMPCommand,\
                              stderr=subprocess.STDOUT, universal_newlines=True)
-            self.temp_files.append(os.path.join(self.tel.temp_file_path, 'scamp.xml'))
         except subprocess.CalledProcessError as e:
             self.logger.error("SCAMP failed.  Command: {}".format(e.cmd))
             self.logger.error("SCAMP failed.  Returncode: {}".format(e.returncode))
@@ -1450,9 +1444,6 @@ class Image(object):
                     self.logger.info("  SCAMP Output: "+line)
                 else:
                     self.logger.debug("  SCAMP Output: "+line)
-        ## Store Output Catalog Name
-        if os.path.exists(mergedcat_name):
-            self.SCAMP_catalog = mergedcat_name
 
         ## Populate FITS header with SCAMP derived header values in .head file
         head_file = os.path.splitext(self.working_file)[0]+'.head'
@@ -1492,7 +1483,7 @@ class Image(object):
         if os.path.exists(swarp_file): os.remove(swarp_file)
         SWarp_params = {'IMAGEOUT_NAME': swarp_file,
                         'COPY_KEYWORDS': 'FILTER,OBJECT,AIRMASS,DATE-OBS,LAT-OBS,LONG-OBS,ALT-OBS,RA,DEC',
-                        'WRITE_XML': 'Y',
+                        'WRITE_XML': 'N',
                         'XML_NAME': os.path.join(self.tel.temp_file_path, 'swarp.xml'),
                         'FSCALASTRO_TYPE': 'NONE',
                         'SUBTRACT_BACK': 'N',
@@ -1520,7 +1511,6 @@ class Image(object):
                 self.logger.debug("  SWarp Output: "+line)
         ## Replace working_file with SWarp output file
         if os.path.exists(swarp_file):
-            self.temp_files.append(os.path.join(self.tel.temp_file_path, 'swarp.xml'))
             self.logger.debug('  SWarp process succeeded.')
             self.logger.debug('  Moving SWarpped file to working file.')
             if os.path.exists(self.working_file): os.remove(self.working_file)
@@ -1554,13 +1544,12 @@ class Image(object):
             dDEC = max(DECs) - min(DECs)
             if not self.coordinate_of_center_pixel:
                 center_from_WCS = self.image_WCS.wcs_pix2world([[self.nXPix/2, self.nYPix/2]], 1)
-                self.logger.debug("  Using coordinates of center point: {0} {1}".format(\
-                                     center_from_WCS[0][0], center_from_WCS[0][1]))
                 self.coordinate_of_center_pixel = coords.SkyCoord(\
                                                   ra=center_from_WCS[0][0],\
                                                   dec=center_from_WCS[0][1],\
                                                   unit=(u.degree, u.degree),\
                                                   frame='icrs')
+            self.logger.debug("  Center Coordinate: {}".format(self.coordinate_of_center_pixel.to_string(style='hmsdms', precision=1)))
             USNO = viz.query_region(coordinates=self.coordinate_of_center_pixel,\
                                     width=dRA*u.deg, height=dDEC*u.deg,\
                                     catalog=catalog)
@@ -1681,7 +1670,7 @@ class Image(object):
         zero_points = [(entry['assoc_catmag'] - entry['MAG_AUTO']) for entry in self.SExtractor_results if entry['FLAGS'] == 0]
 
         if len(zero_points) < min_stars:
-            self.logger.info('Zero point not calculated.  Only {} catalog stars found.'.format(\
+            self.logger.warning('  Zero point not calculated.  Only {} catalog stars found.'.format(\
                              len(zero_points)))
         else:
             self.zero_point_mode = mode(zero_points, 0.1)
@@ -1916,22 +1905,6 @@ class Image(object):
             for r in radii:
                 draw.ellipse((x-r, y-r, x+r, y+r), outline=crosshair_color)
 
-        ## Mark Detected Stars
-        if mark_detected_stars and self.SExtractor_results:
-            if self.FWHM:
-                ms = max([6, 2*math.ceil(self.FWHM.to(u.pix).value)])
-            else:
-                ms = 6
-            circle_color = 'green'
-            self.logger.debug('  Marking detected stars with {} radius {} circles'.format(ms, circle_color))
-            for star in self.SExtractor_results:
-                x = star['XWIN_IMAGE']
-                y = star['YWIN_IMAGE']
-                thickness = 1
-                radii = np.linspace(ms, ms+thickness, thickness)
-                for r in radii:
-                    draw.ellipse((x-r, y-r, x+r, y+r), outline=circle_color)
-
         ## Mark Catalog Stars
         if mark_catalog_stars and self.catalog_data:
             if self.FWHM:
@@ -1945,6 +1918,22 @@ class Image(object):
                 xy = self.image_WCS.wcs_world2pix([[float(star['RA']), float(star['Dec'])]], 1)[0]
                 x = int(xy[0])
                 y = int(xy[1])
+                thickness = 1
+                radii = np.linspace(ms, ms+thickness, thickness)
+                for r in radii:
+                    draw.ellipse((x-r, y-r, x+r, y+r), outline=circle_color)
+
+        ## Mark Detected Stars
+        if mark_detected_stars and self.SExtractor_results:
+            if self.FWHM:
+                ms = max([6, 2*math.ceil(self.FWHM.to(u.pix).value)])
+            else:
+                ms = 6
+            circle_color = 'green'
+            self.logger.debug('  Marking detected stars with {} radius {} circles'.format(ms, circle_color))
+            for star in self.SExtractor_results:
+                x = star['XWIN_IMAGE']
+                y = star['YWIN_IMAGE']
                 thickness = 1
                 radii = np.linspace(ms, ms+thickness, thickness)
                 for r in radii:
@@ -2008,6 +1997,7 @@ class Image(object):
         Clean up by deleting temporary files.
         '''
         self.logger.info("Cleaning Up Temporary Files.")
+        print(self.temp_files)
         for item in self.temp_files:
             if os.path.exists(item):
                 self.logger.debug("  Deleting {0}".format(item))
@@ -2131,7 +2121,7 @@ class Image(object):
                 JPEG1_html = "<a href='{}'>".format(os.path.join("..", "..", "Plots", self.jpeg_file_names[0]))
                 JPEG2_html = " (<a href='{}'>JPEG2</a>)".format(os.path.join("..", "..", "Plots", self.jpeg_file_names[1]))
                 JPEG3_html = " (<a href='{}'>JPEG3</a>)".format(os.path.join("..", "..", "Plots", self.jpeg_file_names[2]))
-            if self.PSF_plotfile:
+            if self.PSF_plot_file:
                 PSFplot_html = " (<a href='{}'>PSF</a>)".format(os.path.join("..", "..", "Plots", self.PSF_plot_filename))
             else:
                 PSFplot_html = ""
