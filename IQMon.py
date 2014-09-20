@@ -1394,7 +1394,7 @@ class Image(object):
             SCAMP_aheader = 'scamp.ahead'
 
         SCAMP_default = {
-                        'SCAMP_AHEADER_GLOBAL': SCAMP_aheader,
+                        'AHEADER_GLOBAL': SCAMP_aheader,
                         'ASTREF_CATALOG': catalog,
                         'SAVE_REFCATALOG': 'N',
                         'REFOUT_CATPATH': self.tel.temp_file_path,
