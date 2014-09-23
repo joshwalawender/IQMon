@@ -275,7 +275,7 @@ class Image(object):
             self.logger.debug('  {} = {}'.format(entry, self.tel.config[entry]))
 
 
-    def make_logger(self, logfile=None, clobber=True, verbose=False):
+    def make_logger(self, logfile=None, clobber=False, verbose=False):
         '''
         Create the logger object to use when processing.  Takes as input the
         full path to the file to write the log to and verboase, a boolean value
@@ -2016,7 +2016,6 @@ class Image(object):
         Clean up by deleting temporary files.
         '''
         self.logger.info("Cleaning Up Temporary Files.")
-        print(self.temp_files)
         for item in self.temp_files:
             if os.path.exists(item):
                 self.logger.debug("  Deleting {0}".format(item))
