@@ -1687,12 +1687,12 @@ class Image(object):
             self.zero_point = self.zero_point_mode
 
             ## Check zero point
-            try:
+            if self.tel.threshold_zeropoint and self.zero_point:
                 if self.zero_point < self.tel.threshold_zeropoint:
                     self.flags['zero point'] = True
                 else:
                     self.flags['zero point'] = False
-            except:
+            else:
                 self.flags['zero point'] = False
 
             end_time = datetime.datetime.now()
