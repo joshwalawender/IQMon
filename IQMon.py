@@ -275,7 +275,7 @@ class Image(object):
             self.logger.debug('  {} = {}'.format(entry, self.tel.config[entry]))
 
 
-    def make_logger(self, logfile=None, verbose=False):
+    def make_logger(self, logfile=None, clobber=True, verbose=False):
         '''
         Create the logger object to use when processing.  Takes as input the
         full path to the file to write the log to and verboase, a boolean value
@@ -283,7 +283,9 @@ class Image(object):
         always be at debug level).
         '''
         if not logfile:
-            logfile = os.path.join(self.tel.logs_file_path, 'IQMon.log')
+            logfile = os.path.join(self.tel.logs_file_path, '{}_IQMon.log'.format(self.raw_file_basename))
+        if clobber:
+            if os.path.exists(logfile): os.remove(logfile)
         self.logger = logging.getLogger('IQMonLogger')
         if len(self.logger.handlers) < 1:
             self.logger.setLevel(logging.DEBUG)
@@ -300,8 +302,16 @@ class Image(object):
             self.logger.addHandler(LogConsoleHandler)
             self.logger.addHandler(LogFileHandler)
 
+        ## Put initial lines in log
+        self.logger.info('')
+        self.logger.info("###### Processing Image {} ######".format(self.raw_file_name))
+        self.logger.info('')
+
         ## Print Configuration to Log
-        self.logger.debug('Using configuration:')
+        if 'name' in self.tel.config.keys():
+            self.logger.debug('Using configuration for telescope: {}'.format(self.tel.config['name']))
+        else:
+            self.logger.debug('Using configuration:')
         for entry in self.tel.config.keys():
             self.logger.debug('  {} = {}'.format(entry, self.tel.config[entry]))
 
