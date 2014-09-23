@@ -284,6 +284,8 @@ class Image(object):
         '''
         if not logfile:
             logfile = os.path.join(self.tel.logs_file_path, '{}_IQMon.log'.format(self.raw_file_basename))
+        self.logfile = logfile
+        self.logfilename = os.path.split(self.logfile)[1]
         if clobber:
             if os.path.exists(logfile): os.remove(logfile)
         self.logger = logging.getLogger('IQMonLogger')
@@ -2146,7 +2148,8 @@ class Image(object):
                 ZPplot_html = " (<a href='{}'>ZP</a>)".format(os.path.join("..", "..", "Plots", self.zero_point_plotfilename))
             else:
                 ZPplot_html = ""
-            htmlline = "      <td style='color:black;text-align:left'>" + JPEG1_html + "{}</a>".format(self.raw_file_basename) + JPEG2_html + JPEG3_html + PSFplot_html + ZPplot_html + "</td>\n"
+            log_html = " (<a href='{}'>log</a>)".format(os.path.join("..", "..", "Logs", self.tel.config['name'], self.logfilename))
+            htmlline = "      <td style='color:black;text-align:left'>" + JPEG1_html + "{}</a>".format(self.raw_file_basename) + JPEG2_html + JPEG3_html + PSFplot_html + ZPplot_html + log_html + "</td>\n"
             HTML.write(htmlline)
         ## Write Target Name
         if "Target" in fields:
