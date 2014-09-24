@@ -240,6 +240,7 @@ class Image(object):
                       'ellipticity': False,\
                       'pointing error': False,\
                       'zero point': False,\
+                      'other': False,\
                      }
 
     def __del__(self):
@@ -1445,11 +1446,14 @@ class Image(object):
         else:
             if 'DETECT_MINAREA' in self.tel.SExtractor_params: del self.tel.SExtractor_params['DETECT_MINAREA']
 
+
         if len(filtered_stars) < nstars_threshold:
             self.logger.warning('  Only {} bright stars detected.  Image appears blank'.format(len(filtered_stars)))
+            self.flags['other'] = True
             return True
         else:
             self.logger.info('  Found {} bright stars.'.format(len(filtered_stars)))
+            self.flags['other'] = False
             return False
 
 
