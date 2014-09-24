@@ -288,7 +288,7 @@ class Image(object):
         self.logfilename = os.path.split(self.logfile)[1]
         if clobber:
             if os.path.exists(logfile): os.remove(logfile)
-        self.logger = logging.getLogger('IQMonLogger')
+        self.logger = logging.getLogger(self.raw_file_basename)
         if len(self.logger.handlers) < 1:
             self.logger.setLevel(logging.DEBUG)
             LogFileHandler = logging.FileHandler(logfile)
