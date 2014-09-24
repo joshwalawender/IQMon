@@ -232,7 +232,7 @@ class Image(object):
         self.original_nXPix = None
         self.original_nYPix = None
         self.SCAMP_catalog = None
-        self.SCAMP_done = False
+        self.SCAMP_successful = False
         self.catalog_name = None
         self.catalog_data = None
         self.flags = {
@@ -1102,7 +1102,16 @@ class Image(object):
             ## Read FITS_LDAC SExtractor Catalog
             self.logger.debug("  Reading SExtractor output catalog.")
             hdu = fits.open(self.SExtractor_catalog)
-            self.SExtractor_results = table.Table(hdu[2].data)
+            results = table.Table(hdu[2].data)
+
+            rows_to_remove = []
+            for i in range(0,len(results)):
+                if results['FLAGS'][i] != 0:
+                    rows_to_remove.append(i)
+            if len(rows_to_remove) > 0:
+                results.remove_rows(rows_to_remove)
+
+            self.SExtractor_results = results
             SExImageRadius = []
             SExAngleInImage = []
             assoc_x = []
@@ -1393,6 +1402,56 @@ class Image(object):
             elapzed_time = end_time - start_time
             self.logger.info('  Done making PSF plot in {:.1f} s'.format(elapzed_time.total_seconds()))
 
+    ##-------------------------------------------------------------------------
+    ## Is the Image Blank
+    ##-------------------------------------------------------------------------
+    def is_blank(self):
+        '''
+        '''
+        self.logger.info('Checking if image is blank')
+        nstars_threshold = 10
+
+        ## Edit SExtractor parameters to detect only bright stars
+        if 'DETECT_THRESH' in self.tel.SExtractor_params.keys():
+            dt = self.tel.SExtractor_params['DETECT_THRESH']
+        else:
+            dt = None
+        if 'ANALYSIS_THRESH' in self.tel.SExtractor_params.keys():
+            at = self.tel.SExtractor_params['ANALYSIS_THRESH']
+        else:
+            at = None
+        if 'DETECT_MINAREA' in self.tel.SExtractor_params.keys():
+            da = self.tel.SExtractor_params['DETECT_MINAREA']
+        else:
+            da = None
+        self.tel.SExtractor_params['DETECT_THRESH'] = 7.0
+        self.tel.SExtractor_params['ANALYSIS_THRESH'] = 7.0
+        self.tel.SExtractor_params['DETECT_MINAREA'] = 9
+        self.run_SExtractor()
+        stars = [entry for entry in self.SExtractor_results if entry['FLAGS'] == 0]
+        filtered_stars = [star for star in stars if star['BWIN_IMAGE'] > 1.0]
+
+        ## Edit SExtractor parameters back to original state
+        if dt:
+            self.tel.SExtractor_params['DETECT_THRESH'] = dt
+        else:
+            if 'DETECT_THRESH' in self.tel.SExtractor_params: del self.tel.SExtractor_params['DETECT_THRESH']
+        if at:
+            self.tel.SExtractor_params['ANALYSIS_THRESH'] = at
+        else:
+            if 'ANALYSIS_THRESH' in self.tel.SExtractor_params: del self.tel.SExtractor_params['ANALYSIS_THRESH']
+        if da:
+            self.tel.SExtractor_params['DETECT_MINAREA'] = da
+        else:
+            if 'DETECT_MINAREA' in self.tel.SExtractor_params: del self.tel.SExtractor_params['DETECT_MINAREA']
+
+        if len(filtered_stars) < nstars_threshold:
+            self.logger.warning('  Only {} bright stars detected.  Image appears blank'.format(len(filtered_stars)))
+            return True
+        else:
+            self.logger.info('  Found {} bright stars.'.format(len(filtered_stars)))
+            return False
+
 
     ##-------------------------------------------------------------------------
     ## Run SCAMP
@@ -1476,15 +1535,15 @@ class Image(object):
             output = str(output)
             for line in output.splitlines():
                 self.logger.debug(line)
-            self.SCAMP_done = True
+            self.SCAMP_successful = True
         else:
-            self.logger.critical('No .head file found from SCAMP.')
-            self.SCAMP_done = False
-            sys.exit(1)
+            self.logger.critical('No .head file found from SCAMP.  SCAMP failed.')
+            self.SCAMP_successful = False
 
         end_time = datetime.datetime.now()
         elapzed_time = end_time - start_time
         self.logger.info('  Done running SCAMP in {:.1f} s'.format(elapzed_time.total_seconds()))
+        return self.SCAMP_successful
 
 
     ##-------------------------------------------------------------------------
