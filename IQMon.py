@@ -1356,7 +1356,7 @@ class Image(object):
                 pyplot.plot([self.ellipticity_average, self.ellipticity_average], [0, 1.1*max(ellip_hist)],\
                             'go-', linewidth=2, label='Mode Ellipticity', alpha=0.9)
                 pyplot.plot([self.ellipticity_median, self.ellipticity_median], [0, 1.1*max(ellip_hist)],\
-                            'ro-', linewidth=2, label='Median Ellipticity', alpha=0.5)
+                            'bo-', linewidth=2, label='Median Ellipticity', alpha=0.5)
                 pyplot.xlabel('Ellipticity', size=10)
                 pyplot.ylabel('N Stars', size=10)
                 pyplot.xlim(0,1)
