@@ -208,7 +208,7 @@ class Image(object):
         self.SExtractor_background = None
         self.SExtractor_background_RMS = None
         self.temp_files = []
-        self.SExtractor_catalog = None
+        self.SExtractor_catalogfile = None
         self.SExtractor_results = None
         self.position_angle = None
         self.zero_point = None
@@ -983,9 +983,9 @@ class Image(object):
             self.logger.info('  Using {} filter for catalog magnitudes.'.format(self.catalog_filter))
 
         ## Set up file names
-        self.SExtractor_catalog = os.path.join(self.tel.temp_file_path,\
+        self.SExtractor_catalogfile = os.path.join(self.tel.temp_file_path,\
                                                self.raw_file_basename+".cat")
-        self.temp_files.append(self.SExtractor_catalog)
+        self.temp_files.append(self.SExtractor_catalogfile)
 
         sextractor_output_param_file = os.path.join(self.tel.temp_file_path,\
                                                    '{}.param'.format(self.raw_file_basename))
@@ -1008,7 +1008,7 @@ class Image(object):
 
         ## Compare input parameters dict to default
         SExtractor_default = {
-                             'CATALOG_NAME': self.SExtractor_catalog,
+                             'CATALOG_NAME': self.SExtractor_catalogfile,
                              'CATALOG_TYPE': 'FITS_LDAC',
                              'PARAMETERS_NAME': sextractor_output_param_file,
                              'GAIN': self.tel.gain.value,
@@ -1113,13 +1113,13 @@ class Image(object):
                 self.SExtractor_background_RMS = None
 
             ## If No Output Catalog Created ...
-            if not os.path.exists(self.SExtractor_catalog):
+            if not os.path.exists(self.SExtractor_catalogfile):
                 self.logger.warning("SExtractor failed to create catalog.")
-                self.SExtractor_catalog = None
+                self.SExtractor_catalogfile = None
 
             ## Read FITS_LDAC SExtractor Catalog
             self.logger.debug("  Reading SExtractor output catalog.")
-            hdu = fits.open(self.SExtractor_catalog)
+            hdu = fits.open(self.SExtractor_catalogfile)
             results = table.Table(hdu[2].data)
 
             rows_to_remove = []
@@ -1446,7 +1446,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Is the Image Blank
     ##-------------------------------------------------------------------------
-    def is_blank(self):
+    def is_blank(self, threshold=5.0, area=9):
         '''
         '''
         self.logger.info('Checking if image is blank')
@@ -1465,8 +1465,9 @@ class Image(object):
             da = self.tel.SExtractor_params['DETECT_MINAREA']
         else:
             da = None
-        self.tel.SExtractor_params['DETECT_THRESH'] = 5.0
-        self.tel.SExtractor_params['ANALYSIS_THRESH'] = 5.0
+        self.tel.SExtractor_params['DETECT_THRESH'] = threshold
+        self.tel.SExtractor_params['ANALYSIS_THRESH'] = threshold
+        self.tel.SExtractor_params['DETECT_MINAREA'] = area
         self.run_SExtractor()
         stars = [entry for entry in self.SExtractor_results if entry['FLAGS'] == 0]
         filtered_stars = [star for star in stars if star['BWIN_IMAGE'] > 1.0]
@@ -1480,6 +1481,17 @@ class Image(object):
             self.tel.SExtractor_params['ANALYSIS_THRESH'] = at
         else:
             if 'ANALYSIS_THRESH' in self.tel.SExtractor_params: del self.tel.SExtractor_params['ANALYSIS_THRESH']
+        if da:
+            self.tel.SExtractor_params['DETECT_MINAREA'] = da
+        else:
+            if 'DETECT_MINAREA' in self.tel.SExtractor_params: del self.tel.SExtractor_params['DETECT_MINAREA']
+
+        self.SExtractor_catalogfile = None
+        self.SExtractor_results = None
+        self.n_stars_SExtracted = None
+        self.SExtractor_background = None
+        self.SExtractor_background_RMS = None
+        
 
         if len(filtered_stars) < nstars_threshold:
             self.logger.warning('  Only {} bright stars detected.  Image appears blank'.format(len(filtered_stars)))
@@ -1527,7 +1539,7 @@ class Image(object):
                 if not key in self.tel.SCAMP_params.keys():
                     SCAMP_params[key] = SCAMP_default[key]
 
-        SCAMPCommand = ["scamp", self.SExtractor_catalog]
+        SCAMPCommand = ["scamp", self.SExtractor_catalogfile]
         for key in SCAMP_params.keys():
             SCAMPCommand.append('-{}'.format(key))
             SCAMPCommand.append('{}'.format(SCAMP_params[key]))
