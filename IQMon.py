@@ -212,6 +212,10 @@ class Image(object):
         self.SExtractor_results = None
         self.position_angle = None
         self.zero_point = None
+        self.zero_point_mode = None
+        self.zero_point_median = None
+        self.zero_point_average = None
+        self.zero_point_correlation = None
         self.zero_point_plotfile = None
         self.total_process_time = None
         self.FWHM = None
@@ -1425,9 +1429,8 @@ class Image(object):
             da = self.tel.SExtractor_params['DETECT_MINAREA']
         else:
             da = None
-        self.tel.SExtractor_params['DETECT_THRESH'] = 7.0
-        self.tel.SExtractor_params['ANALYSIS_THRESH'] = 7.0
-        self.tel.SExtractor_params['DETECT_MINAREA'] = 9
+        self.tel.SExtractor_params['DETECT_THRESH'] = 5.0
+        self.tel.SExtractor_params['ANALYSIS_THRESH'] = 5.0
         self.run_SExtractor()
         stars = [entry for entry in self.SExtractor_results if entry['FLAGS'] == 0]
         filtered_stars = [star for star in stars if star['BWIN_IMAGE'] > 1.0]
@@ -1441,11 +1444,6 @@ class Image(object):
             self.tel.SExtractor_params['ANALYSIS_THRESH'] = at
         else:
             if 'ANALYSIS_THRESH' in self.tel.SExtractor_params: del self.tel.SExtractor_params['ANALYSIS_THRESH']
-        if da:
-            self.tel.SExtractor_params['DETECT_MINAREA'] = da
-        else:
-            if 'DETECT_MINAREA' in self.tel.SExtractor_params: del self.tel.SExtractor_params['DETECT_MINAREA']
-
 
         if len(filtered_stars) < nstars_threshold:
             self.logger.warning('  Only {} bright stars detected.  Image appears blank'.format(len(filtered_stars)))
@@ -1750,6 +1748,10 @@ class Image(object):
         min_stars = 50
 
         zero_points = [(entry['assoc_catmag'] - entry['MAG_AUTO']) for entry in self.SExtractor_results if entry['FLAGS'] == 0]
+        SNR = [(entry['FLUX_AUTO'] / entry['FLUXERR_AUTO']) for entry in self.SExtractor_results if entry['FLAGS'] == 0]
+
+#         self.zero_point_correlation = np.corrcoef(zip(list(entry['assoc_catmag']), list(entry['MAG_AUTO'])))
+#         print(self.zero_point_correlation)
 
         if len(zero_points) < min_stars:
             self.logger.warning('  Zero point not calculated.  Only {} catalog stars found.'.format(\
@@ -1757,9 +1759,11 @@ class Image(object):
         else:
             self.zero_point_mode = mode(zero_points, 0.1)
             self.zero_point_median = np.median(zero_points)
+            self.zero_point_average = np.average(zero_points, weights=SNR)
             self.logger.info('  Mode Zero Point = {:.2f}'.format(self.zero_point_mode))
             self.logger.info('  Median Zero Point = {:.2f}'.format(self.zero_point_median))
-            self.zero_point = self.zero_point_mode
+            self.logger.info('  Weighted Average Zero Point = {:.2f}'.format(self.zero_point_average))
+            self.zero_point = self.zero_point_average
 
             ## Check zero point
             if self.tel.threshold_zeropoint and self.zero_point:
@@ -1834,10 +1838,12 @@ class Image(object):
         ## Plot Histogram of Zero Point Values
         TopRight = pyplot.axes([0.535, 0.650, 0.465, 0.335])
         pyplot.title('Histogram of Zero Point Values for {}'.format(self.raw_file_name), size=10)
-        pyplot.plot([self.zero_point_median, self.zero_point_median], [0, 1.1*max(zp_hist)],\
-                    'ro-', linewidth=2, label='Median Zero Point')
         pyplot.plot([self.zero_point_mode, self.zero_point_mode], [0, 1.1*max(zp_hist)],\
-                    'ro-', linewidth=2, label='Mode Zero Point')
+                    'ro-', linewidth=2, label='Mode Zero Point', alpha=0.5)
+        pyplot.plot([self.zero_point_average, self.zero_point_average], [0, 1.1*max(zp_hist)],\
+                    'go-', linewidth=2, label='Mode Zero Point', alpha=0.9)
+        pyplot.plot([self.zero_point_median, self.zero_point_median], [0, 1.1*max(zp_hist)],\
+                    'bo-', linewidth=2, label='Median Zero Point', alpha=0.5)
         pyplot.bar(zp_centers, zp_hist, align='center', width=0.7*zp_binsize)
         pyplot.xlabel('Zero Point', size=10)
         pyplot.ylabel('N Stars', size=10)
@@ -1977,7 +1983,7 @@ class Image(object):
             crosshair_color = 'cyan'
             ms = int((self.tel.pointing_marker_size.to(u.arcsec) / self.tel.pixel_scale).to(u.pix).value)/2
             self.logger.debug('  Pointing marker diameter is {} = {} pix'.format(self.tel.pointing_marker_size.to(u.arcmin), ms*2))
-            thickness = 3
+            thickness = 5
             for i in range(-1*int((thickness-1)/2),int((thickness+1)/2),1):
                 draw.line((x-1.5*ms, y+i, x-0.5*ms, y+i), fill=crosshair_color)
                 draw.line((x+1.5*ms, y+i, x+0.5*ms, y+i), fill=crosshair_color)
@@ -2000,7 +2006,7 @@ class Image(object):
                 xy = self.image_WCS.wcs_world2pix([[float(star['RA']), float(star['Dec'])]], 1)[0]
                 x = int(xy[0])
                 y = int(xy[1])
-                thickness = 1
+                thickness = 2
                 radii = np.linspace(ms, ms+thickness, thickness)
                 for r in radii:
                     draw.ellipse((x-r, y-r, x+r, y+r), outline=circle_color)
@@ -2016,7 +2022,7 @@ class Image(object):
             for star in self.SExtractor_results:
                 x = star['XWIN_IMAGE']
                 y = star['YWIN_IMAGE']
-                thickness = 1
+                thickness = 2
                 radii = np.linspace(ms, ms+thickness, thickness)
                 for r in radii:
                     draw.ellipse((x-r, y-r, x+r, y+r), outline=circle_color)
