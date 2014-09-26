@@ -3,6 +3,10 @@
 This is an example of how to create a script to analyze an image using the
 IQMon module tools.  This script is not general and will need to be customized
 to the particular telescope and camera system of interest.
+
+For a more sophisticated (and likely more up to date) example, see the scripts
+I wrote for the VYSOS project at:
+https://github.com/joshwalawender/VYSOStools
 '''
 
 from __future__ import division, print_function

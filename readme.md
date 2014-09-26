@@ -34,12 +34,21 @@ External Programs:
 * SExtractor (<http://www.astromatic.net/software/sextractor>)
 * SCAMP (<http://www.astromatic.net/software/scamp>)
 * SWarp (<http://www.astromatic.net/software/swarp>)
+* MissFITS (<http://www.astromatic.net/software/missfits>)
 * astrometry.net solver (<http://astrometry.net>)
 
 
 
 ## Version History
 
+* **v1.3**
+    * Can now query Vizier for USNO-B1.0 and UCAC4 catalogs using `get_catalog()` method.
+    * Calculation of FWHM, ellipticity, and zero point now all use a weighted average where the weight is equal to the signal to noise calculated from the source extractor photometry.
+    * Improved configuration files to handle SCAMP configuration and photometric catalog information
+    * Default behavior is now to write new IQMon log file for each image.
+    * Minor improvements to PSF plot and zero point plot.
+    * Added experimental `is_blank()` method to try to guess whether image is blank.  Can be used to determine if time should be spent analyzing image.
+    * Bug fixes
 * **v1.2**
     * New configuration scheme.  The telescope configuration scheme is read from a YAML config file.  The config file also controls output directories for the logs, plots, and tmp files.
     * Flags if the image FWHM, ellipticity, pointing error, or zero point are above their respective threshold values are now recorded in the YAML file and are used to color code the HTML output.
