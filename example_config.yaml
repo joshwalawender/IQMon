@@ -1,3 +1,6 @@
+# For a more sophisticated (and likely more up to date) example, see the scripts
+# and configuration files I wrote for the VYSOS project at:
+# https://github.com/joshwalawender/VYSOStools
 ---
 name: 'VYSOS-5'
 logs_file_path: '/Users/joshw/IQMon/Logs/VYSOS-5'
