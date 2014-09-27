@@ -1786,7 +1786,7 @@ class Image(object):
             colends =   (9, 22, 35, 42, 49, 53, 56, 59, 67, 75, 79, 83, 86, 89,\
                          92, 99, 106, 110, 114, 125, 132, 139, 146, 158, 167,\
                          174, 181, 188, 195, 202)
-            self.catalog_name = 'UCAC4(local)'
+            self.catalog_name = 'UCAC4'
             self.catalog_data = ascii.read(catalog_file_path,\
                                            Reader=ascii.FixedWidthNoHeader,\
                                            data_start=1, guess=False,\
@@ -1855,7 +1855,7 @@ class Image(object):
                    and not np.isnan(entry['assoc_catmag'])\
                    and not (float(entry['assoc_catmag']) == 0.0)]
 
-            self.logger.info('  Using {} stars with {} magnitude'.format(len(zero_points), self.catalog_filter))
+            self.logger.info('  Using {} stars with {} catalog magnitude'.format(len(zero_points), self.catalog_filter))
 
     #         self.zero_point_correlation = np.corrcoef(zip(list(entry['assoc_catmag']), list(entry['MAG_AUTO'])))
     #         print(self.zero_point_correlation)
@@ -1958,8 +1958,8 @@ class Image(object):
         pyplot.hist2d(catalog_mags, instrumental_mags, bins=[xbins, ybins], cmap='binary')
         pyplot.xlabel('{} {} Magnitude'.format(self.catalog_name, self.catalog_filter), size=10)
         pyplot.ylabel('Instrumental Magnitude', size=10)
-        pyplot.xticks(np.arange(0,25,1))
-        pyplot.yticks(np.arange(0,25,1))
+        pyplot.xticks(np.arange(-5,25,1))
+        pyplot.yticks(np.arange(-25,25,1))
         pyplot.grid()
         pyplot.ylim(ymin,ymax)
         pyplot.xlim(xmin,xmax)
