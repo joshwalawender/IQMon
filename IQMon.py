@@ -1149,7 +1149,7 @@ class Image(object):
             self.SExtractor_results.add_column(table.Column(\
                                     data=SExAngleInImage, name='AngleInImage'))
             self.n_stars_SExtracted = len(self.SExtractor_results)
-            self.logger.info("  Read in {0} stars from SExtractor catalog.".format(\
+            self.logger.info("  Read in {0} stars from SExtractor catalog (after filtering).".format(\
                                                       self.n_stars_SExtracted))
             if assoc:
                 self.SExtractor_results.add_column(table.Column(\
@@ -1337,11 +1337,11 @@ class Image(object):
                 pyplot.title('Histogram of FWHM Values for {}'.format(self.raw_file_name), size=10)
                 pyplot.bar(fwhm_centers, fwhm_hist, align='center', width=0.7*fwhm_binsize)
                 pyplot.plot([self.FWHM_mode.to(u.pix).value, self.FWHM_mode.to(u.pix).value], [0, 1.1*max(fwhm_hist)],\
-                            'ro-', linewidth=2, label='Mode FWHM', alpha=0.5)
-                pyplot.plot([self.FWHM_average.to(u.pix).value, self.FWHM_average.to(u.pix).value], [0, 1.1*max(fwhm_hist)],\
-                            'go-', linewidth=2, label='Mode FWHM', alpha=0.9)
+                            'ro-', linewidth=2, label='Mode FWHM', alpha=0.4)
                 pyplot.plot([self.FWHM_median.to(u.pix).value, self.FWHM_median.to(u.pix).value], [0, 1.1*max(fwhm_hist)],\
-                            'bo-', linewidth=2, label='Median FWHM', alpha=0.5)
+                            'go-', linewidth=2, label='Median FWHM', alpha=0.4)
+                pyplot.plot([self.FWHM_average.to(u.pix).value, self.FWHM_average.to(u.pix).value], [0, 1.1*max(fwhm_hist)],\
+                            'bo-', linewidth=2, label='Mode FWHM', alpha=1.0)
                 pyplot.xlabel('FWHM (pixels)', size=10)
                 pyplot.ylabel('N Stars', size=10)
                 pyplot.xlim(0,np.percentile(CentralFWHMs, 95)+1)
@@ -1352,11 +1352,11 @@ class Image(object):
                 pyplot.title('Histogram of Elliptiticty Values for {}'.format(self.raw_file_name), size=10)
                 pyplot.bar(ellip_centers, ellip_hist, align='center', width=0.7*ellip_binsize)
                 pyplot.plot([self.ellipticity_mode, self.ellipticity_mode], [0, 1.1*max(ellip_hist)],\
-                            'ro-', linewidth=2, label='Mode Ellipticity', alpha=0.5)
-                pyplot.plot([self.ellipticity_average, self.ellipticity_average], [0, 1.1*max(ellip_hist)],\
-                            'go-', linewidth=2, label='Mode Ellipticity', alpha=0.9)
+                            'ro-', linewidth=2, label='Mode Ellipticity', alpha=0.4)
                 pyplot.plot([self.ellipticity_median, self.ellipticity_median], [0, 1.1*max(ellip_hist)],\
-                            'bo-', linewidth=2, label='Median Ellipticity', alpha=0.5)
+                            'go-', linewidth=2, label='Median Ellipticity', alpha=0.4)
+                pyplot.plot([self.ellipticity_average, self.ellipticity_average], [0, 1.1*max(ellip_hist)],\
+                            'bo-', linewidth=2, label='Mode Ellipticity', alpha=1.0)
                 pyplot.xlabel('Ellipticity', size=10)
                 pyplot.ylabel('N Stars', size=10)
                 pyplot.xlim(0,1)
@@ -1415,9 +1415,15 @@ class Image(object):
 
                 BottomLeft = pyplot.axes([0.000, 0.0, 0.465, 0.320])
                 pyplot.title('Correlation of Ellipticity with Image Radius', size=10)
+                if self.n_stars_SExtracted > 4000:
+                    bins = 40
+                elif self.n_stars_SExtracted > 2000:
+                    bins = 30
+                else:
+                    bins = 20
                 pyplot.hist2d(self.SExtractor_results['ImageRadius'],\
                               self.SExtractor_results['ELLIPTICITY'],\
-                              bins=40, cmap='binary')
+                              bins=bins, cmap='binary')
                 pyplot.xlabel('r (pixels)', size=10)
                 pyplot.ylabel('Ellipticity', size=10)
                 pyplot.xlim(0, math.sqrt(self.nXPix**2 + self.nYPix**2)/2.)
@@ -1428,7 +1434,7 @@ class Image(object):
                 BottomRight = pyplot.axes([0.535, 0.0, 0.465, 0.320])
                 BottomRight.set_aspect('equal')
                 pyplot.title('Correlation Between PSF Angle and Position in Image', size=10)
-                pyplot.hist2d(star_angles, image_angles, bins=36, cmap='binary')
+                pyplot.hist2d(star_angles, image_angles, bins=bins, cmap='binary')
                 pyplot.xlabel('Stellar PSF PA', size=10)
                 pyplot.ylabel('Image PA', size=10)
                 pyplot.xlim(-100,100)
@@ -1757,6 +1763,17 @@ class Image(object):
                                                       'ucac4.txt')
                 shutil.move('ucac4.txt', catalog_file_path)
                 self.temp_files.append(catalog_file_path)
+            else:
+                self.logger.warning('  No ucac4.txt output file found.  Trying again.')
+                result = subprocess.call(UCACcommand)
+                if os.path.exists('ucac4.txt'):
+                    catalog_file_path = os.path.join(self.tel.temp_file_path,\
+                                                          'ucac4.txt')
+                    shutil.move('ucac4.txt', catalog_file_path)
+                    self.temp_files.append(catalog_file_path)
+                else:
+                    self.logger.warning('  No ucac4.txt output file found.  Trying again.')
+                    return False
 
             ## Read in UCAC catalog
             colnames = ('id', 'RA', 'Dec', 'mag1', 'mag2', 'smag', 'ot', 'dsf',\
@@ -1791,8 +1808,22 @@ class Image(object):
             self.catalog_data.rename_column('r', 'rmag')
             self.catalog_data.rename_column('i', 'imag')
 
+            ## Filter catalog for magnitude limits
+            faint_stars_to_remove = []
+            for i in range(0,len(self.catalog_data)):
+                entry = self.catalog_data[i]
+                if entry[self.tel.catalog_info[self.filter]] > self.tel.catalog_info['magmax']:
+                    faint_stars_to_remove.append(i)
+            if len(faint_stars_to_remove) > 0:
+                self.logger.info('  Removing {} faint stars ({} > {}) from catalog.'.format(\
+                                  len(faint_stars_to_remove),\
+                                  self.tel.catalog_info[self.filter],\
+                                  self.tel.catalog_info['magmax'],\
+                                  ))
+                self.catalog_data.remove_rows(faint_stars_to_remove)
+
             nUCACStars = len(self.catalog_data)
-            self.logger.info("  Retrieved {} lines from UCAC catalog.".format(nUCACStars))
+            self.logger.info("  Retrieved {} stars from UCAC catalog.".format(nUCACStars))
 
         end_time = datetime.datetime.now()
         elapzed_time = end_time - start_time
@@ -1813,8 +1844,18 @@ class Image(object):
         if self.SExtractor_results and ('assoc_catmag' in self.SExtractor_results.keys()) and ('MAG_AUTO' in self.SExtractor_results.keys()):
             min_stars = 50
 
-            zero_points = [(entry['assoc_catmag'] - entry['MAG_AUTO']) for entry in self.SExtractor_results if (entry['FLAGS'] == 0) and not np.isnan(entry['assoc_catmag'])]
-            SNR = [(entry['FLUX_AUTO'] / entry['FLUXERR_AUTO']) for entry in self.SExtractor_results if (entry['FLAGS'] == 0) and not np.isnan(entry['assoc_catmag'])]
+            zero_points = [entry['assoc_catmag'] - entry['MAG_AUTO']\
+                           for entry in self.SExtractor_results\
+                           if (entry['FLAGS'] == 0)\
+                           and not np.isnan(entry['assoc_catmag'])\
+                           and not (float(entry['assoc_catmag']) == 0.0)]
+            SNR = [entry['FLUX_AUTO'] / entry['FLUXERR_AUTO']\
+                   for entry in self.SExtractor_results\
+                   if (entry['FLAGS'] == 0)\
+                   and not np.isnan(entry['assoc_catmag'])\
+                   and not (float(entry['assoc_catmag']) == 0.0)]
+
+            self.logger.info('  Using {} stars with {} magnitude'.format(len(zero_points), self.catalog_filter))
 
     #         self.zero_point_correlation = np.corrcoef(zip(list(entry['assoc_catmag']), list(entry['MAG_AUTO'])))
     #         print(self.zero_point_correlation)
@@ -1861,22 +1902,34 @@ class Image(object):
 
         catalog_mags = [entry['assoc_catmag']\
                         for entry in self.SExtractor_results\
-                        if (entry['FLAGS'] == 0) and not np.isnan(entry['assoc_catmag'])]
+                        if (entry['FLAGS'] == 0)\
+                        and not np.isnan(entry['assoc_catmag'])
+                        and not (float(entry['assoc_catmag']) == 0.0)]
         instrumental_mags = [entry['MAG_AUTO']\
                              for entry in self.SExtractor_results\
-                             if (entry['FLAGS'] == 0) and not np.isnan(entry['assoc_catmag'])]
+                             if (entry['FLAGS'] == 0)\
+                             and not np.isnan(entry['assoc_catmag'])
+                             and not (float(entry['assoc_catmag']) == 0.0)]
         zero_points = [entry['assoc_catmag'] - entry['MAG_AUTO']\
                        for entry in self.SExtractor_results\
-                       if (entry['FLAGS'] == 0) and not np.isnan(entry['assoc_catmag'])]
+                       if (entry['FLAGS'] == 0)\
+                       and not np.isnan(entry['assoc_catmag'])
+                       and not (float(entry['assoc_catmag']) == 0.0)]
         xpix = [entry['XWIN_IMAGE']\
                 for entry in self.SExtractor_results\
-                if (entry['FLAGS'] == 0) and not np.isnan(entry['assoc_catmag'])]
+                if (entry['FLAGS'] == 0)\
+                and not np.isnan(entry['assoc_catmag'])
+                and not (float(entry['assoc_catmag']) == 0.0)]
         ypix = [entry['YWIN_IMAGE']\
                 for entry in self.SExtractor_results
-                if (entry['FLAGS'] == 0) and not np.isnan(entry['assoc_catmag'])]
+                if (entry['FLAGS'] == 0)\
+                and not np.isnan(entry['assoc_catmag'])
+                and not (float(entry['assoc_catmag']) == 0.0)]
         residuals = [entry['assoc_catmag'] - entry['MAG_AUTO'] - self.zero_point\
                      for entry in self.SExtractor_results
-                     if (entry['FLAGS'] == 0) and not np.isnan(entry['assoc_catmag'])]
+                     if (entry['FLAGS'] == 0)\
+                     and not np.isnan(entry['assoc_catmag'])
+                     and not (float(entry['assoc_catmag']) == 0.0)]
 
         zp_binsize = 0.1
         bmin = math.floor(min(zero_points)/zp_binsize)*zp_binsize - zp_binsize/2.
@@ -1890,20 +1943,23 @@ class Image(object):
 
         reject_percent = 3.0
         padding = 0.5
+        hist2d_binsize = 0.1
 
         ## Correlation of Instrumental Magnitude with Catalog Magnitude
         TopLeft = pyplot.axes([0.000, 0.650, 0.465, 0.335])
         TopLeft.set_aspect('equal')
-        xmin = math.floor( ( (np.percentile(catalog_mags, reject_percent)-padding)*4))/4.
-        xmax = math.ceil( ( (np.percentile(catalog_mags, 100.-reject_percent)+padding)*4))/4.
-        ymin = math.floor( ( (np.percentile(instrumental_mags, reject_percent)-padding)*4))/4.
-        ymax = math.ceil( ( (np.percentile(instrumental_mags, 100.-reject_percent)+padding)*4))/4.
-        xbins = list(np.arange(xmin,xmax+0.25,0.25))
-        ybins = list(np.arange(ymin,ymax+0.25,0.25))
+        xmin = math.floor( ( (np.percentile(catalog_mags, reject_percent)-padding)*2))/2.
+        xmax = math.ceil( ( (np.percentile(catalog_mags, 100.-reject_percent)+padding)*2))/2.
+        ymin = math.floor( ( (np.percentile(instrumental_mags, reject_percent)-padding)*2))/2.
+        ymax = math.ceil( ( (np.percentile(instrumental_mags, 100.-reject_percent)+padding)*2))/2.
+        xbins = list(np.arange(xmin,xmax,hist2d_binsize))
+        ybins = list(np.arange(ymin,ymax,hist2d_binsize))
         pyplot.title('Correlation of Instrumental and Calalog Magnitudes', size=10)
         pyplot.hist2d(catalog_mags, instrumental_mags, bins=[xbins, ybins], cmap='binary')
         pyplot.xlabel('{} {} Magnitude'.format(self.catalog_name, self.catalog_filter), size=10)
         pyplot.ylabel('Instrumental Magnitude', size=10)
+        pyplot.xticks(np.arange(0,25,1))
+        pyplot.yticks(np.arange(0,25,1))
         pyplot.grid()
         pyplot.ylim(ymin,ymax)
         pyplot.xlim(xmin,xmax)
@@ -1917,11 +1973,11 @@ class Image(object):
         TopRight = pyplot.axes([0.535, 0.650, 0.465, 0.335])
         pyplot.title('Histogram of Zero Point Values for {}'.format(self.raw_file_name), size=10)
         pyplot.plot([self.zero_point_mode, self.zero_point_mode], [0, 1.1*max(zp_hist)],\
-                    'ro-', linewidth=2, label='Mode Zero Point', alpha=0.5)
-        pyplot.plot([self.zero_point_average, self.zero_point_average], [0, 1.1*max(zp_hist)],\
-                    'go-', linewidth=2, label='Mode Zero Point', alpha=0.9)
+                    'ro-', linewidth=2, label='Mode Zero Point', alpha=0.4)
         pyplot.plot([self.zero_point_median, self.zero_point_median], [0, 1.1*max(zp_hist)],\
-                    'bo-', linewidth=2, label='Median Zero Point', alpha=0.5)
+                    'go-', linewidth=2, label='Median Zero Point', alpha=0.4)
+        pyplot.plot([self.zero_point_average, self.zero_point_average], [0, 1.1*max(zp_hist)],\
+                    'bo-', linewidth=2, label='Mode Zero Point', alpha=1.0)
         pyplot.bar(zp_centers, zp_hist, align='center', width=0.7*zp_binsize)
         pyplot.xlabel('Zero Point', size=10)
         pyplot.ylabel('N Stars', size=10)
@@ -1935,8 +1991,8 @@ class Image(object):
         xmax = math.ceil( ( (np.percentile(catalog_mags, 100.-reject_percent)+padding)*4))/4.
         ymin = math.floor( ( (np.percentile(residuals, reject_percent)-padding)*4))/4.
         ymax = math.ceil( ( (np.percentile(residuals, 100.-reject_percent)+padding)*4))/4.
-        xbins = list(np.arange(xmin,xmax+0.25,0.25))
-        ybins = list(np.arange(ymin,ymax+0.25,0.25))
+        xbins = list(np.arange(xmin,xmax,hist2d_binsize))
+        ybins = list(np.arange(ymin,ymax,hist2d_binsize))
         pyplot.hist2d(catalog_mags, residuals, bins=[xbins, ybins], cmap='binary')
         pyplot.xlabel('{} {} Magnitude'.format(self.catalog_name, self.catalog_filter), size=10)
         pyplot.ylabel('Magnitude Residuals', size=10)
@@ -2257,7 +2313,7 @@ class Image(object):
             HTML.close()
             HTML = open(htmlImageList, 'w')
             for line in existingContent:
-                IsEndTable = re.match("\s*</table>\s*", line)
+                IsEndTable = re.match("\s*</table><br><br>\s*", line)
                 IsEndBody = re.match("\s*</body>\s*", line)
                 IsEndHTML = re.match("\s*</html>\s*", line)
                 if not IsEndTable and not IsEndBody and not IsEndHTML:
@@ -2413,7 +2469,7 @@ class Image(object):
                 HTML.write("      <td style='color:{0}'>{1}</td>\n".format("black", ""))
         ## Complete Table
         HTML.write("    </tr>\n")
-        HTML.write("  </table>\n")
+        HTML.write("  </table><br><br>\n")
         HTML.write("</body>\n")
         HTML.write("</html>\n")
         HTML.close()
