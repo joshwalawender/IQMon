@@ -1456,7 +1456,7 @@ class Image(object):
         '''
         '''
         self.logger.info('Checking if image is blank')
-        nstars_threshold = 10
+        nstars_threshold = 5
 
         ## Edit SExtractor parameters to detect only bright stars
         if 'DETECT_THRESH' in self.tel.SExtractor_params.keys():
@@ -1695,7 +1695,10 @@ class Image(object):
             footprint = self.image_WCS.calc_footprint()
             RAs = [val[0] for val in footprint]
             DECs = [val[1] for val in footprint]
-            dRA = (max(RAs) - min(RAs))*math.cos(center_from_WCS[0][1]*u.deg.to(u.radian))
+            dRA = (max(RAs) - min(RAs))
+            if dRA > 180:
+                dRA = (min(RAs)+360. - max(RAs))
+            dRA = dRA*math.cos(center_from_WCS[0][1]*u.deg.to(u.radian))
             dDEC = (max(DECs) - min(DECs))
             self.logger.debug("  Center Coordinate: {}".format(self.coordinate_of_center_pixel.to_string(style='hmsdms', precision=1)))
 
@@ -1744,16 +1747,24 @@ class Image(object):
         elif not os.path.exists(local_UCAC_data):
             self.logger.warning('Cannot find local UCAC data: {}'.format(local_UCAC_data))
         else:
-            corners = self.image_WCS.wcs_pix2world([[0, 0], [self.nXPix, 0],\
-                                 [0, self.nYPix], [self.nXPix, self.nYPix]], 1)
-            field_size_RA = max(corners[:,0]) - min(corners[:,0])
-            field_size_DEC = max(corners[:,1]) - min(corners[:,1])
+            center_from_WCS = self.image_WCS.wcs_pix2world([[self.nXPix/2, self.nYPix/2]], 1)
+            footprint = self.image_WCS.calc_footprint()
+            RAs = [val[0] for val in footprint]
+            DECs = [val[1] for val in footprint]
+            dRA = (max(RAs) - min(RAs))
+            if dRA > 180:
+                dRA = (min(RAs)+360. - max(RAs))
+            dDEC = (max(DECs) - min(DECs))
+#             corners = self.image_WCS.wcs_pix2world([[0, 0], [self.nXPix, 0],\
+#                                  [0, self.nYPix], [self.nXPix, self.nYPix]], 1)
+#             field_size_RA = (max(corners[:,0]) - min(corners[:,0]))*math.cos(self.coordinate_of_center_pixel.dec.degree*u.deg.to(u.radian))
+#             field_size_DEC = max(corners[:,1]) - min(corners[:,1])
             self.logger.info("Getting stars from local UCAC4 catalog.")
             UCACcommand = [local_UCAC_command,\
                            "{:.4f}".format(self.coordinate_of_center_pixel.ra.degree),\
                            "{:.4f}".format(self.coordinate_of_center_pixel.dec.degree),\
-                           "{:.2f}".format(field_size_RA),\
-                           "{:.2f}".format(field_size_DEC),\
+                           "{:.2f}".format(dRA),\
+                           "{:.2f}".format(dDEC),\
                            local_UCAC_data]
             self.logger.debug("  Using command: {}".format(UCACcommand))
             if os.path.exists("ucac4.txt"): os.remove("ucac4.txt")
