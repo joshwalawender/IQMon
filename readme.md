@@ -11,8 +11,7 @@ The base functionality is that it uses SExtractor to find stars in the image and
 
 If the image contains a WCS, the module can also compare the WCS coordinates of the central pixel to the pointing coordinates in the image header to determine the pointing error.  If no WCS is present, the module can also attempt to solve the astrometry in the image using the astrometry.net solver.  
 
-In addition, the software can use SCAMP and SWarp to determine a plate solution which includes distortion parameters and compare the instrumental magnitudes determined by SExtractor to catalog magnitudes to determine the photometric zero point of the image.
-
+In addition, the software can use SCAMP and SWarp to determine a plate solution which includes distortion parameters and then compare the instrumental magnitudes determined by SExtractor to catalog magnitudes to determine the photometric zero point of the image.
 
 
 ## Requirements
@@ -38,16 +37,18 @@ External Programs:
 * astrometry.net solver (<http://astrometry.net>)
 
 
-
 ## Version History
 
+* **v1.3.1**
+    * Bug fix to related to coordinate wrapping in `get_catalog` and `get_local_UCAC` methods.
+    * Filtered out stars with magnitude of exactly 0.0 from zero point calculation as some catlaogs seems to return 0.0 in place of `nan` or `None`.
 * **v1.3**
-    * Can now query Vizier for USNO-B1.0 and UCAC4 catalogs using `get_catalog()` method.
+    * Can now query Vizier for USNO-B1.0 and UCAC4 catalogs using `get_catalog` method.
     * Calculation of FWHM, ellipticity, and zero point now all use a weighted average where the weight is equal to the signal to noise calculated from the source extractor photometry.
     * Improved configuration files to handle SCAMP configuration and photometric catalog information
     * Default behavior is now to write new IQMon log file for each image.
     * Minor improvements to PSF plot and zero point plot.
-    * Added experimental `is_blank()` method to try to guess whether image is blank.  Can be used to determine if time should be spent analyzing image.
+    * Added experimental `is_blank` method to try to guess whether image is blank.  Can be used to determine if time should be spent analyzing image.
     * Bug fixes
 * **v1.2**
     * New configuration scheme.  The telescope configuration scheme is read from a YAML config file.  The config file also controls output directories for the logs, plots, and tmp files.
@@ -97,17 +98,26 @@ External Programs:
     * Makes HTML and text file versions of results with one line per image, usually one night of images per file.
 
 
+## Known Bugs
+
+Please see the [issues]<https://github.com/joshwalawender/IQMon/issues> on the github page for IQMon.
+
+
 ## Code Structure
 
 IQMon functionality centers around the use of two objects:  IQMon.Telescope and IQMon.Image.  When used, you must create one of each of these objects.
 
-* IQMon.Telescope object and holds detailed information on the telescope used to take the data and some custom configuration parameters.
+* IQMon.Telescope object and holds detailed information on the telescope used to take the data and some custom configuration parameters.  The telescope object is passed to the image object on creation of an image object.
 
 * IQMon.Image object holds information about the image and contains the methods which do all of the image analysis which then fills in the object properties.
 
+
 ### Example Use
 
-Please see example_MeasureImage.py file.
+See example_MeasureImage.py file in this repository.  This file may be slightly out of date relative to the main program as it is not updated as often because it is not in use with any real telescopes.
+
+A better example is to look at the MeasureImage.py file in the [VYSOStools]<https://github.com/joshwalawender/VYSOStools repository>.  This is a repository of programs for the VYSOS robotic telescopes and is always updated to use the very latest commit of IQMon.  It is a bit more complex than the example included in this repository because it handles two telescopes.
+
 
 ## License Terms
 
