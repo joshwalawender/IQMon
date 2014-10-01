@@ -2554,7 +2554,7 @@ class Image(object):
                       'WCS_position_angle': str(posang),\
                       'process_time': str(self.total_process_time),\
                       'flags': str(self.flags),\
-#                      'IQMon Version': str(
+                      'IQMon Version': str(__version__),\
                      }
         result_list.append(new_result)
         yaml_string = yaml.dump(result_list)
