@@ -1853,7 +1853,7 @@ class Image(object):
         self.logger.info('Analyzing SExtractor results to determine photometric zero point')
 
         if self.SExtractor_results and ('assoc_catmag' in self.SExtractor_results.keys()) and ('MAG_AUTO' in self.SExtractor_results.keys()):
-            min_stars = 50
+            min_stars = 10
 
             zero_points = [entry['assoc_catmag'] - entry['MAG_AUTO']\
                            for entry in self.SExtractor_results\
@@ -2550,7 +2550,8 @@ class Image(object):
                       'moon_illumination': str(self.moon_phase),\
                       'WCS_position_angle': str(posang),\
                       'process_time': str(self.total_process_time),\
-                      'flags': str(self.flags)
+                      'flags': str(self.flags),\
+#                      'IQMon Version': str(
                      }
         result_list.append(new_result)
         yaml_string = yaml.dump(result_list)
