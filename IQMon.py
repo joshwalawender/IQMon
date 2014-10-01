@@ -735,7 +735,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Solve Astrometry Using astrometry.net
     ##-------------------------------------------------------------------------
-    def solve_astrometry(self, timeout=None):
+    def solve_astrometry(self, timeout=None, downsample=4):
         '''
         Solve astrometry in the working image using the astrometry.net solver.
         '''
@@ -744,7 +744,7 @@ class Image(object):
         AstrometryCommand = ["solve-field", "-l", "5", "-O", "-p", "-T",
                              "-L", str(self.tel.pixel_scale.value*0.75),
                              "-H", str(self.tel.pixel_scale.value*1.25),
-                             "-u", "arcsecperpix", "-z", "4", self.working_file]
+                             "-u", "arcsecperpix", "-z", str(downsample), self.working_file]
         AstrometrySTDOUT = open(os.path.join(self.tel.temp_file_path, 'astrometry_output.txt'), 'w')
         self.temp_files.append(os.path.join(self.tel.temp_file_path, 'astrometry_output.txt'))
 
