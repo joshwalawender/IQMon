@@ -39,15 +39,15 @@ External Programs:
 
 ## Version History
 
-* **v1.3.2**
+* __v1.3.2__
     * Reduced threshold number of stars to calculate zero point to 10.
     * Made downsampling factor for solve-field (from astrometry.net) a user settable argument in `solve_astrometry()`.  Defaults to 4.
     * Stored `__version__` property in IQMon module instead of in setup.py file.
     * Records IQMon version in the YAML entry for that image.
-* **v1.3.1**
+* __v1.3.1__
     * Bug fix to related to coordinate wrapping in `get_catalog` and `get_local_UCAC` methods.
-    * Filtered out stars with magnitude of exactly 0.0 from zero point calculation as some catlaogs seems to return 0.0 in place of `nan` or `None`.
-* **v1.3**
+    * Filtered out stars with magnitude of exactly 0.0 from zero point calculation as some catlaogs seem to return 0.0 in place of `nan` or `None`.
+* __v1.3__
     * Can now query Vizier for USNO-B1.0 and UCAC4 catalogs using `get_catalog` method.
     * Calculation of FWHM, ellipticity, and zero point now all use a weighted average where the weight is equal to the signal to noise calculated from the source extractor photometry.
     * Improved configuration files to handle SCAMP configuration and photometric catalog information
@@ -55,7 +55,7 @@ External Programs:
     * Minor improvements to PSF plot and zero point plot.
     * Added experimental `is_blank` method to try to guess whether image is blank.  Can be used to determine if time should be spent analyzing image.
     * Bug fixes
-* **v1.2**
+* __v1.2__
     * New configuration scheme.  The telescope configuration scheme is read from a YAML config file.  The config file also controls output directories for the logs, plots, and tmp files.
     * Flags if the image FWHM, ellipticity, pointing error, or zero point are above their respective threshold values are now recorded in the YAML file and are used to color code the HTML output.
     * New `add_yaml_entry` method (intended to replace `add_summary_entry`) stores image analysis results in YAML file.
@@ -63,35 +63,35 @@ External Programs:
     * The `make_JPEG` method can now flag saturated pixels
     * Image histogram is now optional output of `make_JPEG` method.
     * Numerous bug fixes.
-* **v1.1**
+* __v1.1__
     * Added ability to solve astrometry using SCAMP and rectify the image using SWarp
     * Added ability to solve for Zero Point using the SCAMP-solved data
     * Renamed many methods to better follow PEP8 conventions
     * Refactored `make_JPEG` to use matplotlib and PIL instead of ImageMagick.  The previous method is available as `make_JPEG_ImageMagick`.  This removes the 5000 star limit from marking, but the image annotations are no longer available.
-* **v1.0.6**
+* __v1.0.6__
     * Tweaks related to marking up of jpeg files.  Better markers, user settable maker size, and marks are labeled.
-* **v1.0.5**
+* __v1.0.5__
     * Bug fixes related to marking up of jpeg files.
-* **v1.0.4**
+* __v1.0.4__
     * MakeJPEG now marks the brightest 5000 stars rather than the first 5000 in the table.  Also annotates image to let viewer know more stars were detected.
     * added option to HTML output to choose which columns are displayed
     * other minor bug fixes and tweaks
     * fixed bug where axes in crop were reversed
-* **v1.0.3**
+* __v1.0.3__
     * Fixed handling of spaces in filenames by repalcing spaces in input file name with underscores when making working file.
     * Fixed bug in MakeJPEG which hard coded a binning of 2x2.
     * Added flag to ignore missing end card in fits header after running astrometry.net.
-* **v1.0.2**
+* __v1.0.2__
     * Fixed bug in jpeg creation which would crash when many (>~5000) stars were to be marked.  Now marks first 5000 stars.
     * Fixed bug in color coding of HTML.
-* **v1.0.1**
+* __v1.0.1__
     * Added astropy units converter between pixels and arcseconds to handle internal conversion of pixel scale.
     * Fixed bug in jpeg creation.  Will now handle rotation and marked stars.
     * Fixed bug when reading in summary text file.
-* **v1.0** (released on github.com 2013/08/14)
+* __v1.0__ (released on github.com 2013/08/14)
     * Rewritten as object oriented code.  Implements most capabilities of v0.X.
     * Runs roughly 2x faster than v0.X.
-* **v0.X** (frozen 2013/07/15)
+* __v0.X__ (frozen 2013/07/15)
     * Initial version, not under version control.
     * Deployed on live VYSOS data.
     * Analyzes image with SExtractor
@@ -105,7 +105,7 @@ External Programs:
 
 ## Known Bugs
 
-Please see the [issues]<https://github.com/joshwalawender/IQMon/issues> on the github page for IQMon.
+Please see issues (<https://github.com/joshwalawender/IQMon/issues>) on the github page for IQMon.
 
 
 ## Code Structure
@@ -121,7 +121,7 @@ IQMon functionality centers around the use of two objects:  IQMon.Telescope and 
 
 See example_MeasureImage.py file in this repository.  This file may be slightly out of date relative to the main program as it is not updated as often because it is not in use with any real telescopes.
 
-A better example is to look at the MeasureImage.py file in the [VYSOStools]<https://github.com/joshwalawender/VYSOStools repository>.  This is a repository of programs for the VYSOS robotic telescopes and is always updated to use the very latest commit of IQMon.  It is a bit more complex than the example included in this repository because it handles two telescopes.
+A better example is to look at the MeasureImage.py file in the VYSOStools repository (<https://github.com/joshwalawender/VYSOStools>).  This is a repository of programs for the VYSOS robotic telescopes and is always updated to use the very latest commit of IQMon.  It is a bit more complex than the example included in this repository because it handles two telescopes.
 
 
 ## License Terms
