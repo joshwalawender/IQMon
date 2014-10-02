@@ -34,7 +34,7 @@ import astropy.wcs as wcs
 import astropy.io.ascii as ascii
 
 
-__version__ = '1.3.1'
+__version__ = '1.3.2'
 
 
 ##-----------------------------------------------------------------------------

@@ -39,6 +39,11 @@ External Programs:
 
 ## Version History
 
+* **v1.3.2**
+    * Reduced threshold number of stars to calculate zero point to 10.
+    * Made downsampling factor for solve-field (from astrometry.net) a user settable argument in `solve_astrometry()`.  Defaults to 4.
+    * Stored `__version__` property in IQMon module instead of in setup.py file.
+    * Records IQMon version in the YAML entry for that image.
 * **v1.3.1**
     * Bug fix to related to coordinate wrapping in `get_catalog` and `get_local_UCAC` methods.
     * Filtered out stars with magnitude of exactly 0.0 from zero point calculation as some catlaogs seems to return 0.0 in place of `nan` or `None`.
@@ -62,7 +67,7 @@ External Programs:
     * Added ability to solve astrometry using SCAMP and rectify the image using SWarp
     * Added ability to solve for Zero Point using the SCAMP-solved data
     * Renamed many methods to better follow PEP8 conventions
-    * Refactored `make_JPEG` to use matplotlib and PIL instead of ImageMagick.  The previous method is available as `make_JPEG_ImageMagick`.
+    * Refactored `make_JPEG` to use matplotlib and PIL instead of ImageMagick.  The previous method is available as `make_JPEG_ImageMagick`.  This removes the 5000 star limit from marking, but the image annotations are no longer available.
 * **v1.0.6**
     * Tweaks related to marking up of jpeg files.  Better markers, user settable maker size, and marks are labeled.
 * **v1.0.5**
