@@ -34,6 +34,9 @@ import astropy.wcs as wcs
 import astropy.io.ascii as ascii
 
 
+__version__ = '1.3.2'
+
+
 ##-----------------------------------------------------------------------------
 ## Mode Function
 ##-----------------------------------------------------------------------------
@@ -732,7 +735,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Solve Astrometry Using astrometry.net
     ##-------------------------------------------------------------------------
-    def solve_astrometry(self, timeout=None):
+    def solve_astrometry(self, timeout=None, downsample=4):
         '''
         Solve astrometry in the working image using the astrometry.net solver.
         '''
@@ -741,7 +744,7 @@ class Image(object):
         AstrometryCommand = ["solve-field", "-l", "5", "-O", "-p", "-T",
                              "-L", str(self.tel.pixel_scale.value*0.75),
                              "-H", str(self.tel.pixel_scale.value*1.25),
-                             "-u", "arcsecperpix", "-z", "4", self.working_file]
+                             "-u", "arcsecperpix", "-z", str(downsample), self.working_file]
         AstrometrySTDOUT = open(os.path.join(self.tel.temp_file_path, 'astrometry_output.txt'), 'w')
         self.temp_files.append(os.path.join(self.tel.temp_file_path, 'astrometry_output.txt'))
 
@@ -1853,7 +1856,7 @@ class Image(object):
         self.logger.info('Analyzing SExtractor results to determine photometric zero point')
 
         if self.SExtractor_results and ('assoc_catmag' in self.SExtractor_results.keys()) and ('MAG_AUTO' in self.SExtractor_results.keys()):
-            min_stars = 50
+            min_stars = 10
 
             zero_points = [entry['assoc_catmag'] - entry['MAG_AUTO']\
                            for entry in self.SExtractor_results\
@@ -2550,7 +2553,8 @@ class Image(object):
                       'moon_illumination': str(self.moon_phase),\
                       'WCS_position_angle': str(posang),\
                       'process_time': str(self.total_process_time),\
-                      'flags': str(self.flags)
+                      'flags': str(self.flags),\
+                      'IQMon Version': str(__version__),\
                      }
         result_list.append(new_result)
         yaml_string = yaml.dump(result_list)
