@@ -783,6 +783,8 @@ class Image(object):
             for line in output:
                 self.logger.warning('  astrometry.net output: {}'.format(line.strip('\n')))
         else:
+            for line in output:
+                self.logger.debug('  Astrometry.net Output: {}'.format(line.strip('\n')))
             total_process_time = (EndTime - StartTime).total_seconds()
             self.logger.debug("  Astrometry.net Processing Time: {:.1f} s".format(\
                                                            total_process_time))
