@@ -34,7 +34,7 @@ import astropy.wcs as wcs
 import astropy.io.ascii as ascii
 
 
-__version__ = '1.3.2'
+__version__ = '1.3.3'
 
 
 ##-----------------------------------------------------------------------------
@@ -317,6 +317,7 @@ class Image(object):
         ## Put initial lines in log
         self.logger.info('')
         self.logger.info("###### Processing Image {} ######".format(self.raw_file_name))
+        self.logger.info('IQMon version = '.format(__version__))
         self.logger.info('')
 
         ## Print Configuration to Log
@@ -782,6 +783,8 @@ class Image(object):
             for line in output:
                 self.logger.warning('  astrometry.net output: {}'.format(line.strip('\n')))
         else:
+            for line in output:
+                self.logger.debug('  Astrometry.net Output: {}'.format(line.strip('\n')))
             total_process_time = (EndTime - StartTime).total_seconds()
             self.logger.debug("  Astrometry.net Processing Time: {:.1f} s".format(\
                                                            total_process_time))
@@ -1032,7 +1035,7 @@ class Image(object):
         if assoc:
             ## Create Assoc file with pixel coordinates of catalog stars
             assoc_file = os.path.join(self.tel.temp_file_path, self.raw_file_basename+'_assoc.txt')
-#             self.temp_files.append(assoc_file)
+            self.temp_files.append(assoc_file)
             if os.path.exists(assoc_file): os.remove(assoc_file)
 
             with open(assoc_file, 'w') as assocFO:
@@ -1087,6 +1090,9 @@ class Image(object):
             for line in SExSTDOUT.splitlines():
                 line.replace("[1A", "")
                 line.replace("[1M>", "")
+                MatchVersion = re.search('SExtractor (\d+\.\d+\.\d+) started on', line)
+                if MatchVersion:
+                    self.logger.info('  SExtractor version = {}'.format(MatchVersion.group(1)))
                 if not re.match(".*Setting up background map.*", line) and\
                    not re.match(".*Line:\s[0-9]*.*", line):
                     self.logger.debug("  SExtractor Output: {}".format(line))
@@ -1455,13 +1461,13 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Is the Image Blank
     ##-------------------------------------------------------------------------
-    def is_blank(self, threshold=5.0, area=9):
+    def is_blank(self, threshold=None, area=None):
         '''
         '''
         self.logger.info('Checking if image is blank')
         nstars_threshold = 5
 
-        ## Edit SExtractor parameters to detect only bright stars
+        ## Save original SExtractor parameters
         if 'DETECT_THRESH' in self.tel.SExtractor_params.keys():
             dt = self.tel.SExtractor_params['DETECT_THRESH']
         else:
@@ -1474,12 +1480,17 @@ class Image(object):
             da = self.tel.SExtractor_params['DETECT_MINAREA']
         else:
             da = None
-        self.tel.SExtractor_params['DETECT_THRESH'] = threshold
-        self.tel.SExtractor_params['ANALYSIS_THRESH'] = threshold
-        self.tel.SExtractor_params['DETECT_MINAREA'] = area
+        ## Set new (temporary) parmaters
+        if threshold:
+            self.tel.SExtractor_params['DETECT_THRESH'] = threshold
+            self.tel.SExtractor_params['ANALYSIS_THRESH'] = threshold
+        if area:
+            self.tel.SExtractor_params['DETECT_MINAREA'] = area
+        
+        ## Run SExtractor
         self.run_SExtractor()
         stars = [entry for entry in self.SExtractor_results if entry['FLAGS'] == 0]
-        filtered_stars = [star for star in stars if star['BWIN_IMAGE'] > 1.0]
+#        filtered_stars = [star for star in stars if star['BWIN_IMAGE'] > 1.0]
 
         ## Edit SExtractor parameters back to original state
         if dt:
@@ -1495,19 +1506,20 @@ class Image(object):
         else:
             if 'DETECT_MINAREA' in self.tel.SExtractor_params: del self.tel.SExtractor_params['DETECT_MINAREA']
 
+        ## Reset all SExtractor results to None, so we don't confuse these results with meaningful ones
         self.SExtractor_catalogfile = None
         self.SExtractor_results = None
         self.n_stars_SExtracted = None
         self.SExtractor_background = None
         self.SExtractor_background_RMS = None
-        
 
-        if len(filtered_stars) < nstars_threshold:
+        ## If few stars found, the image is blank
+        if len(stars) < nstars_threshold:
             self.logger.warning('  Only {} bright stars detected.  Image appears blank'.format(len(filtered_stars)))
             self.flags['other'] = True
             return True
         else:
-            self.logger.info('  Found {} bright stars.'.format(len(filtered_stars)))
+            self.logger.info('  Found {} bright stars.'.format(len(stars)))
             self.flags['other'] = False
             return False
 
@@ -1554,7 +1566,7 @@ class Image(object):
             SCAMPCommand.append('{}'.format(SCAMP_params[key]))
         self.logger.info("Running SCAMP")
         if SCAMP_aheader:
-            self.logger.info("  Using SCAMP_aheader file: {}".format(SCAMP_aheader))
+            self.logger.info("  Using SCAMP aheader file: {}".format(SCAMP_aheader))
         self.logger.debug("  SCAMP command: {}".format(SCAMPCommand))
         try:
             SCAMP_STDOUT = subprocess.check_output(SCAMPCommand,\
@@ -1571,6 +1583,9 @@ class Image(object):
             StartAstrometricStats = False
             EndAstrometricStats = False
             for line in SCAMP_STDOUT.splitlines():
+                MatchVersion = re.search('SCAMP (\d+\.\d+\.\d+) started on', line)
+                if MatchVersion:
+                    self.logger.info('  SCAMP version = {}'.format(MatchVersion.group(1)))
                 if re.search('Astrometric stats \(external\)', line):
                     StartAstrometricStats = True
                 if re.search('Generating astrometric plots', line):
@@ -1581,7 +1596,8 @@ class Image(object):
                     self.logger.debug("  SCAMP Output: "+line)
 
         ## Populate FITS header with SCAMP derived header values in .head file
-        head_file = os.path.splitext(self.working_file)[0]+'.head'
+        head_filename = '{}.head'.format(self.raw_file_basename)
+        head_file = os.path.join(self.tel.temp_file_path, head_filename)
         if os.path.exists(head_file):
             self.temp_files.append(head_file)
             self.logger.info('  Writing SCAMP results to fits header on {}'.format(\
@@ -1643,6 +1659,9 @@ class Image(object):
             self.logger.error("SWarp process failed: {0}".format(sys.exc_info()[2]))
         else:
             for line in SWarp_STDOUT.splitlines():
+                MatchVersion = re.search('SWarp (\d+\.\d+\.\d+) started on', line)
+                if MatchVersion:
+                    self.logger.info('  SWarp version = {}'.format(MatchVersion.group(1)))
                 self.logger.debug("  SWarp Output: "+line)
         ## Replace working_file with SWarp output file
         if os.path.exists(swarp_file):
@@ -2089,6 +2108,7 @@ class Image(object):
             hist_binsize = (hist_high-hist_low)/128
             hist_bins = np.arange(hist_low,hist_high,hist_binsize)
             self.logger.debug('  Histogram range: {} {}.'.format(hist_low, hist_high))
+            pyplot.ioff()
             fig = pyplot.figure()
             pyplot.hist(data.ravel(), bins=hist_bins, label='binsize = {:4f}'.format(hist_binsize))
             pyplot.xlim(hist_low,hist_high)
