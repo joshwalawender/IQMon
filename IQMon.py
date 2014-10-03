@@ -1032,7 +1032,7 @@ class Image(object):
         if assoc:
             ## Create Assoc file with pixel coordinates of catalog stars
             assoc_file = os.path.join(self.tel.temp_file_path, self.raw_file_basename+'_assoc.txt')
-#             self.temp_files.append(assoc_file)
+            self.temp_files.append(assoc_file)
             if os.path.exists(assoc_file): os.remove(assoc_file)
 
             with open(assoc_file, 'w') as assocFO:
