@@ -1587,7 +1587,8 @@ class Image(object):
                     self.logger.debug("  SCAMP Output: "+line)
 
         ## Populate FITS header with SCAMP derived header values in .head file
-        head_file = os.path.splitext(self.working_file)[0]+'.head'
+        head_filename = os.path.splitext(self.working_file)[0]+'.head'
+        head_file = os.path.join(self.tel.temp_file_path, head_filename)
         if os.path.exists(head_file):
             self.temp_files.append(head_file)
             self.logger.info('  Writing SCAMP results to fits header on {}'.format(\
