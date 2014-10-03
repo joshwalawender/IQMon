@@ -1560,7 +1560,7 @@ class Image(object):
             SCAMPCommand.append('{}'.format(SCAMP_params[key]))
         self.logger.info("Running SCAMP")
         if SCAMP_aheader:
-            self.logger.info("  Using SCAMP_aheader file: {}".format(SCAMP_aheader))
+            self.logger.info("  Using SCAMP aheader file: {}".format(SCAMP_aheader))
         self.logger.debug("  SCAMP command: {}".format(SCAMPCommand))
         try:
             SCAMP_STDOUT = subprocess.check_output(SCAMPCommand,\
@@ -1587,7 +1587,7 @@ class Image(object):
                     self.logger.debug("  SCAMP Output: "+line)
 
         ## Populate FITS header with SCAMP derived header values in .head file
-        head_filename = os.path.splitext(self.working_file)[0]+'.head'
+        head_filename = '{}.head'.format(self.raw_file_basename)
         head_file = os.path.join(self.tel.temp_file_path, head_filename)
         if os.path.exists(head_file):
             self.temp_files.append(head_file)
