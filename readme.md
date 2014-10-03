@@ -39,6 +39,9 @@ External Programs:
 
 ## Version History
 
+* __v1.3.3__
+    * Bug fixes.
+    * Added version info for IQMon, SExtractor, SCAMP, and SWarp to log.
 * __v1.3.2__
     * Reduced threshold number of stars to calculate zero point to 10.
     * Made downsampling factor for solve-field (from astrometry.net) a user settable argument in `solve_astrometry()`.  Defaults to 4.
