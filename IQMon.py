@@ -1581,6 +1581,9 @@ class Image(object):
             StartAstrometricStats = False
             EndAstrometricStats = False
             for line in SCAMP_STDOUT.splitlines():
+                MatchVersion = re.search('SCAMP (\d+\.\d+\.\d+) started on', line)
+                if MatchVersion:
+                    self.logger.info('  SCAMP version = {}'.format(MatchVersion.group(1)))
                 if re.search('Astrometric stats \(external\)', line):
                     StartAstrometricStats = True
                 if re.search('Generating astrometric plots', line):
@@ -1654,6 +1657,9 @@ class Image(object):
             self.logger.error("SWarp process failed: {0}".format(sys.exc_info()[2]))
         else:
             for line in SWarp_STDOUT.splitlines():
+                MatchVersion = re.search('SWarp (\d+\.\d+\.\d+) started on', line)
+                if MatchVersion:
+                    self.logger.info('  SWarp version = {}'.format(MatchVersion.group(1)))
                 self.logger.debug("  SWarp Output: "+line)
         ## Replace working_file with SWarp output file
         if os.path.exists(swarp_file):
@@ -2100,6 +2106,7 @@ class Image(object):
             hist_binsize = (hist_high-hist_low)/128
             hist_bins = np.arange(hist_low,hist_high,hist_binsize)
             self.logger.debug('  Histogram range: {} {}.'.format(hist_low, hist_high))
+            pyplot.ioff()
             fig = pyplot.figure()
             pyplot.hist(data.ravel(), bins=hist_bins, label='binsize = {:4f}'.format(hist_binsize))
             pyplot.xlim(hist_low,hist_high)
