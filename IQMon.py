@@ -1455,13 +1455,13 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Is the Image Blank
     ##-------------------------------------------------------------------------
-    def is_blank(self, threshold=5.0, area=9):
+    def is_blank(self, threshold=None, area=None):
         '''
         '''
         self.logger.info('Checking if image is blank')
         nstars_threshold = 5
 
-        ## Edit SExtractor parameters to detect only bright stars
+        ## Save original SExtractor parameters
         if 'DETECT_THRESH' in self.tel.SExtractor_params.keys():
             dt = self.tel.SExtractor_params['DETECT_THRESH']
         else:
@@ -1474,12 +1474,17 @@ class Image(object):
             da = self.tel.SExtractor_params['DETECT_MINAREA']
         else:
             da = None
-        self.tel.SExtractor_params['DETECT_THRESH'] = threshold
-        self.tel.SExtractor_params['ANALYSIS_THRESH'] = threshold
-        self.tel.SExtractor_params['DETECT_MINAREA'] = area
+        ## Set new (temporary) parmaters
+        if threshold:
+            self.tel.SExtractor_params['DETECT_THRESH'] = threshold
+            self.tel.SExtractor_params['ANALYSIS_THRESH'] = threshold
+        if area:
+            self.tel.SExtractor_params['DETECT_MINAREA'] = area
+        
+        ## Run SExtractor
         self.run_SExtractor()
         stars = [entry for entry in self.SExtractor_results if entry['FLAGS'] == 0]
-        filtered_stars = [star for star in stars if star['BWIN_IMAGE'] > 1.0]
+#        filtered_stars = [star for star in stars if star['BWIN_IMAGE'] > 1.0]
 
         ## Edit SExtractor parameters back to original state
         if dt:
@@ -1495,19 +1500,20 @@ class Image(object):
         else:
             if 'DETECT_MINAREA' in self.tel.SExtractor_params: del self.tel.SExtractor_params['DETECT_MINAREA']
 
+        ## Reset all SExtractor results to None, so we don't confuse these results with meaningful ones
         self.SExtractor_catalogfile = None
         self.SExtractor_results = None
         self.n_stars_SExtracted = None
         self.SExtractor_background = None
         self.SExtractor_background_RMS = None
-        
 
-        if len(filtered_stars) < nstars_threshold:
+        ## If few stars found, the image is blank
+        if len(stars) < nstars_threshold:
             self.logger.warning('  Only {} bright stars detected.  Image appears blank'.format(len(filtered_stars)))
             self.flags['other'] = True
             return True
         else:
-            self.logger.info('  Found {} bright stars.'.format(len(filtered_stars)))
+            self.logger.info('  Found {} bright stars.'.format(len(stars)))
             self.flags['other'] = False
             return False
 
