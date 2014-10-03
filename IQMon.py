@@ -1087,6 +1087,9 @@ class Image(object):
             for line in SExSTDOUT.splitlines():
                 line.replace("[1A", "")
                 line.replace("[1M>", "")
+                MatchVersion = re.search('SExtractor (\d+\.\d+\.\d+) started on', line)
+                if MatchVersion:
+                    self.logger.info('  SExtractor version = {}'.format(MatchVersion.group(1)))
                 if not re.match(".*Setting up background map.*", line) and\
                    not re.match(".*Line:\s[0-9]*.*", line):
                     self.logger.debug("  SExtractor Output: {}".format(line))
