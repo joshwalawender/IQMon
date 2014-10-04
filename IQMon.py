@@ -1662,7 +1662,8 @@ class Image(object):
                 MatchVersion = re.search('SWarp (\d+\.\d+\.\d+) started on', line)
                 if MatchVersion:
                     self.logger.info('  SWarp version = {}'.format(MatchVersion.group(1)))
-                self.logger.debug("  SWarp Output: "+line)
+                if not re.search('Resampling line', line) and not re.search('Setting up background map at', line):
+                    self.logger.debug("  SWarp Output: "+line)
         ## Replace working_file with SWarp output file
         if os.path.exists(swarp_file):
             self.logger.debug('  SWarp process succeeded.')
