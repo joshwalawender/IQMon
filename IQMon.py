@@ -317,7 +317,7 @@ class Image(object):
         ## Put initial lines in log
         self.logger.info('')
         self.logger.info("###### Processing Image {} ######".format(self.raw_file_name))
-        self.logger.info('IQMon version = '.format(__version__))
+        self.logger.info('IQMon version = {}'.format(__version__))
         self.logger.info('')
 
         ## Print Configuration to Log
