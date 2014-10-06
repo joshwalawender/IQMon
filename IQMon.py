@@ -749,6 +749,7 @@ class Image(object):
         AstrometrySTDOUT = open(os.path.join(self.tel.temp_file_path, 'astrometry_output.txt'), 'w')
         self.temp_files.append(os.path.join(self.tel.temp_file_path, 'astrometry_output.txt'))
 
+        self.logger.debug('  Calling astrometry.net with: {}'.format(' '.join(AstrometryCommand)))
         if timeout:
             StartTime = datetime.datetime.now()
             astrometry_process = subprocess.Popen(AstrometryCommand, stdout=AstrometrySTDOUT, stderr=AstrometrySTDOUT)
@@ -1069,7 +1070,7 @@ class Image(object):
             SExtractorCommand.append('-{}'.format(key))
             SExtractorCommand.append('{}'.format(SExtractor_params[key]))
         self.logger.info("Invoking SExtractor")
-        self.logger.debug("  SExtractor command: {}".format(repr(SExtractorCommand)))
+        self.logger.debug("  SExtractor command: {}".format(' '.join(SExtractorCommand)))
         try:
             SExSTDOUT = subprocess.check_output(SExtractorCommand,\
                              stderr=subprocess.STDOUT, universal_newlines=True)
@@ -1567,7 +1568,7 @@ class Image(object):
         self.logger.info("Running SCAMP")
         if SCAMP_aheader:
             self.logger.info("  Using SCAMP aheader file: {}".format(SCAMP_aheader))
-        self.logger.debug("  SCAMP command: {}".format(SCAMPCommand))
+        self.logger.debug("  SCAMP command: {}".format(' '.join(SCAMPCommand)))
         try:
             SCAMP_STDOUT = subprocess.check_output(SCAMPCommand,\
                              stderr=subprocess.STDOUT, universal_newlines=True)
@@ -1644,7 +1645,7 @@ class Image(object):
             SWarpCommand.append('-{}'.format(key))
             SWarpCommand.append('{}'.format(SWarp_params[key]))
         self.logger.info("Running SWarp.")
-        self.logger.debug("  SWarp command: {}".format(SWarpCommand))
+        self.logger.debug("  SWarp command: {}".format(' '.join(SWarpCommand)))
         try:
             SWarp_STDOUT = subprocess.check_output(SWarpCommand,\
                                                    stderr=subprocess.STDOUT,\
