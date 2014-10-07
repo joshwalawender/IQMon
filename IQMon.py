@@ -994,6 +994,10 @@ class Image(object):
                                                self.raw_file_basename+".cat")
         self.temp_files.append(self.SExtractor_catalogfile)
 
+        ## Remove catalog file from previous run of SExtractor (if it exists)
+        if os.path.exists(self.SExtractor_catalogfile):
+            os.remove(self.SExtractor_catalogfile)
+
         sextractor_output_param_file = os.path.join(self.tel.temp_file_path,\
                                                    '{}.param'.format(self.raw_file_basename))
         if os.path.exists(sextractor_output_param_file):
@@ -1184,11 +1188,7 @@ class Image(object):
         '''
         if self.n_stars_SExtracted > 1:
             self.logger.info('Analyzing SExtractor results to determine typical image quality.')
-            if self.tel.PSF_measurement_radius:
-                self.logger.info('  Using {} stars in the inner {}'.format(\
-                                 self.n_stars_SExtracted,\
-                                 self.tel.PSF_measurement_radius))
-            else:
+            if not self.tel.PSF_measurement_radius:
                 IQRadiusFactor = 1.0
                 DiagonalRadius = math.sqrt((self.nXPix/2)**2+(self.nYPix/2)**2)
                 self.tel.PSF_measurement_radius = DiagonalRadius*IQRadiusFactor
@@ -1213,8 +1213,9 @@ class Image(object):
                 self.ellipticity_median = np.median(CentralEllipticities)
                 self.ellipticity_average = np.average(CentralEllipticities, weights=CentralSNRs)
                 self.ellipticity = self.ellipticity_average
-                self.logger.debug("  Using {0} stars in central region to determine PSF quality.".format(\
-                                                                len(CentralFWHMs)))
+                self.logger.debug("  Using {0} stars in central {1} to determine PSF quality.".format(\
+                                                                len(CentralFWHMs),\
+                                                                self.tel.PSF_measurement_radius))
                 self.logger.info("  Mode FWHM in inner region is {0:.2f} pixels".format(\
                                                         self.FWHM_mode.to(u.pix).value))
                 self.logger.info("  Median FWHM in inner region is {0:.2f} pixels".format(\
@@ -1790,7 +1791,7 @@ class Image(object):
                            "{:.2f}".format(dRA),\
                            "{:.2f}".format(dDEC),\
                            local_UCAC_data]
-            self.logger.debug("  Using command: {}".format(UCACcommand))
+            self.logger.debug("  Using command: {}".format(' '.join(UCACcommand)))
             if os.path.exists("ucac4.txt"): os.remove("ucac4.txt")
             result = subprocess.call(UCACcommand)
             if os.path.exists('ucac4.txt'):
