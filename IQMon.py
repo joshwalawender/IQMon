@@ -34,7 +34,7 @@ import astropy.wcs as wcs
 import astropy.io.ascii as ascii
 
 
-__version__ = '1.3.3'
+__version__ = '1.3.4'
 
 
 ##-----------------------------------------------------------------------------
@@ -1200,18 +1200,21 @@ class Image(object):
             CentralEllipticities = [star['ELLIPTICITY']\
                                     for star in self.SExtractor_results\
                                     if (star['ImageRadius'] <= self.tel.PSF_measurement_radius.to(u.pix).value)]
-            CentralSNRs = [star['FLUX_AUTO'] / star['FLUXERR_AUTO']\
-                           for star in self.SExtractor_results\
-                           if (star['ImageRadius'] <= self.tel.PSF_measurement_radius.to(u.pix).value)]
+            ## Weights assumes that uncertainty on a given measurement of the
+            ## FWHM is equal to 1/SNR pixels
+            weights = [(star['FLUX_AUTO'] / star['FLUXERR_AUTO'])**2\
+                       for star in self.SExtractor_results\
+                       if (star['ImageRadius'] <= self.tel.PSF_measurement_radius.to(u.pix).value)]
 
             if len(CentralFWHMs) > 3:
                 self.FWHM_mode = mode(CentralFWHMs, 0.2) * u.pix
                 self.FWHM_median = np.median(CentralFWHMs) * u.pix
-                self.FWHM_average = np.average(CentralFWHMs, weights=CentralSNRs) * u.pix
+                self.FWHM_average = np.average(CentralFWHMs, weights=weights) * u.pix
+                self.FWHM_average_uncertainty = (np.sum(weights))**-0.5 * u.pix
                 self.FWHM = self.FWHM_average
                 self.ellipticity_mode = mode(CentralEllipticities, 0.05) 
                 self.ellipticity_median = np.median(CentralEllipticities)
-                self.ellipticity_average = np.average(CentralEllipticities, weights=CentralSNRs)
+                self.ellipticity_average = np.average(CentralEllipticities, weights=weights)
                 self.ellipticity = self.ellipticity_average
                 self.logger.debug("  Using {0} stars in central {1} to determine PSF quality.".format(\
                                                                 len(CentralFWHMs),\
@@ -1220,8 +1223,9 @@ class Image(object):
                                                         self.FWHM_mode.to(u.pix).value))
                 self.logger.info("  Median FWHM in inner region is {0:.2f} pixels".format(\
                                                         self.FWHM_median.to(u.pix).value))
-                self.logger.info("  Average FWHM in inner region is {0:.2f} pixels".format(\
-                                                        self.FWHM_average.to(u.pix).value))
+                self.logger.info("  Average FWHM in inner region is {0:.2f} +/- {1:.2f} pixels".format(\
+                                    self.FWHM_average.to(u.pix).value,\
+                                    self.FWHM_average_uncertainty.to(u.pix).value))
 
                 self.logger.info("  Mode Ellipticity in inner region is {0:.2f}".format(\
                                                                  self.ellipticity_mode))
@@ -1885,11 +1889,16 @@ class Image(object):
                            if (entry['FLAGS'] == 0)\
                            and not np.isnan(entry['assoc_catmag'])\
                            and not (float(entry['assoc_catmag']) == 0.0)]
-            SNR = [entry['FLUX_AUTO'] / entry['FLUXERR_AUTO']\
-                   for entry in self.SExtractor_results\
-                   if (entry['FLAGS'] == 0)\
-                   and not np.isnan(entry['assoc_catmag'])\
-                   and not (float(entry['assoc_catmag']) == 0.0)]
+            ## Weights assumes that uncertainty on a given measurement of the
+            ## zero point is equal to 2.512/Ln(10)*1/SNR magnitudes
+            ##   m = 2.512 * log10(F)
+            ##   sig_m = dm/dF * sig_F = 2.512/ln(10) sig_F/F
+            ##   weight = 1/sig_m^2 = (ln(10)/2.512 * SNR)^2
+            weights = [(np.log(10)/2.512*entry['FLUX_AUTO'] / entry['FLUXERR_AUTO'])**2\
+                       for entry in self.SExtractor_results\
+                       if (entry['FLAGS'] == 0)\
+                       and not np.isnan(entry['assoc_catmag'])\
+                       and not (float(entry['assoc_catmag']) == 0.0)]
 
             self.logger.info('  Using {} stars with {} catalog magnitude'.format(len(zero_points), self.catalog_filter))
 
@@ -1902,10 +1911,13 @@ class Image(object):
             else:
                 self.zero_point_mode = mode(zero_points, 0.1)
                 self.zero_point_median = np.median(zero_points)
-                self.zero_point_average = np.average(zero_points, weights=SNR)
+                self.zero_point_average = np.average(zero_points, weights=weights)
+                self.zero_point_average_uncertainty = (np.sum(weights))**-0.5
                 self.logger.info('  Mode Zero Point = {:.2f}'.format(self.zero_point_mode))
                 self.logger.info('  Median Zero Point = {:.2f}'.format(self.zero_point_median))
-                self.logger.info('  Weighted Average Zero Point = {:.2f}'.format(self.zero_point_average))
+                self.logger.info('  Weighted Average Zero Point = {:.2f} +/- {:.2f}'.format(\
+                                    self.zero_point_average,\
+                                    self.zero_point_average_uncertainty))
                 self.zero_point = self.zero_point_average
 
                 ## Check zero point

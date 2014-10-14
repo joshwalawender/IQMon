@@ -39,6 +39,9 @@ External Programs:
 
 ## Version History
 
+* __v1.3.4__
+    * Various minor bug fixes.
+    * Fixed bug in calculation of weights for FWHM and zero point calculations.  Very little actual impact on results.
 * __v1.3.3__
     * Bug fixes.
     * Added version info for IQMon, SExtractor, SCAMP, and SWarp to log.
