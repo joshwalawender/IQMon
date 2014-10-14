@@ -1537,7 +1537,7 @@ class Image(object):
         '''
         Run SCAMP on SExtractor output catalog.
         '''
-        if not image.image_WCS:
+        if not self.image_WCS:
             self.logger.warning('No image WCS found.  Skipping SCAMP.')
             self.SCAMP_successful = False
             return self.SCAMP_successful
