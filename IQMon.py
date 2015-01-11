@@ -1845,6 +1845,7 @@ class Image(object):
                                               'pmRA', 'pmDec', 'sRA', 'sDec',\
                                               '2mass', 'RAepoch', 'Decepoch',\
                                               'e2mphos', 'icq_flag'])
+
             self.catalog_data.rename_column('id', 'ID')
             self.catalog_data.rename_column('B', 'Bmag')
             self.catalog_data.rename_column('V', 'Vmag')
@@ -1856,7 +1857,10 @@ class Image(object):
             faint_stars_to_remove = []
             for i in range(0,len(self.catalog_data)):
                 entry = self.catalog_data[i]
-                if entry[self.tel.catalog_info[self.filter]] > self.tel.catalog_info['magmax']:
+                try:
+                    if entry[self.tel.catalog_info[self.filter]] > self.tel.catalog_info['magmax']:
+                        faint_stars_to_remove.append(i)
+                except:
                     faint_stars_to_remove.append(i)
             if len(faint_stars_to_remove) > 0:
                 self.logger.info('  Removing {} faint stars ({} > {}) from catalog.'.format(\
