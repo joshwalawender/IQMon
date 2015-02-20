@@ -1078,10 +1078,17 @@ class Image(object):
         try:
             SExSTDOUT = subprocess.check_output(SExtractorCommand,\
                              stderr=subprocess.STDOUT, universal_newlines=True)
+        except OSError as e:
+            if e.errno == 2:
+                self.logger.error('Could not find sextractor executable.  Is sextractor installed?')
+            self.logger.error("SExtractor failed. ErrNo: {}".format(e.errno))
+            self.logger.error("SExtractor failed. StrErr: {}".format(e.strerror))
+            self.SExtractor_results = None
+            self.SExtractor_background = None
+            self.SExtractor_background_RMS = None
         except subprocess.CalledProcessError as e:
-            self.logger.error("SExtractor failed.  Command: {}".format(e.cmd))
-            self.logger.error("SExtractor failed.  Returncode: {}".format(e.returncode))
-            self.logger.error("SExtractor failed.  Output: {}".format(e.output))
+            self.logger.error("SExtractor failed. Returncode: {}".format(e.returncode))
+            self.logger.error("SExtractor failed. Output: {}".format(e.output))
             self.SExtractor_results = None
             self.SExtractor_background = None
             self.SExtractor_background_RMS = None
