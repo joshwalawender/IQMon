@@ -522,6 +522,30 @@ class Image(object):
 
 
     ##-------------------------------------------------------------------------
+    ## Uncompress image
+    ##-------------------------------------------------------------------------
+    def uncompress(self):
+        if not self.working_file:
+            self.logger.warning('Must have working file to uncompress file')
+        else:
+            result = subprocess.check_output(['fpack', '-L', self.working_file])
+            found_compression_info = False
+            for line in result.split('\n'):
+                IsMatch = re.match('\s*\d+\s+IMAGE\s+([\w/=\.]+)\s(BITPIX=[\-\d]+)\s(\[.*\])\s([\w]+)', line)
+                if IsMatch:
+                    self.logger.debug('  funpack -L Output: {}'.format(line))
+                    if re.search('not_tiled', IsMatch.group(4)) and not re.search('no_pixels', IsMatch.group(3)):
+                        self.logger.debug('  Image is not compressed')
+                        found_compression_info = True
+                    elif re.search('tiled_rice', IsMatch.group(4)):
+                        self.logger.debug('  Image is rice compressed.  Running funpack.')
+                        found_compression_info = True
+            if not found_compression_info:
+                self.logger.warning('Could not determine compression status')
+            else:
+                subprocess.call(['funpack', '-F', self.working_file])
+
+    ##-------------------------------------------------------------------------
     ## Read Image
     ##-------------------------------------------------------------------------
     def read_image(self):
@@ -559,6 +583,7 @@ class Image(object):
             os.chmod(self.working_file, chmod_code)
             self.temp_files.append(self.working_file)
             self.file_ext = '.fits'
+            self.uncompress()
         ## fits extension:  make working copy
         elif self.file_ext == '.fits':
             self.logger.info('Making working copy of raw image: {}'.format(\
@@ -569,6 +594,7 @@ class Image(object):
             os.chmod(self.working_file, chmod_code)
             self.temp_files.append(self.working_file)
             self.file_ext = '.fits'
+            self.uncompress()
         ## DSLR file:  convert to fits
         elif self.file_ext in ['.dng', '.DNG', '.cr2', '.CR2']:
             self.logger.info('Converting {} to fits format'.format(\
@@ -1588,6 +1614,11 @@ class Image(object):
         try:
             SCAMP_STDOUT = subprocess.check_output(SCAMPCommand,\
                              stderr=subprocess.STDOUT, universal_newlines=True)
+        except OSError as e:
+            if e.errno == 2:
+                self.logger.error('Could not find SCAMP executable.  Is SCAMP installed?')
+            self.logger.error("SCAMP failed. ErrNo: {}".format(e.errno))
+            self.logger.error("SCAMP failed. StrErr: {}".format(e.strerror))
         except subprocess.CalledProcessError as e:
             self.logger.error("SCAMP failed.  Command: {}".format(e.cmd))
             self.logger.error("SCAMP failed.  Returncode: {}".format(e.returncode))
