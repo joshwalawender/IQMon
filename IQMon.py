@@ -1639,7 +1639,7 @@ class Image(object):
                 if re.search('Generating astrometric plots', line):
                     EndAstrometricStats = True
                 if StartAstrometricStats and not EndAstrometricStats:
-                    self.logger.info("  SCAMP Output: "+line)
+                    self.logger.debug("  SCAMP Output: "+line)
                 else:
                     self.logger.debug("  SCAMP Output: "+line)
 
