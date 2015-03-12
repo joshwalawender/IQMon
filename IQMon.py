@@ -2569,6 +2569,88 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Append Line With Image Info to YAML Text File
     ##-------------------------------------------------------------------------
+    def add_mongo_entry(self, address, port, db_name, collection_name):
+        ## Connect to mongo database
+        logger.info('Writing results to mongo db at {}:{}'.format(address, port))
+        try:
+            client = MongoClient('192.168.1.101', 27017)
+            logger.debug('  Connected to client')
+            db = client[db_name]
+            logger.debug('  Connected to database')
+            data = db[collection_name]
+            logger.debug('  Found collection')
+        except:
+            return False
+
+        ## Form datum to add
+        ## Form dictionary with new result info
+        try:
+            FWHM_median_pix = self.FWHM_median.to(u.pix).value
+        except:
+            FWHM_median_pix = None
+        try:
+            FWHM_mode_pix = self.FWHM_mode.to(u.pix).value
+        except:
+            FWHM_mode_pix = None
+        try:
+            FWHM_pix = self.FWHM.to(u.pix).value
+        except:
+            FWHM_pix = None
+        try:
+            pointing_error_arcmin = self.pointing_error.arcminute
+        except:
+            pointing_error_arcmin = None
+        try:
+            alt = self.target_alt.to(u.deg).value
+        except:
+            alt = None
+        try:
+            az = self.target_az.to(u.deg).value
+        except:
+            az = None
+        try:
+            moon_sep = self.moon_sep.to(u.deg).value
+        except:
+            moon_sep = None
+        try:
+            posang = self.position_angle.to(u.deg).value
+        except:
+            posang = None
+        new_result = {
+                      'filename': self.raw_file_name,\
+                      'exposure_start': self.observation_date,\
+                      'FWHM_median_pix': str(FWHM_median_pix),\
+                      'FWHM_mode_pix': str(FWHM_mode_pix),\
+                      'FWHM_pix': str(FWHM_pix),\
+                      'ellipticity_median': str(self.ellipticity_median),\
+                      'ellipticity_mode': str(self.ellipticity_mode),\
+                      'ellipticity': str(self.ellipticity),\
+                      'n_stars': str(self.n_stars_SExtracted),\
+                      'background': str(self.SExtractor_background),\
+                      'background_rms': str(self.SExtractor_background_RMS),\
+                      'pointing_error_arcmin': str(pointing_error_arcmin),\
+                      'zero_point': str(self.zero_point),\
+                      'alt': str(alt),\
+                      'az': str(az),\
+                      'airmass': str(self.airmass),\
+                      'moon_separation': str(moon_sep),\
+                      'moon_illumination': str(self.moon_phase),\
+                      'WCS_position_angle': str(posang),\
+                      'process_time': str(self.total_process_time),\
+                      'flags': str(self.flags),\
+                      'IQMon Version': str(__version__),\
+                     }
+
+        ## Add datum to collection
+        id = status.insert(new_result)
+        logger.debug('  Inserted datum with ID: {}'.format(id))
+
+
+
+
+    ##-------------------------------------------------------------------------
+    ## Append Line With Image Info to YAML Text File
+    ##-------------------------------------------------------------------------
     def add_yaml_entry(self, summary_file):
         self.logger.info("Writing YAML Summary File: {}".format(summary_file))
         result_list = []
