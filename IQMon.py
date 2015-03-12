@@ -22,6 +22,8 @@ import math
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as pyplot
+import pymongo
+from pymongo import MongoClient
 
 
 ## Import Astronomy Specific Tools
@@ -522,6 +524,30 @@ class Image(object):
 
 
     ##-------------------------------------------------------------------------
+    ## Uncompress image
+    ##-------------------------------------------------------------------------
+    def uncompress(self):
+        if not self.working_file:
+            self.logger.warning('Must have working file to uncompress file')
+        else:
+            result = subprocess.check_output(['fpack', '-L', self.working_file])
+            found_compression_info = False
+            for line in result.split('\n'):
+                IsMatch = re.match('\s*\d+\s+IMAGE\s+([\w/=\.]+)\s(BITPIX=[\-\d]+)\s(\[.*\])\s([\w]+)', line)
+                if IsMatch:
+                    self.logger.debug('  funpack -L Output: {}'.format(line))
+                    if re.search('not_tiled', IsMatch.group(4)) and not re.search('no_pixels', IsMatch.group(3)):
+                        self.logger.debug('  Image is not compressed')
+                        found_compression_info = True
+                    elif re.search('tiled_rice', IsMatch.group(4)):
+                        self.logger.debug('  Image is rice compressed.  Running funpack.')
+                        found_compression_info = True
+            if not found_compression_info:
+                self.logger.warning('Could not determine compression status')
+            else:
+                subprocess.call(['funpack', '-F', self.working_file])
+
+    ##-------------------------------------------------------------------------
     ## Read Image
     ##-------------------------------------------------------------------------
     def read_image(self):
@@ -559,6 +585,7 @@ class Image(object):
             os.chmod(self.working_file, chmod_code)
             self.temp_files.append(self.working_file)
             self.file_ext = '.fits'
+            self.uncompress()
         ## fits extension:  make working copy
         elif self.file_ext == '.fits':
             self.logger.info('Making working copy of raw image: {}'.format(\
@@ -569,6 +596,7 @@ class Image(object):
             os.chmod(self.working_file, chmod_code)
             self.temp_files.append(self.working_file)
             self.file_ext = '.fits'
+            self.uncompress()
         ## DSLR file:  convert to fits
         elif self.file_ext in ['.dng', '.DNG', '.cr2', '.CR2']:
             self.logger.info('Converting {} to fits format'.format(\
@@ -1078,10 +1106,17 @@ class Image(object):
         try:
             SExSTDOUT = subprocess.check_output(SExtractorCommand,\
                              stderr=subprocess.STDOUT, universal_newlines=True)
+        except OSError as e:
+            if e.errno == 2:
+                self.logger.error('Could not find sextractor executable.  Is sextractor installed?')
+            self.logger.error("SExtractor failed. ErrNo: {}".format(e.errno))
+            self.logger.error("SExtractor failed. StrErr: {}".format(e.strerror))
+            self.SExtractor_results = None
+            self.SExtractor_background = None
+            self.SExtractor_background_RMS = None
         except subprocess.CalledProcessError as e:
-            self.logger.error("SExtractor failed.  Command: {}".format(e.cmd))
-            self.logger.error("SExtractor failed.  Returncode: {}".format(e.returncode))
-            self.logger.error("SExtractor failed.  Output: {}".format(e.output))
+            self.logger.error("SExtractor failed. Returncode: {}".format(e.returncode))
+            self.logger.error("SExtractor failed. Output: {}".format(e.output))
             self.SExtractor_results = None
             self.SExtractor_background = None
             self.SExtractor_background_RMS = None
@@ -1581,6 +1616,11 @@ class Image(object):
         try:
             SCAMP_STDOUT = subprocess.check_output(SCAMPCommand,\
                              stderr=subprocess.STDOUT, universal_newlines=True)
+        except OSError as e:
+            if e.errno == 2:
+                self.logger.error('Could not find SCAMP executable.  Is SCAMP installed?')
+            self.logger.error("SCAMP failed. ErrNo: {}".format(e.errno))
+            self.logger.error("SCAMP failed. StrErr: {}".format(e.strerror))
         except subprocess.CalledProcessError as e:
             self.logger.error("SCAMP failed.  Command: {}".format(e.cmd))
             self.logger.error("SCAMP failed.  Returncode: {}".format(e.returncode))
@@ -1601,7 +1641,7 @@ class Image(object):
                 if re.search('Generating astrometric plots', line):
                     EndAstrometricStats = True
                 if StartAstrometricStats and not EndAstrometricStats:
-                    self.logger.info("  SCAMP Output: "+line)
+                    self.logger.debug("  SCAMP Output: "+line)
                 else:
                     self.logger.debug("  SCAMP Output: "+line)
 
@@ -2530,6 +2570,145 @@ class Image(object):
         HTML.write("</body>\n")
         HTML.write("</html>\n")
         HTML.close()
+
+
+    ##-------------------------------------------------------------------------
+    ## Append Line With Image Info to YAML Text File
+    ##-------------------------------------------------------------------------
+    def add_mongo_entry(self, address, db_name, collection_name, port=27017):
+        ## Connect to mongo database
+        self.logger.info('Writing results to mongo db at {}:{}'.format(address, port))
+        try:
+            client = MongoClient('192.168.1.101', 27017)
+            self.logger.debug('  Connected to client')
+        except:
+            self.logger.warning('  Failed to connect to client')
+            return False
+
+        try:
+            db = client[db_name]
+            self.logger.debug('  Connected to database: {}'.format(db_name))
+        except:
+            self.logger.warning('  Failed to connect to database')
+            return False
+
+        try:
+            data = db[collection_name]
+            self.logger.debug('  Found collection: {}'.format(collection_name))
+        except:
+            self.logger.warning('  Failed to find collection')
+            return False
+
+
+        ## Form datum to add
+        ## Form dictionary with new result info
+        new_result = {}
+        try:
+            new_result['filename'] = str(self.raw_file_name)
+            self.logger.debug('  Result: filename = {}'.format(new_result['filename']))
+        except: self.logger.debug('  Could not write filename to result')
+        try:
+            new_result['exposure_start'] = str(self.observation_date)
+            self.logger.debug('  Result: exposure_start = {}'.format(new_result['exposure_start']))
+        except: self.logger.debug('  Could not write exposure_start to result')
+        try:
+            new_result['FWHM_median_pix'] = float(self.FWHM_median.to(u.pix).value)
+            self.logger.debug('  Result: FWHM_median_pix = {}'.format(new_result['FWHM_median_pix']))
+        except: self.logger.debug('  Could not write FWHM_median_pix to result')
+        try:
+            new_result['FWHM_mode_pix'] = float(self.FWHM_mode.to(u.pix).value)
+            self.logger.debug('  Result: FWHM_mode_pix = {}'.format(new_result['FWHM_mode_pix']))
+        except: self.logger.debug('  Could not write FWHM_mode_pix to result')
+        try:
+            new_result['FWHM_pix'] = float(self.FWHM.to(u.pix).value)
+            self.logger.debug('  Result: FWHM_pix = {}'.format(new_result['FWHM_pix']))
+        except: self.logger.debug('  Could not write FWHM_pix to result')
+        try:
+            new_result['ellipticity_median'] = float(self.ellipticity_median)
+            self.logger.debug('  Result: ellipticity_median = {}'.format(new_result['ellipticity_median']))
+        except: self.logger.debug('  Could not write ellipticity_median to result')
+        try:
+            new_result['ellipticity_mode'] = float(self.ellipticity_mode)
+            self.logger.debug('  Result: ellipticity_mode = {}'.format(new_result['ellipticity_mode']))
+        except: self.logger.debug('  Could not write ellipticity_mode to result')
+        try:
+            new_result['ellipticity'] = float(self.ellipticity)
+            self.logger.debug('  Result: ellipticity = {}'.format(new_result['ellipticity']))
+        except: self.logger.debug('  Could not write ellipticity to result')
+        try:
+            new_result['n_stars'] = int(self.n_stars_SExtracted)
+            self.logger.debug('  Result: n_stars = {}'.format(new_result['n_stars']))
+        except: self.logger.debug('  Could not write n_stars to result')
+        try:
+            new_result['background'] = float(self.SExtractor_background)
+            self.logger.debug('  Result: background = {}'.format(new_result['background']))
+        except: self.logger.debug('  Could not write background to result')
+        try:
+            new_result['background_rms'] = float(self.SExtractor_background_RMS)
+            self.logger.debug('  Result: background_rms = {}'.format(new_result['background_rms']))
+        except: self.logger.debug('  Could not write background_rms to result')
+        try:
+            new_result['pointing_error_arcmin'] = float(self.pointing_error.arcminute)
+            self.logger.debug('  Result: pointing_error_arcmin = {}'.format(new_result['pointing_error_arcmin']))
+        except: self.logger.debug('  Could not write pointing_error_arcmin to result')
+        try:
+            new_result['zero_point'] = float(self.zero_point)
+            self.logger.debug('  Result: zero_point = {}'.format(new_result['zero_point']))
+        except: self.logger.debug('  Could not write zero_point to result')
+        try:
+            new_result['alt'] = float(self.target_alt.to(u.deg).value)
+            self.logger.debug('  Result: alt = {}'.format(new_result['alt']))
+        except: self.logger.debug('  Could not write alt to result')
+        try:
+            new_result['az'] = float(self.target_az.to(u.deg).value)
+            self.logger.debug('  Result: az = {}'.format(new_result['az']))
+        except: self.logger.debug('  Could not write az to result')
+        try:
+            new_result['airmass'] = float(self.airmass)
+            self.logger.debug('  Result: airmass = {}'.format(new_result['airmass']))
+        except: self.logger.debug('  Could not write airmass to result')
+        try:
+            new_result['moon_separation'] = float(self.moon_sep.to(u.deg).value)
+            self.logger.debug('  Result: moon_separation = {}'.format(new_result['moon_separation']))
+        except: self.logger.debug('  Could not write moon_separation to result')
+        try:
+            new_result['moon_illumination'] = float(self.moon_phase)
+            self.logger.debug('  Result: moon_illumination = {}'.format(new_result['moon_illumination']))
+        except: self.logger.debug('  Could not write moon_illumination to result')
+        try:
+            new_result['WCS_position_angle'] = float(self.position_angle.to(u.deg).value)
+            self.logger.debug('  Result: WCS_position_angle = {}'.format(new_result['WCS_position_angle']))
+        except: self.logger.debug('  Could not write WCS_position_angle to result')
+        try:
+            new_result['process_time'] = float(self.total_process_time)
+            self.logger.debug('  Result: process_time = {}'.format(new_result['process_time']))
+        except: self.logger.debug('  Could not write process_time to result')
+        try:
+            new_result['flags'] = self.flags
+            self.logger.debug('  Result: flags = {}'.format(new_result['flags']))
+        except: self.logger.debug('  Could not write flags to result')
+        try:
+            new_result['IQMon Version'] = str(__version__)
+            self.logger.debug('  Result: IQMon Version = {}'.format(new_result['IQMon Version']))
+        except: self.logger.debug('  Could not write IQMon Version to result')
+
+        ## Check if this image is already in the collection
+        matches = [item for item in data.find( {"filename" : new_result['filename']} )]
+
+        ## Add datum to collection
+        try:
+            id = data.insert(new_result)
+            self.logger.debug('  Inserted datum with ID: {}'.format(id))
+            self.logger.debug('  Found {} previous entries for this file.  Deleting old entries.'.format(len(matches)))
+            for match in matches:
+                data.remove( {"_id" : match["_id"]} )
+                self.logger.debug('  Removed "_id": {}'.format(match["_id"]))
+        except:
+            self.logger.warning('  Failed to insert datum')
+            return False
+
+        return True
+
 
 
     ##-------------------------------------------------------------------------
