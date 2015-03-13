@@ -530,22 +530,31 @@ class Image(object):
         if not self.working_file:
             self.logger.warning('Must have working file to uncompress file')
         else:
+            return False
+        
+        try:
             result = subprocess.check_output(['fpack', '-L', self.working_file])
-            found_compression_info = False
-            for line in result.split('\n'):
-                IsMatch = re.match('\s*\d+\s+IMAGE\s+([\w/=\.]+)\s(BITPIX=[\-\d]+)\s(\[.*\])\s([\w]+)', line)
-                if IsMatch:
-                    self.logger.debug('  funpack -L Output: {}'.format(line))
-                    if re.search('not_tiled', IsMatch.group(4)) and not re.search('no_pixels', IsMatch.group(3)):
-                        self.logger.debug('  Image is not compressed')
-                        found_compression_info = True
-                    elif re.search('tiled_rice', IsMatch.group(4)):
-                        self.logger.debug('  Image is rice compressed.  Running funpack.')
-                        found_compression_info = True
-            if not found_compression_info:
-                self.logger.warning('Could not determine compression status')
-            else:
+        except:
+            self.logger.warning('Could not run fpack to check compression status status')
+
+        found_compression_info = False
+        for line in result.split('\n'):
+            IsMatch = re.match('\s*\d+\s+IMAGE\s+([\w/=\.]+)\s(BITPIX=[\-\d]+)\s(\[.*\])\s([\w]+)', line)
+            if IsMatch:
+                self.logger.debug('  funpack -L Output: {}'.format(line))
+                if re.search('not_tiled', IsMatch.group(4)) and not re.search('no_pixels', IsMatch.group(3)):
+                    self.logger.debug('  Image is not compressed')
+                    found_compression_info = True
+                elif re.search('tiled_rice', IsMatch.group(4)):
+                    self.logger.debug('  Image is rice compressed.  Running funpack.')
+                    found_compression_info = True
+        if not found_compression_info:
+            self.logger.warning('Could not determine compression status')
+        else:
+            try:
                 subprocess.call(['funpack', '-F', self.working_file])
+            except:
+                self.logger.warning('Failed to run funpack')
 
     ##-------------------------------------------------------------------------
     ## Read Image
@@ -1885,7 +1894,6 @@ class Image(object):
                                               'pmRA', 'pmDec', 'sRA', 'sDec',\
                                               '2mass', 'RAepoch', 'Decepoch',\
                                               'e2mphos', 'icq_flag'])
-
             self.catalog_data.rename_column('id', 'ID')
             self.catalog_data.rename_column('B', 'Bmag')
             self.catalog_data.rename_column('V', 'Vmag')
@@ -1897,10 +1905,7 @@ class Image(object):
             faint_stars_to_remove = []
             for i in range(0,len(self.catalog_data)):
                 entry = self.catalog_data[i]
-                try:
-                    if entry[self.tel.catalog_info[self.filter]] > self.tel.catalog_info['magmax']:
-                        faint_stars_to_remove.append(i)
-                except:
+                if entry[self.tel.catalog_info[self.filter]] > self.tel.catalog_info['magmax']:
                     faint_stars_to_remove.append(i)
             if len(faint_stars_to_remove) > 0:
                 self.logger.info('  Removing {} faint stars ({} > {}) from catalog.'.format(\
