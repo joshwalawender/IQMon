@@ -2613,9 +2613,12 @@ class Image(object):
             self.logger.debug('  Result: filename = {}'.format(new_result['filename']))
         except: self.logger.debug('  Could not write filename to result')
         try:
-            new_result['exposure_start'] = str(self.observation_date)
-            self.logger.debug('  Result: exposure_start = {}'.format(new_result['exposure_start']))
-        except: self.logger.debug('  Could not write exposure_start to result')
+            obsdt = datetime.datetime.strptime(str(self.observation_date), '%Y-%m-%dT%H:%M:%S')
+            new_result['date'] = obsdt.strftime('%Y%m%dUT')
+            new_result['time'] = obsdt.strftime('%H:%M:%S')
+            self.logger.debug('  Result: date = {}'.format(new_result['date']))
+            self.logger.debug('  Result: time = {}'.format(new_result['time']))
+        except: self.logger.debug('  Could not write date and time to result')
         try:
             new_result['FWHM_median_pix'] = float(self.FWHM_median.to(u.pix).value)
             self.logger.debug('  Result: FWHM_median_pix = {}'.format(new_result['FWHM_median_pix']))
