@@ -2611,94 +2611,116 @@ class Image(object):
         try:
             new_result['filename'] = str(self.raw_file_name)
             self.logger.debug('  Result: filename = {}'.format(new_result['filename']))
-        except: self.logger.debug('  Could not write filename to result')
+        except: self.logger.warning('  Could not write filename to result')
+
         try:
             obsdt = datetime.datetime.strptime(str(self.observation_date), '%Y-%m-%dT%H:%M:%S')
             new_result['date'] = obsdt.strftime('%Y%m%dUT')
             new_result['time'] = obsdt.strftime('%H:%M:%S')
+            new_result['exposure_start'] = obsdt
             self.logger.debug('  Result: date = {}'.format(new_result['date']))
             self.logger.debug('  Result: time = {}'.format(new_result['time']))
-        except: self.logger.debug('  Could not write date and time to result')
+        except: self.logger.warning('  Could not write date and time to result')
+
         try:
             new_result['FWHM_median_pix'] = float(self.FWHM_median.to(u.pix).value)
             self.logger.debug('  Result: FWHM_median_pix = {}'.format(new_result['FWHM_median_pix']))
-        except: self.logger.debug('  Could not write FWHM_median_pix to result')
+        except: self.logger.warning('  Could not write FWHM_median_pix to result')
+
         try:
             new_result['FWHM_mode_pix'] = float(self.FWHM_mode.to(u.pix).value)
             self.logger.debug('  Result: FWHM_mode_pix = {}'.format(new_result['FWHM_mode_pix']))
-        except: self.logger.debug('  Could not write FWHM_mode_pix to result')
+        except: self.logger.warning('  Could not write FWHM_mode_pix to result')
+
         try:
             new_result['FWHM_pix'] = float(self.FWHM.to(u.pix).value)
             self.logger.debug('  Result: FWHM_pix = {}'.format(new_result['FWHM_pix']))
-        except: self.logger.debug('  Could not write FWHM_pix to result')
+        except: self.logger.warning('  Could not write FWHM_pix to result')
+
         try:
             new_result['ellipticity_median'] = float(self.ellipticity_median)
             self.logger.debug('  Result: ellipticity_median = {}'.format(new_result['ellipticity_median']))
-        except: self.logger.debug('  Could not write ellipticity_median to result')
+        except: self.logger.warning('  Could not write ellipticity_median to result')
+
         try:
             new_result['ellipticity_mode'] = float(self.ellipticity_mode)
             self.logger.debug('  Result: ellipticity_mode = {}'.format(new_result['ellipticity_mode']))
-        except: self.logger.debug('  Could not write ellipticity_mode to result')
+        except: self.logger.warning('  Could not write ellipticity_mode to result')
+
         try:
             new_result['ellipticity'] = float(self.ellipticity)
             self.logger.debug('  Result: ellipticity = {}'.format(new_result['ellipticity']))
-        except: self.logger.debug('  Could not write ellipticity to result')
+        except: self.logger.warning('  Could not write ellipticity to result')
+
         try:
             new_result['n_stars'] = int(self.n_stars_SExtracted)
             self.logger.debug('  Result: n_stars = {}'.format(new_result['n_stars']))
-        except: self.logger.debug('  Could not write n_stars to result')
+        except: self.logger.warning('  Could not write n_stars to result')
+
         try:
             new_result['background'] = float(self.SExtractor_background)
             self.logger.debug('  Result: background = {}'.format(new_result['background']))
-        except: self.logger.debug('  Could not write background to result')
+        except: self.logger.warning('  Could not write background to result')
+
         try:
             new_result['background_rms'] = float(self.SExtractor_background_RMS)
             self.logger.debug('  Result: background_rms = {}'.format(new_result['background_rms']))
-        except: self.logger.debug('  Could not write background_rms to result')
+        except: self.logger.warning('  Could not write background_rms to result')
+
         try:
             new_result['pointing_error_arcmin'] = float(self.pointing_error.arcminute)
             self.logger.debug('  Result: pointing_error_arcmin = {}'.format(new_result['pointing_error_arcmin']))
-        except: self.logger.debug('  Could not write pointing_error_arcmin to result')
+        except: self.logger.warning('  Could not write pointing_error_arcmin to result')
+
         try:
             new_result['zero_point'] = float(self.zero_point)
             self.logger.debug('  Result: zero_point = {}'.format(new_result['zero_point']))
-        except: self.logger.debug('  Could not write zero_point to result')
+        except: self.logger.warning('  Could not write zero_point to result')
+
         try:
             new_result['alt'] = float(self.target_alt.to(u.deg).value)
             self.logger.debug('  Result: alt = {}'.format(new_result['alt']))
-        except: self.logger.debug('  Could not write alt to result')
+        except: self.logger.warning('  Could not write alt to result')
+
         try:
             new_result['az'] = float(self.target_az.to(u.deg).value)
             self.logger.debug('  Result: az = {}'.format(new_result['az']))
-        except: self.logger.debug('  Could not write az to result')
+        except: self.logger.warning('  Could not write az to result')
+
         try:
             new_result['airmass'] = float(self.airmass)
             self.logger.debug('  Result: airmass = {}'.format(new_result['airmass']))
-        except: self.logger.debug('  Could not write airmass to result')
+        except: self.logger.warning('  Could not write airmass to result')
+
         try:
             new_result['moon_separation'] = float(self.moon_sep.to(u.deg).value)
             self.logger.debug('  Result: moon_separation = {}'.format(new_result['moon_separation']))
-        except: self.logger.debug('  Could not write moon_separation to result')
+        except: self.logger.warning('  Could not write moon_separation to result')
+
         try:
             new_result['moon_illumination'] = float(self.moon_phase)
             self.logger.debug('  Result: moon_illumination = {}'.format(new_result['moon_illumination']))
-        except: self.logger.debug('  Could not write moon_illumination to result')
+        except: self.logger.warning('  Could not write moon_illumination to result')
+
         try:
             new_result['WCS_position_angle'] = float(self.position_angle.to(u.deg).value)
             self.logger.debug('  Result: WCS_position_angle = {}'.format(new_result['WCS_position_angle']))
-        except: self.logger.debug('  Could not write WCS_position_angle to result')
+        except: self.logger.warning('  Could not write WCS_position_angle to result')
+
         try:
             new_result['process_time'] = float(self.total_process_time)
             self.logger.debug('  Result: process_time = {}'.format(new_result['process_time']))
-        except: self.logger.debug('  Could not write process_time to result')
+        except: self.logger.warning('  Could not write process_time to result')
+
         try:
             new_result['flags'] = self.flags
             self.logger.debug('  Result: flags = {}'.format(new_result['flags']))
-        except: self.logger.debug('  Could not write flags to result')
+        except: self.logger.warning('  Could not write flags to result')
+
         try:
             new_result['IQMon Version'] = str(__version__)
             self.logger.debug('  Result: IQMon Version = {}'.format(new_result['IQMon Version']))
-        except: self.logger.debug('  Could not write IQMon Version to result')
+        except: self.logger.warning('  Could not write IQMon Version to result')
 
         ## Check if this image is already in the collection
         matches = [item for item in data.find( {"filename" : new_result['filename']} )]
@@ -2706,13 +2728,13 @@ class Image(object):
         ## Add datum to collection
         try:
             id = data.insert(new_result)
-            self.logger.debug('  Inserted datum with ID: {}'.format(id))
+            self.logger.debug('  Inserted document with ID: {}'.format(id))
             self.logger.debug('  Found {} previous entries for this file.  Deleting old entries.'.format(len(matches)))
             for match in matches:
                 data.remove( {"_id" : match["_id"]} )
                 self.logger.debug('  Removed "_id": {}'.format(match["_id"]))
         except:
-            self.logger.warning('  Failed to insert datum')
+            self.logger.warning('  Failed to insert document')
             return False
 
         return True
