@@ -2614,6 +2614,11 @@ class Image(object):
         except: self.logger.warning('  Could not write filename to result')
 
         try:
+            new_result['target name'] = str(self.object_name)
+            self.logger.debug('  Result: target name = {}'.format(new_result['target name']))
+        except: self.logger.warning('  Could not write target name to result')
+
+        try:
             obsdt = datetime.datetime.strptime(str(self.observation_date), '%Y-%m-%dT%H:%M:%S')
             new_result['date'] = obsdt.strftime('%Y%m%dUT')
             new_result['time'] = obsdt.strftime('%H:%M:%S')
