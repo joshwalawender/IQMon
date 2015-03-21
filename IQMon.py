@@ -2708,6 +2708,11 @@ class Image(object):
         except: self.logger.warning('  Could not write moon_illumination to result')
 
         try:
+            new_result['moon_alt'] = float(self.moon_alt.value)
+            self.logger.debug('  Result: moon_alt = {}'.format(new_result['moon_alt']))
+        except: self.logger.warning('  Could not write moon_alt to result')
+
+        try:
             new_result['WCS_position_angle'] = float(self.position_angle.to(u.deg).value)
             self.logger.debug('  Result: WCS_position_angle = {}'.format(new_result['WCS_position_angle']))
         except: self.logger.warning('  Could not write WCS_position_angle to result')
