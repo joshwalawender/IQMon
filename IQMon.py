@@ -448,13 +448,13 @@ class Image(object):
                 self.logger.debug('    {}'.format(item))
 
         ## Determine PA of Image
-        if self.image_WCS:
-            self.orientation_from_wcs()
-            if self.position_angle:
-                self.logger.debug("  Position angle of WCS is {0:.1f} deg".format(\
-                                              self.position_angle.to(u.deg).value))
-                if self.image_flipped:
-                    self.logger.debug("  Image is mirrored.")
+#         if self.image_WCS:
+#             self.orientation_from_wcs()
+#             if self.position_angle:
+#                 self.logger.debug("  Position angle of WCS is {0:.1f} deg".format(\
+#                                               self.position_angle.to(u.deg).value))
+#                 if self.image_flipped:
+#                     self.logger.debug("  Image is mirrored.")
 
         ## Determine Alt, Az, Moon Sep, Moon Illum using ephem module
         if self.observation_date and self.latitude and self.longitude and self.coordinate_from_header:
@@ -1586,6 +1586,9 @@ class Image(object):
             self.SCAMP_successful = False
             return self.SCAMP_successful
         start_time = datetime.datetime.now()
+        ## Change to tmp directory
+        origWD = os.getcwd()
+        os.chdir(self.tel.temp_file_path)
         ## Parameters for SCAMP
         if self.tel.SCAMP_aheader:
             SCAMP_aheader = self.tel.SCAMP_aheader
@@ -1674,6 +1677,7 @@ class Image(object):
             self.logger.critical('No .head file found from SCAMP.  SCAMP failed.')
             self.SCAMP_successful = False
 
+        os.chdir(origWD)
         end_time = datetime.datetime.now()
         elapzed_time = end_time - start_time
         self.logger.info('  Done running SCAMP in {:.1f} s'.format(elapzed_time.total_seconds()))
@@ -2619,38 +2623,81 @@ class Image(object):
         except: self.logger.warning('  Could not write target name to result')
 
         try:
+            new_result['target RA'] = self.coordinate_from_header.to_string('hmsdms', sep=':').split()[0]
+            new_result['target Dec'] = self.coordinate_from_header.to_string('hmsdms', sep=':').split()[1]
+            self.logger.debug('  Result: target RA = {}'.format(new_result['target RA']))
+            self.logger.debug('  Result: target Dec = {}'.format(new_result['target Dec']))
+        except: self.logger.warning('  Could not write target RA and Dec to result')
+
+        try:
+            new_result['exposure time'] = self.exptime.value
+            self.logger.debug('  Result: exposure time = {}'.format(new_result['exposure time']))
+        except: self.logger.warning('  Could not write exposure time to result')
+
+        try:
+            new_result['filter'] = str(self.filter)
+            self.logger.debug('  Result: filter = {}'.format(new_result['filter']))
+        except: self.logger.warning('  Could not write filter to result')
+
+        try:
+            new_result['WCS RA'] = self.coordinate_of_center_pixel.to_string('hmsdms', sep=':', precision=1).split()[0]
+            new_result['WCS Dec'] = self.coordinate_of_center_pixel.to_string('hmsdms', sep=':', precision=0).split()[1]
+            self.logger.debug('  Result: WCS RA = {}'.format(new_result['WCS RA']))
+            self.logger.debug('  Result: WCS Dec = {}'.format(new_result['WCS Dec']))
+        except: self.logger.warning('  Could not write WCS RA and Dec to result')
+
+        try:
+            new_result['CRPIX1'] = self.image_WCS.to_header()['CRPIX1']
+            new_result['CRPIX2'] = self.image_WCS.to_header()['CRPIX2']
+            new_result['CRVAL1'] = self.image_WCS.to_header()['CRVAL1']
+            new_result['CRVAL2'] = self.image_WCS.to_header()['CRVAL2']
+            new_result['PC1_1'] = self.image_WCS.to_header()['PC1_1']
+            new_result['PC1_2'] = self.image_WCS.to_header()['PC1_2']
+            new_result['PC2_1'] = self.image_WCS.to_header()['PC2_1']
+            new_result['PC2_2'] = self.image_WCS.to_header()['PC2_2']
+            self.logger.debug('  Result: WCS CRPIX1 = {}'.format(new_result['CRPIX1']))
+            self.logger.debug('  Result: WCS CRPIX2 = {}'.format(new_result['CRPIX2']))
+            self.logger.debug('  Result: WCS CRVAL1 = {}'.format(new_result['CRVAL1']))
+            self.logger.debug('  Result: WCS CRVAL2 = {}'.format(new_result['CRVAL2']))
+            self.logger.debug('  Result: WCS PC1_1 = {}'.format(new_result['PC1_1']))
+            self.logger.debug('  Result: WCS PC1_2 = {}'.format(new_result['PC1_2']))
+            self.logger.debug('  Result: WCS PC2_1 = {}'.format(new_result['PC2_1']))
+            self.logger.debug('  Result: WCS PC2_2 = {}'.format(new_result['PC2_2']))
+        except: self.logger.warning('  Could not write WCS values to result')
+
+        try:
             obsdt = datetime.datetime.strptime(str(self.observation_date), '%Y-%m-%dT%H:%M:%S')
             new_result['date'] = obsdt.strftime('%Y%m%dUT')
             new_result['time'] = obsdt.strftime('%H:%M:%S')
-            new_result['exposure_start'] = obsdt
+            new_result['exposure start'] = obsdt
             self.logger.debug('  Result: date = {}'.format(new_result['date']))
             self.logger.debug('  Result: time = {}'.format(new_result['time']))
         except: self.logger.warning('  Could not write date and time to result')
 
         try:
-            new_result['FWHM_median_pix'] = float(self.FWHM_median.to(u.pix).value)
-            self.logger.debug('  Result: FWHM_median_pix = {}'.format(new_result['FWHM_median_pix']))
-        except: self.logger.warning('  Could not write FWHM_median_pix to result')
+            new_result['FWHM pix median'] = float(self.FWHM_median.to(u.pix).value)
+            self.logger.debug('  Result: FWHM pix median = {}'.format(new_result['FWHM pix median']))
+        except: self.logger.warning('  Could not write FWHM pix median to result')
 
         try:
-            new_result['FWHM_mode_pix'] = float(self.FWHM_mode.to(u.pix).value)
-            self.logger.debug('  Result: FWHM_mode_pix = {}'.format(new_result['FWHM_mode_pix']))
-        except: self.logger.warning('  Could not write FWHM_mode_pix to result')
+            new_result['FWHM pix mode'] = float(self.FWHM_mode.to(u.pix).value)
+            self.logger.debug('  Result: FWHM pix mode = {}'.format(new_result['FWHM pix mode']))
+        except: self.logger.warning('  Could not write FWHM pix mode to result')
 
         try:
-            new_result['FWHM_pix'] = float(self.FWHM.to(u.pix).value)
-            self.logger.debug('  Result: FWHM_pix = {}'.format(new_result['FWHM_pix']))
-        except: self.logger.warning('  Could not write FWHM_pix to result')
+            new_result['FWHM pix'] = float(self.FWHM.to(u.pix).value)
+            self.logger.debug('  Result: FWHM pix = {}'.format(new_result['FWHM pix']))
+        except: self.logger.warning('  Could not write FWHM pix to result')
 
         try:
-            new_result['ellipticity_median'] = float(self.ellipticity_median)
-            self.logger.debug('  Result: ellipticity_median = {}'.format(new_result['ellipticity_median']))
-        except: self.logger.warning('  Could not write ellipticity_median to result')
+            new_result['ellipticity median'] = float(self.ellipticity_median)
+            self.logger.debug('  Result: ellipticity median = {}'.format(new_result['ellipticity median']))
+        except: self.logger.warning('  Could not write ellipticity median to result')
 
         try:
-            new_result['ellipticity_mode'] = float(self.ellipticity_mode)
-            self.logger.debug('  Result: ellipticity_mode = {}'.format(new_result['ellipticity_mode']))
-        except: self.logger.warning('  Could not write ellipticity_mode to result')
+            new_result['ellipticity mode'] = float(self.ellipticity_mode)
+            self.logger.debug('  Result: ellipticity mode = {}'.format(new_result['ellipticity mode']))
+        except: self.logger.warning('  Could not write ellipticity mode to result')
 
         try:
             new_result['ellipticity'] = float(self.ellipticity)
@@ -2668,19 +2715,20 @@ class Image(object):
         except: self.logger.warning('  Could not write background to result')
 
         try:
-            new_result['background_rms'] = float(self.SExtractor_background_RMS)
-            self.logger.debug('  Result: background_rms = {}'.format(new_result['background_rms']))
-        except: self.logger.warning('  Could not write background_rms to result')
+            new_result['background RMS'] = float(self.SExtractor_background_RMS)
+            self.logger.debug('  Result: background RMS = {}'.format(new_result['background RMS']))
+        except: self.logger.warning('  Could not write background RMS to result')
 
         try:
-            new_result['pointing_error_arcmin'] = float(self.pointing_error.arcminute)
-            self.logger.debug('  Result: pointing_error_arcmin = {}'.format(new_result['pointing_error_arcmin']))
-        except: self.logger.warning('  Could not write pointing_error_arcmin to result')
+            new_result['pointing error arcmin'] = float(self.pointing_error.arcminute)
+            self.logger.debug('  Result: pointing error arcmin = {}'.format(new_result['pointing error arcmin']))
+        except: self.logger.warning('  Could not write pointing error arcmin to result')
 
-        try:
-            new_result['zero_point'] = float(self.zero_point)
-            self.logger.debug('  Result: zero_point = {}'.format(new_result['zero_point']))
-        except: self.logger.warning('  Could not write zero_point to result')
+        if self.zero_point:
+            try:
+                new_result['zero point'] = float(self.zero_point)
+                self.logger.debug('  Result: zero point = {}'.format(new_result['zero point']))
+            except: self.logger.warning('  Could not write zero point to result')
 
         try:
             new_result['alt'] = float(self.target_alt.to(u.deg).value)
@@ -2698,29 +2746,25 @@ class Image(object):
         except: self.logger.warning('  Could not write airmass to result')
 
         try:
-            new_result['moon_separation'] = float(self.moon_sep.to(u.deg).value)
-            self.logger.debug('  Result: moon_separation = {}'.format(new_result['moon_separation']))
-        except: self.logger.warning('  Could not write moon_separation to result')
+            new_result['moon separation'] = float(self.moon_sep.to(u.deg).value)
+            self.logger.debug('  Result: moon separation = {}'.format(new_result['moon separation']))
+        except: self.logger.warning('  Could not write moon separation to result')
 
         try:
-            new_result['moon_illumination'] = float(self.moon_phase)
-            self.logger.debug('  Result: moon_illumination = {}'.format(new_result['moon_illumination']))
-        except: self.logger.warning('  Could not write moon_illumination to result')
+            new_result['moon illumination'] = float(self.moon_phase)
+            self.logger.debug('  Result: moon illumination = {}'.format(new_result['moon illumination']))
+        except: self.logger.warning('  Could not write moon illumination to result')
 
         try:
-            new_result['moon_alt'] = float(self.moon_alt.value)
-            self.logger.debug('  Result: moon_alt = {}'.format(new_result['moon_alt']))
-        except: self.logger.warning('  Could not write moon_alt to result')
+            new_result['moon alt'] = float(self.moon_alt.value)
+            self.logger.debug('  Result: moon alt = {}'.format(new_result['moon alt']))
+        except: self.logger.warning('  Could not write moon alt to result')
 
-        try:
-            new_result['WCS_position_angle'] = float(self.position_angle.to(u.deg).value)
-            self.logger.debug('  Result: WCS_position_angle = {}'.format(new_result['WCS_position_angle']))
-        except: self.logger.warning('  Could not write WCS_position_angle to result')
-
-        try:
-            new_result['process_time'] = float(self.total_process_time)
-            self.logger.debug('  Result: process_time = {}'.format(new_result['process_time']))
-        except: self.logger.warning('  Could not write process_time to result')
+        if self.position_angle:
+            try:
+                new_result['WCS position angle'] = float(self.position_angle.to(u.deg).value)
+                self.logger.debug('  Result: WCS_position_angle = {}'.format(new_result['WCS position angle']))
+            except: self.logger.warning('  Could not write WCS position angle to result')
 
         try:
             new_result['flags'] = self.flags
@@ -2731,6 +2775,16 @@ class Image(object):
             new_result['IQMon Version'] = str(__version__)
             self.logger.debug('  Result: IQMon Version = {}'.format(new_result['IQMon Version']))
         except: self.logger.warning('  Could not write IQMon Version to result')
+
+        try:
+            new_result['IQMon processing time'] = float(self.total_process_time)
+            self.logger.debug('  Result: IQMon processing time = {}'.format(new_result['IQMon processing time']))
+        except: self.logger.warning('  Could not write IQMon processing time to result')
+
+        try:
+            new_result['IQMon start time'] = self.start_process_time + datetime.timedelta(0, 60*60*10)
+            self.logger.debug('  Result: IQMon Start Time = {}'.format(new_result['IQMon start time'].strftime('%Y%m%d %H:%M:%S')))
+        except: self.logger.warning('  Could not write IQMon start time to result')
 
         ## Check if this image is already in the collection
         matches = [item for item in data.find( {"filename" : new_result['filename']} )]
