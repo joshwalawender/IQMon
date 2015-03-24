@@ -2308,7 +2308,7 @@ class Image(object):
             im.thumbnail(size, Image.ANTIALIAS)
 
         ## Save to JPEG
-        self.logger.info('  Saving jpeg (p1={:.1f}, p2={:.1f}), binning={}, quality={:.0f}) to: {}'.format(p1, p2, binning, quality, jpeg_file_name))
+        self.logger.debug('  Saving jpeg (p1={:.1f}, p2={:.1f}), bin={}, q={:.0f}) to: {}'.format(p1, p2, binning, quality, jpeg_file_name))
         im.save(jpeg_file, 'JPEG', quality=quality)
         self.jpeg_file_names.append(jpeg_file_name)
 
@@ -2647,23 +2647,30 @@ class Image(object):
         except: self.logger.warning('  Could not write WCS RA and Dec to result')
 
         try:
-            new_result['CRPIX1'] = self.image_WCS.to_header()['CRPIX1']
-            new_result['CRPIX2'] = self.image_WCS.to_header()['CRPIX2']
-            new_result['CRVAL1'] = self.image_WCS.to_header()['CRVAL1']
-            new_result['CRVAL2'] = self.image_WCS.to_header()['CRVAL2']
-            new_result['PC1_1'] = self.image_WCS.to_header()['PC1_1']
-            new_result['PC1_2'] = self.image_WCS.to_header()['PC1_2']
-            new_result['PC2_1'] = self.image_WCS.to_header()['PC2_1']
-            new_result['PC2_2'] = self.image_WCS.to_header()['PC2_2']
+            wcs_header = self.image_WCS.to_header()
+            new_result['CRPIX1'] = wcs_header['CRPIX1']
+            new_result['CRPIX2'] = wcs_header['CRPIX2']
+            new_result['CRVAL1'] = wcs_header['CRVAL1']
+            new_result['CRVAL2'] = wcs_header['CRVAL2']
+            new_result['PC1_1'] = wcs_header['PC1_1']
+            new_result['PC2_2'] = wcs_header['PC2_2']
             self.logger.debug('  Result: WCS CRPIX1 = {}'.format(new_result['CRPIX1']))
             self.logger.debug('  Result: WCS CRPIX2 = {}'.format(new_result['CRPIX2']))
             self.logger.debug('  Result: WCS CRVAL1 = {}'.format(new_result['CRVAL1']))
             self.logger.debug('  Result: WCS CRVAL2 = {}'.format(new_result['CRVAL2']))
             self.logger.debug('  Result: WCS PC1_1 = {}'.format(new_result['PC1_1']))
-            self.logger.debug('  Result: WCS PC1_2 = {}'.format(new_result['PC1_2']))
-            self.logger.debug('  Result: WCS PC2_1 = {}'.format(new_result['PC2_1']))
             self.logger.debug('  Result: WCS PC2_2 = {}'.format(new_result['PC2_2']))
-        except: self.logger.warning('  Could not write WCS values to result')
+            if 'PC1_2' in wcs_header.keys():
+                new_result['PC1_2'] = wcs_header['PC1_2']
+                self.logger.debug('  Result: WCS PC1_2 = {}'.format(new_result['PC1_2']))
+            if 'PC2_1' in wcs_header.keys():
+                new_result['PC2_1'] = wcs_header['PC2_1']
+                self.logger.debug('  Result: WCS PC2_1 = {}'.format(new_result['PC2_1']))
+        except:
+            self.logger.warning('  Could not write WCS values to result')
+            wcs_header = self.image_WCS.to_header()
+            for entry in wcs_header:
+                self.logger.debug('{} {}'.format(entry, wcs_header[entry]))
 
         try:
             obsdt = datetime.datetime.strptime(str(self.observation_date), '%Y-%m-%dT%H:%M:%S')
