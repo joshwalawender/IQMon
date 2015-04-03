@@ -268,6 +268,7 @@ class Image(object):
         return self
 
     def __exit__(self ,type, value, traceback):
+        logging.shutdown()
         self.__del__()
 
 
@@ -301,7 +302,7 @@ class Image(object):
         if clobber:
             if os.path.exists(logfile): os.remove(logfile)
         self.logger = logging.getLogger(self.raw_file_basename)
-        if len(self.logger.handlers) < 1:
+        if len(self.logger.handlers) == 0:
             self.logger.setLevel(logging.DEBUG)
             LogFileHandler = logging.FileHandler(logfile)
             LogFileHandler.setLevel(logging.DEBUG)
@@ -516,8 +517,6 @@ class Image(object):
         Edit a single keyword in the image fits header.
         '''
         self.logger.info('Editing image header: {} = {}'.format(keyword, value))
-#         hdulist = fits.open(self.working_file,\
-#                             ignore_missing_end=True, mode='update')
         with fits.open(self.working_file, ignore_missing_end=True, mode='update') as hdulist:
             hdulist[0].header[keyword] = value
             hdulist.flush()
@@ -684,58 +683,56 @@ class Image(object):
         start_time = datetime.datetime.now()
         self.logger.info("Dark subtracting image.")
         self.logger.debug("  Opening image data.")
-        hdulist_image = fits.open(self.working_file, mode='update')
-        ## Load master dark if provided, but if multiple files input, combine
-        ## them in to master dark, then load combined master dark.
-        if len(Darks) == 1:
-            self.logger.debug("  Found master dark.  Opening master dark data.")
-            hdulist_dark = fits.open(Darks[0])
-            MasterDarkData = hdulist_dark[0].data
-            hdulist_dark.close()
-        elif len(Darks) > 1:
-            self.logger.info("  Median combining {0} darks.".format(len(Darks)))
-            ## Combine multiple darks frames
-            DarkData = []
-            for Dark in Darks:
-                hdulist = fits.open(Dark)
-                DarkData.append(hdulist[0].data)
-            DarkData = np.array(DarkData)
-            MasterDarkData = np.median(DarkData, axis=0)
-            ## Save Master Dark to Fits File
-            DataPath = os.path.split(self.raw_file)[0]
-            DataNightString = os.path.split(DataPath)[1]
-#             MasterDarkFilename = "MasterDark_"+self.tel.name+"_"+DataNightString+"_"+str(int(math.floor(self.exptime.to(u.s).value)))+".fits"
-            MasterDarkFilename = 'MasterDark_{}_{}_{}.fits'.format(\
-                                      self.tel.name,\
-                                      DataNightString,\
-                                      str(int(math.floor(self.exptime.to(u.s).value)))
-                                      )
-            MasterDarkFile  = os.path.join(self.tel.temp_file_path,\
-                                           MasterDarkFilename)
-            hdu_MasterDark = fits.PrimaryHDU(MasterDarkData)
-            hdulist_MasterDark = fits.HDUList([hdu_MasterDark])
-            hdulist_MasterDark.header = hdulist[0].header
-            hdulist_MasterDark.header['history'] = \
-                       "Combined {0} images to make this master dark.".format(\
-                                                                    len(Darks))
-            self.logger.debug("  Writing master dark file: {0}".format(\
-                                                               MasterDarkFile))
-            hdulist_MasterDark.writeto(MasterDarkFile)
-        else:
-            self.logger.error("No input dark files detected.")
-        ## Now Subtract MasterDark from Image
-        self.logger.debug("  Subtracting dark from image.")
-        ImageData = hdulist_image[0].data
-        DifferenceImage = ImageData - MasterDarkData
-        hdulist_image[0].data = DifferenceImage
-        hdulist_image.flush()
-        self.logger.debug("  Median level of image = {0}".format(
-                                                         np.median(ImageData)))
-        self.logger.debug("  Median level of dark = {0}".format(\
-                                                    np.median(MasterDarkData)))
-        self.logger.debug("  Median level of dark subtracted = {0}".format(\
-                                                   np.median(DifferenceImage)))
-        hdulist_image.close()
+        with fits.open(self.working_file, mode='update') as hdulist_image:
+            ## Load master dark if provided, but if multiple files input, combine
+            ## them in to master dark, then load combined master dark.
+            if len(Darks) == 1:
+                self.logger.debug("  Found master dark.  Opening master dark data.")
+                with fits.open(Darks[0]) as hdulist_dark:
+                    MasterDarkData = hdulist_dark[0].data
+            elif len(Darks) > 1:
+                self.logger.info("  Median combining {0} darks.".format(len(Darks)))
+                ## Combine multiple darks frames
+                DarkData = []
+                for Dark in Darks:
+                    with fits.open(Dark) as hdulist:
+                        DarkData.append(hdulist[0].data)
+                DarkData = np.array(DarkData)
+                MasterDarkData = np.median(DarkData, axis=0)
+                ## Save Master Dark to Fits File
+                DataPath = os.path.split(self.raw_file)[0]
+                DataNightString = os.path.split(DataPath)[1]
+    #             MasterDarkFilename = "MasterDark_"+self.tel.name+"_"+DataNightString+"_"+str(int(math.floor(self.exptime.to(u.s).value)))+".fits"
+                MasterDarkFilename = 'MasterDark_{}_{}_{}.fits'.format(\
+                                          self.tel.name,\
+                                          DataNightString,\
+                                          str(int(math.floor(self.exptime.to(u.s).value)))
+                                          )
+                MasterDarkFile  = os.path.join(self.tel.temp_file_path,\
+                                               MasterDarkFilename)
+                hdu_MasterDark = fits.PrimaryHDU(MasterDarkData)
+                hdulist_MasterDark = fits.HDUList([hdu_MasterDark])
+                hdulist_MasterDark.header = hdulist[0].header
+                hdulist_MasterDark.header['history'] = \
+                           "Combined {0} images to make this master dark.".format(\
+                                                                        len(Darks))
+                self.logger.debug("  Writing master dark file: {0}".format(\
+                                                                   MasterDarkFile))
+                hdulist_MasterDark.writeto(MasterDarkFile)
+            else:
+                self.logger.error("No input dark files detected.")
+            ## Now Subtract MasterDark from Image
+            self.logger.debug("  Subtracting dark from image.")
+            ImageData = hdulist_image[0].data
+            DifferenceImage = ImageData - MasterDarkData
+            hdulist_image[0].data = DifferenceImage
+            hdulist_image.flush()
+            self.logger.debug("  Median level of image = {0}".format(
+                                                             np.median(ImageData)))
+            self.logger.debug("  Median level of dark = {0}".format(\
+                                                        np.median(MasterDarkData)))
+            self.logger.debug("  Median level of dark subtracted = {0}".format(\
+                                                       np.median(DifferenceImage)))
         end_time = datetime.datetime.now()
         elapzed_time = end_time - start_time
         self.logger.info('  Done with dark subtraction in {:.1f} s'.format(elapzed_time.total_seconds()))
@@ -766,7 +763,6 @@ class Image(object):
             self.logger.debug("  Cropping Image To [{0}:{1},{2}:{3}]".format(\
                                                     self.crop_x1, self.crop_x2,\
                                                     self.crop_y1, self.crop_y2))
-#             hdulist = fits.open(self.working_file, mode="update")
             with fits.open(self.working_file, mode="update") as hdulist:
                 hdulist[0].data = hdulist[0].data[self.crop_y1:self.crop_y2,self.crop_x1:self.crop_x2]
                 hdulist.flush()
@@ -788,46 +784,19 @@ class Image(object):
                              "-L", str(self.tel.pixel_scale.value*0.75),
                              "-H", str(self.tel.pixel_scale.value*1.25),
                              "-u", "arcsecperpix", "-z", str(downsample), self.working_file]
-        AstrometrySTDOUT = open(os.path.join(self.tel.temp_file_path, 'astrometry_output.txt'), 'w')
-        self.temp_files.append(os.path.join(self.tel.temp_file_path, 'astrometry_output.txt'))
+        with open(os.path.join(self.tel.temp_file_path, 'astrometry_output.txt'), 'w') as AstrometrySTDOUT:
+            self.temp_files.append(os.path.join(self.tel.temp_file_path, 'astrometry_output.txt'))
+            self.logger.debug('  Calling astrometry.net with: {}'.format(' '.join(AstrometryCommand)))
 
-        self.logger.debug('  Calling astrometry.net with: {}'.format(' '.join(AstrometryCommand)))
-
-        StartTime = datetime.datetime.now()
-        try:
-            rtncode = subprocess.call(AstrometryCommand, stdout=AstrometrySTDOUT, stderr=AstrometrySTDOUT, timeout=30)
-        except subprocess.TimeoutExpired as e:
-            self.logger.warning('Astrometry.net timed out')
-            rtncode = 1
+            StartTime = datetime.datetime.now()
+            try:
+                rtncode = subprocess.call(AstrometryCommand, stdout=AstrometrySTDOUT, stderr=AstrometrySTDOUT, timeout=30)
+            except subprocess.TimeoutExpired as e:
+                self.logger.warning('Astrometry.net timed out')
+                rtncode = 1
 
         EndTime = datetime.datetime.now()
         duration = EndTime - StartTime
-
-#         if timeout:
-#             StartTime = datetime.datetime.now()
-#             astrometry_process = subprocess.Popen(AstrometryCommand, stdout=AstrometrySTDOUT, stderr=AstrometrySTDOUT)
-#             EndTime = datetime.datetime.now()
-#             duration = EndTime - StartTime
-# 
-#             wait = True
-#             while wait:
-#                 if astrometry_process.poll() == None:
-#                     ## Process has not finished
-#                     EndTime = datetime.datetime.now()
-#                     duration = EndTime - StartTime
-#                     if duration.seconds > timeout:
-#                         astrometry_process.terminate()
-#                         wait = False
-#                         self.logger.warning("Astrometry.net timed out.")
-#                 else:
-#                     ## Process finished
-#                     wait = False
-#             rtncode = astrometry_process.returncode
-#         else:
-#             StartTime = datetime.datetime.now()
-#             rtncode = subprocess.call(AstrometryCommand, stdout=AstrometrySTDOUT, stderr=AstrometrySTDOUT)
-#             EndTime = datetime.datetime.now()
-#             duration = EndTime - StartTime
 
         with open(os.path.join(self.tel.temp_file_path, 'astrometry_output.txt'), 'r') as AstrometrySTDOUT:
             output = AstrometrySTDOUT.readlines()
@@ -1055,19 +1024,18 @@ class Image(object):
                                                    '{}.param'.format(self.raw_file_basename))
         if os.path.exists(sextractor_output_param_file):
             os.remove(sextractor_output_param_file)
-        defaultparamsFO = open(sextractor_output_param_file, 'w')
-        params = [
-                  'XWIN_IMAGE', 'YWIN_IMAGE', 
-                  'AWIN_IMAGE', 'BWIN_IMAGE', 'FWHM_IMAGE', 'THETAWIN_IMAGE',
-                  'ERRAWIN_IMAGE', 'ERRBWIN_IMAGE', 'ERRTHETAWIN_IMAGE',
-                  'ELONGATION', 'ELLIPTICITY',
-                  'FLUX_AUTO', 'FLUXERR_AUTO', 'MAG_AUTO', 'MAGERR_AUTO',
-                  'FLAGS', 'FLAGS_WEIGHT', 'FLUX_RADIUS'
-                 ]
-        if assoc: params.append('VECTOR_ASSOC(3)')
-        for param in params:
-            defaultparamsFO.write(param+'\n')
-        defaultparamsFO.close()
+        with open(sextractor_output_param_file, 'w') as defaultparamsFO:
+            params = [
+                      'XWIN_IMAGE', 'YWIN_IMAGE', 
+                      'AWIN_IMAGE', 'BWIN_IMAGE', 'FWHM_IMAGE', 'THETAWIN_IMAGE',
+                      'ERRAWIN_IMAGE', 'ERRBWIN_IMAGE', 'ERRTHETAWIN_IMAGE',
+                      'ELONGATION', 'ELLIPTICITY',
+                      'FLUX_AUTO', 'FLUXERR_AUTO', 'MAG_AUTO', 'MAGERR_AUTO',
+                      'FLAGS', 'FLAGS_WEIGHT', 'FLUX_RADIUS'
+                     ]
+            if assoc: params.append('VECTOR_ASSOC(3)')
+            for param in params:
+                defaultparamsFO.write(param+'\n')
         self.temp_files.append(sextractor_output_param_file)
 
         ## Compare input parameters dict to default
@@ -1198,8 +1166,8 @@ class Image(object):
 
             ## Read FITS_LDAC SExtractor Catalog
             self.logger.debug("  Reading SExtractor output catalog.")
-            hdu = fits.open(self.SExtractor_catalogfile)
-            results = table.Table(hdu[2].data)
+            with fits.open(self.SExtractor_catalogfile) as hdu:
+                results = table.Table(hdu[2].data)
 
             rows_to_remove = []
             for i in range(0,len(results)):
