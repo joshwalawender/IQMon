@@ -15,7 +15,7 @@ import re
 import stat
 import shutil
 import datetime
-import subprocess
+import subprocess32 as subprocess
 import logging
 import yaml
 import math
@@ -533,9 +533,11 @@ class Image(object):
             return False
         
         try:
-            result = subprocess.check_output(['fpack', '-L', self.working_file])
+            result = subprocess.check_output(['fpack', '-L', self.working_file], timeout=10)
+        except subprocess.TimeoutExpired as e:
+            self.logger.warning('fpack timed out')
         except:
-            self.logger.warning('Could not run fpack to check compression status status')
+            self.logger.warning('Could not run fpack to check compression status')
 
         found_compression_info = False
         for line in result.split('\n'):
@@ -552,7 +554,9 @@ class Image(object):
             self.logger.warning('Could not determine compression status')
         else:
             try:
-                subprocess.call(['funpack', '-F', self.working_file])
+                subprocess.call(['funpack', '-F', self.working_file], timeout=20)
+            except subprocess.TimeoutExpired as e:
+                self.logger.warning('fpack timed out')
             except:
                 self.logger.warning('Failed to run funpack')
 
@@ -590,7 +594,8 @@ class Image(object):
                                                             self.raw_file_name))
             self.working_file = os.path.join(self.tel.temp_file_path,\
                                              self.raw_file_basename+'.fits')
-            shutil.copy2(self.raw_file, self.working_file)
+#             shutil.copy2(self.raw_file, self.working_file)
+            subprocess.call(['cp', self.raw_file, self.working_file], timeout=10)
             os.chmod(self.working_file, chmod_code)
             self.temp_files.append(self.working_file)
             self.file_ext = '.fits'
@@ -620,7 +625,7 @@ class Image(object):
             ## Use dcraw to convert to ppm file
             command = ['dcraw', '-t', '2', '-4', self.working_file]
             self.logger.debug('Executing dcraw: {}'.format(repr(command)))
-            subprocess.call(command)
+            subprocess.call(command, timeout=20)
             ppm_file = os.path.join(self.tel.temp_file_path, self.raw_file_basename+'.ppm')
             if os.path.exists(ppm_file):
                 self.working_file = ppm_file
@@ -636,7 +641,7 @@ class Image(object):
                     command = '{} {} > {}'.format(conversion_tool, self.working_file, fits_file)
                     self.logger.debug('Trying {}: {}'.format(conversion_tool, command))
                     try:
-                        subprocess.call(command, shell=True)
+                        subprocess.call(command, shell=True, timeout=20)
                     except:
                         pass
             if os.path.exists(fits_file):
@@ -773,7 +778,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Solve Astrometry Using astrometry.net
     ##-------------------------------------------------------------------------
-    def solve_astrometry(self, timeout=None, downsample=4):
+    def solve_astrometry(self, downsample=4):
         '''
         Solve astrometry in the working image using the astrometry.net solver.
         '''
@@ -787,31 +792,42 @@ class Image(object):
         self.temp_files.append(os.path.join(self.tel.temp_file_path, 'astrometry_output.txt'))
 
         self.logger.debug('  Calling astrometry.net with: {}'.format(' '.join(AstrometryCommand)))
-        if timeout:
-            StartTime = datetime.datetime.now()
-            astrometry_process = subprocess.Popen(AstrometryCommand, stdout=AstrometrySTDOUT, stderr=AstrometrySTDOUT)
-            EndTime = datetime.datetime.now()
-            duration = EndTime - StartTime
 
-            wait = True
-            while wait:
-                if astrometry_process.poll() == None:
-                    ## Process has not finished
-                    EndTime = datetime.datetime.now()
-                    duration = EndTime - StartTime
-                    if duration.seconds > timeout:
-                        astrometry_process.terminate()
-                        wait = False
-                        self.logger.warning("Astrometry.net timed out.")
-                else:
-                    ## Process finished
-                    wait = False
-            rtncode = astrometry_process.returncode
-        else:
-            StartTime = datetime.datetime.now()
-            rtncode = subprocess.call(AstrometryCommand, stdout=AstrometrySTDOUT, stderr=AstrometrySTDOUT)
-            EndTime = datetime.datetime.now()
-            duration = EndTime - StartTime
+        StartTime = datetime.datetime.now()
+        try:
+            rtncode = subprocess.call(AstrometryCommand, stdout=AstrometrySTDOUT, stderr=AstrometrySTDOUT, timeout=30)
+        except subprocess.TimeoutExpired as e:
+            self.logger.warning('Astrometry.net timed out')
+            rtncode = 1
+
+        EndTime = datetime.datetime.now()
+        duration = EndTime - StartTime
+
+#         if timeout:
+#             StartTime = datetime.datetime.now()
+#             astrometry_process = subprocess.Popen(AstrometryCommand, stdout=AstrometrySTDOUT, stderr=AstrometrySTDOUT)
+#             EndTime = datetime.datetime.now()
+#             duration = EndTime - StartTime
+# 
+#             wait = True
+#             while wait:
+#                 if astrometry_process.poll() == None:
+#                     ## Process has not finished
+#                     EndTime = datetime.datetime.now()
+#                     duration = EndTime - StartTime
+#                     if duration.seconds > timeout:
+#                         astrometry_process.terminate()
+#                         wait = False
+#                         self.logger.warning("Astrometry.net timed out.")
+#                 else:
+#                     ## Process finished
+#                     wait = False
+#             rtncode = astrometry_process.returncode
+#         else:
+#             StartTime = datetime.datetime.now()
+#             rtncode = subprocess.call(AstrometryCommand, stdout=AstrometrySTDOUT, stderr=AstrometrySTDOUT)
+#             EndTime = datetime.datetime.now()
+#             duration = EndTime - StartTime
 
         with open(os.path.join(self.tel.temp_file_path, 'astrometry_output.txt'), 'r') as AstrometrySTDOUT:
             output = AstrometrySTDOUT.readlines()
@@ -1113,8 +1129,13 @@ class Image(object):
         self.logger.info("Invoking SExtractor")
         self.logger.debug("  SExtractor command: {}".format(' '.join(SExtractorCommand)))
         try:
-            SExSTDOUT = subprocess.check_output(SExtractorCommand,\
+            SExSTDOUT = subprocess.check_output(SExtractorCommand, timeout=30,\
                              stderr=subprocess.STDOUT, universal_newlines=True)
+        except subprocess.TimeoutExpired as e:
+            self.logger.warning('SExtractor timed out')
+            self.SExtractor_results = None
+            self.SExtractor_background = None
+            self.SExtractor_background_RMS = None
         except OSError as e:
             if e.errno == 2:
                 self.logger.error('Could not find sextractor executable.  Is sextractor installed?')
@@ -1626,8 +1647,10 @@ class Image(object):
             self.logger.info("  Using SCAMP aheader file: {}".format(SCAMP_aheader))
         self.logger.debug("  SCAMP command: {}".format(' '.join(SCAMPCommand)))
         try:
-            SCAMP_STDOUT = subprocess.check_output(SCAMPCommand,\
+            SCAMP_STDOUT = subprocess.check_output(SCAMPCommand, timeout=60,\
                              stderr=subprocess.STDOUT, universal_newlines=True)
+        except subprocess.TimeoutExpired as e:
+            self.logger.warning('SCAMP timed out')
         except OSError as e:
             if e.errno == 2:
                 self.logger.error('Could not find SCAMP executable.  Is SCAMP installed?')
@@ -1667,7 +1690,7 @@ class Image(object):
             missfits_cmd = 'missfits -SAVE_TYPE REPLACE -WRITE_XML N {}'.format(\
                                                              self.working_file)
             self.logger.debug('  Running: {}'.format(missfits_cmd))
-            output = subprocess.check_output(missfits_cmd, shell=True,\
+            output = subprocess.check_output(missfits_cmd, shell=True, timeout=10,\
                              stderr=subprocess.STDOUT, universal_newlines=True)
             output = str(output)
             for line in output.splitlines():
@@ -1709,9 +1732,11 @@ class Image(object):
         self.logger.info("Running SWarp.")
         self.logger.debug("  SWarp command: {}".format(' '.join(SWarpCommand)))
         try:
-            SWarp_STDOUT = subprocess.check_output(SWarpCommand,\
+            SWarp_STDOUT = subprocess.check_output(SWarpCommand, timeout=30,\
                                                    stderr=subprocess.STDOUT,\
                                                    universal_newlines=True)
+        except subprocess.TimeoutExpired as e:
+            self.logger.warning('SWARP timed out')
         except subprocess.CalledProcessError as e:
             self.logger.error("SWarp failed.  Command: {}".format(e.cmd))
             self.logger.error("SWarp failed.  Returncode: {}".format(e.returncode))
@@ -1854,7 +1879,7 @@ class Image(object):
                            local_UCAC_data]
             self.logger.debug("  Using command: {}".format(' '.join(UCACcommand)))
             if os.path.exists("ucac4.txt"): os.remove("ucac4.txt")
-            result = subprocess.call(UCACcommand)
+            result = subprocess.call(UCACcommand, timeout=20)
             if os.path.exists('ucac4.txt'):
                 catalog_file_path = os.path.join(self.tel.temp_file_path,\
                                                       'ucac4.txt')
@@ -1862,7 +1887,7 @@ class Image(object):
                 self.temp_files.append(catalog_file_path)
             else:
                 self.logger.warning('  No ucac4.txt output file found.  Trying again.')
-                result = subprocess.call(UCACcommand)
+                result = subprocess.call(UCACcommand, timeout=20)
                 if os.path.exists('ucac4.txt'):
                     catalog_file_path = os.path.join(self.tel.temp_file_path,\
                                                           'ucac4.txt')
