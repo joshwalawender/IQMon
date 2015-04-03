@@ -1130,7 +1130,7 @@ class Image(object):
                 line.replace("[1M>", "")
                 MatchVersion = re.search('SExtractor (\d+\.\d+\.\d+) started on', line)
                 if MatchVersion:
-                    self.logger.info('  SExtractor version = {}'.format(MatchVersion.group(1)))
+                    self.logger.debug('  SExtractor version = {}'.format(MatchVersion.group(1)))
                 if not re.match(".*Setting up background map.*", line) and\
                    not re.match(".*Line:\s[0-9]*.*", line):
                     self.logger.debug("  SExtractor Output: {}".format(line))
@@ -1145,7 +1145,7 @@ class Image(object):
             IsSExBkgnd = re.match("\s*([0-9\.]+)\s*", SExSTDOUT[pos+11:pos+21])
             if IsSExBkgnd:
                 self.SExtractor_background = float(IsSExBkgnd.group(1))
-                self.logger.info("  SExtractor background is {0:.1f}".format(\
+                self.logger.debug("  SExtractor background is {0:.1f}".format(\
                                                    self.SExtractor_background))
             else:
                 self.SExtractor_background = None
@@ -1154,7 +1154,7 @@ class Image(object):
                                                    SExSTDOUT[pos+21:pos+37])
             if IsSExtractor_background_RMS:
                 self.SExtractor_background_RMS = float(IsSExtractor_background_RMS.group(1))
-                self.logger.info("  SExtractor background RMS is {0:.1f}".format(\
+                self.logger.debug("  SExtractor background RMS is {0:.1f}".format(\
                                                self.SExtractor_background_RMS))
             else:
                 self.SExtractor_background_RMS = None
