@@ -1252,17 +1252,17 @@ class Image(object):
                 self.logger.debug("  Using {0} stars in central {1} to determine PSF quality.".format(\
                                                                 len(CentralFWHMs),\
                                                                 self.tel.PSF_measurement_radius))
-                self.logger.info("  Mode FWHM in inner region is {0:.2f} pixels".format(\
+                self.logger.debug("  Mode FWHM in inner region is {0:.2f} pixels".format(\
                                                         self.FWHM_mode.to(u.pix).value))
-                self.logger.info("  Median FWHM in inner region is {0:.2f} pixels".format(\
+                self.logger.debug("  Median FWHM in inner region is {0:.2f} pixels".format(\
                                                         self.FWHM_median.to(u.pix).value))
                 self.logger.info("  Average FWHM in inner region is {0:.2f} +/- {1:.2f} pixels".format(\
                                     self.FWHM_average.to(u.pix).value,\
                                     self.FWHM_average_uncertainty.to(u.pix).value))
 
-                self.logger.info("  Mode Ellipticity in inner region is {0:.2f}".format(\
+                self.logger.debug("  Mode Ellipticity in inner region is {0:.2f}".format(\
                                                                  self.ellipticity_mode))
-                self.logger.info("  Median Ellipticity in inner region is {0:.2f}".format(\
+                self.logger.debug("  Median Ellipticity in inner region is {0:.2f}".format(\
                                                                  self.ellipticity_median))
                 self.logger.info("  Average Ellipticity in inner region is {0:.2f}".format(\
                                                                  self.ellipticity_average))
@@ -1615,7 +1615,7 @@ class Image(object):
             self.logger.info("  Using SCAMP aheader file: {}".format(SCAMP_aheader))
         self.logger.debug("  SCAMP command: {}".format(' '.join(SCAMPCommand)))
         try:
-            SCAMP_STDOUT = subprocess.check_output(SCAMPCommand, timeout=60,\
+            SCAMP_STDOUT = subprocess.check_output(SCAMPCommand, timeout=90,\
                              stderr=subprocess.STDOUT, universal_newlines=True)
         except subprocess.TimeoutExpired as e:
             self.logger.warning('SCAMP timed out')
