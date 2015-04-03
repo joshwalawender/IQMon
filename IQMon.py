@@ -525,14 +525,14 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Uncompress image
     ##-------------------------------------------------------------------------
-    def uncompress(self):
+    def uncompress(self, timeout=10):
         if not self.working_file:
             self.logger.warning('Must have working file to uncompress file')
         else:
             return False
         
         try:
-            result = subprocess.check_output(['fpack', '-L', self.working_file], timeout=10)
+            result = subprocess.check_output(['fpack', '-L', self.working_file], timeout=timeout)
         except subprocess.TimeoutExpired as e:
             self.logger.warning('fpack timed out')
         except:
@@ -553,7 +553,7 @@ class Image(object):
             self.logger.warning('Could not determine compression status')
         else:
             try:
-                subprocess.call(['funpack', '-F', self.working_file], timeout=20)
+                subprocess.call(['funpack', '-F', self.working_file], timeout=timeout)
             except subprocess.TimeoutExpired as e:
                 self.logger.warning('fpack timed out')
             except:
@@ -562,7 +562,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Read Image
     ##-------------------------------------------------------------------------
-    def read_image(self):
+    def read_image(self, timeout=10):
         '''
         Read the raw image and write out a working image in the IQMon temporary
         directory.
@@ -594,7 +594,7 @@ class Image(object):
             self.working_file = os.path.join(self.tel.temp_file_path,\
                                              self.raw_file_basename+'.fits')
 #             shutil.copy2(self.raw_file, self.working_file)
-            subprocess.call(['cp', self.raw_file, self.working_file], timeout=10)
+            subprocess.call(['cp', self.raw_file, self.working_file], timeout=timeout)
             os.chmod(self.working_file, chmod_code)
             self.temp_files.append(self.working_file)
             self.file_ext = '.fits'
@@ -624,7 +624,7 @@ class Image(object):
             ## Use dcraw to convert to ppm file
             command = ['dcraw', '-t', '2', '-4', self.working_file]
             self.logger.debug('Executing dcraw: {}'.format(repr(command)))
-            subprocess.call(command, timeout=20)
+            subprocess.call(command, timeout=timeout)
             ppm_file = os.path.join(self.tel.temp_file_path, self.raw_file_basename+'.ppm')
             if os.path.exists(ppm_file):
                 self.working_file = ppm_file
@@ -640,7 +640,7 @@ class Image(object):
                     command = '{} {} > {}'.format(conversion_tool, self.working_file, fits_file)
                     self.logger.debug('Trying {}: {}'.format(conversion_tool, command))
                     try:
-                        subprocess.call(command, shell=True, timeout=20)
+                        subprocess.call(command, shell=True, timeout=timeout)
                     except:
                         pass
             if os.path.exists(fits_file):
@@ -774,7 +774,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Solve Astrometry Using astrometry.net
     ##-------------------------------------------------------------------------
-    def solve_astrometry(self, downsample=4):
+    def solve_astrometry(self, downsample=4, timeout=60):
         '''
         Solve astrometry in the working image using the astrometry.net solver.
         '''
@@ -790,7 +790,7 @@ class Image(object):
 
             StartTime = datetime.datetime.now()
             try:
-                rtncode = subprocess.call(AstrometryCommand, stdout=AstrometrySTDOUT, stderr=AstrometrySTDOUT, timeout=30)
+                rtncode = subprocess.call(AstrometryCommand, stdout=AstrometrySTDOUT, stderr=AstrometrySTDOUT, timeout=timeout)
             except subprocess.TimeoutExpired as e:
                 self.logger.warning('Astrometry.net timed out')
                 rtncode = 1
@@ -975,7 +975,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Run SExtractor
     ##-------------------------------------------------------------------------
-    def run_SExtractor(self, assoc=False):
+    def run_SExtractor(self, assoc=False, timeout=60):
         '''
         Run SExtractor on image.
         '''
@@ -1097,7 +1097,7 @@ class Image(object):
         self.logger.info("Invoking SExtractor")
         self.logger.debug("  SExtractor command: {}".format(' '.join(SExtractorCommand)))
         try:
-            SExSTDOUT = subprocess.check_output(SExtractorCommand, timeout=30,\
+            SExSTDOUT = subprocess.check_output(SExtractorCommand, timeout=timeout,\
                              stderr=subprocess.STDOUT, universal_newlines=True)
         except subprocess.TimeoutExpired as e:
             self.logger.warning('SExtractor timed out')
@@ -1566,7 +1566,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Run SCAMP
     ##-------------------------------------------------------------------------
-    def run_SCAMP(self):
+    def run_SCAMP(self, timeout=90):
         '''
         Run SCAMP on SExtractor output catalog.
         '''
@@ -1615,7 +1615,7 @@ class Image(object):
             self.logger.info("  Using SCAMP aheader file: {}".format(SCAMP_aheader))
         self.logger.debug("  SCAMP command: {}".format(' '.join(SCAMPCommand)))
         try:
-            SCAMP_STDOUT = subprocess.check_output(SCAMPCommand, timeout=90,\
+            SCAMP_STDOUT = subprocess.check_output(SCAMPCommand, timeout=timeout,\
                              stderr=subprocess.STDOUT, universal_newlines=True)
         except subprocess.TimeoutExpired as e:
             self.logger.warning('SCAMP timed out')
@@ -1658,7 +1658,7 @@ class Image(object):
             missfits_cmd = 'missfits -SAVE_TYPE REPLACE -WRITE_XML N {}'.format(\
                                                              self.working_file)
             self.logger.debug('  Running: {}'.format(missfits_cmd))
-            output = subprocess.check_output(missfits_cmd, shell=True, timeout=10,\
+            output = subprocess.check_output(missfits_cmd, shell=True, timeout=timeout,\
                              stderr=subprocess.STDOUT, universal_newlines=True)
             output = str(output)
             for line in output.splitlines():
@@ -1681,7 +1681,7 @@ class Image(object):
     '''
     Run SWarp on the image (after SCAMP distortion solution) to de-distort it.
     '''
-    def run_SWarp(self):
+    def run_SWarp(self, timeout=30):
         start_time = datetime.datetime.now()
         ## Parameters for SWarp
         swarp_file = os.path.join(self.tel.temp_file_path, 'swarpped.fits')
@@ -1700,7 +1700,7 @@ class Image(object):
         self.logger.info("Running SWarp.")
         self.logger.debug("  SWarp command: {}".format(' '.join(SWarpCommand)))
         try:
-            SWarp_STDOUT = subprocess.check_output(SWarpCommand, timeout=30,\
+            SWarp_STDOUT = subprocess.check_output(SWarpCommand, timeout=timeout,\
                                                    stderr=subprocess.STDOUT,\
                                                    universal_newlines=True)
         except subprocess.TimeoutExpired as e:
@@ -1811,7 +1811,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Get UCAC4 Catalog for Image from Local File
     ##-------------------------------------------------------------------------
-    def get_local_UCAC4(self,\
+    def get_local_UCAC4(self, timeout=30,\
                       local_UCAC_command="/Volumes/Data/UCAC4/access/u4test",\
                       local_UCAC_data="/Volumes/Data/UCAC4/u4b"):
         '''
@@ -1847,7 +1847,7 @@ class Image(object):
                            local_UCAC_data]
             self.logger.debug("  Using command: {}".format(' '.join(UCACcommand)))
             if os.path.exists("ucac4.txt"): os.remove("ucac4.txt")
-            result = subprocess.call(UCACcommand, timeout=20)
+            result = subprocess.call(UCACcommand, timeout=timeout)
             if os.path.exists('ucac4.txt'):
                 catalog_file_path = os.path.join(self.tel.temp_file_path,\
                                                       'ucac4.txt')
@@ -1855,7 +1855,7 @@ class Image(object):
                 self.temp_files.append(catalog_file_path)
             else:
                 self.logger.warning('  No ucac4.txt output file found.  Trying again.')
-                result = subprocess.call(UCACcommand, timeout=20)
+                result = subprocess.call(UCACcommand, timeout=timeout)
                 if os.path.exists('ucac4.txt'):
                     catalog_file_path = os.path.join(self.tel.temp_file_path,\
                                                           'ucac4.txt')
