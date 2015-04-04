@@ -2661,9 +2661,11 @@ class Image(object):
                 self.logger.debug('  Result: WCS PC2_1 = {}'.format(new_result['PC2_1']))
         except:
             self.logger.warning('  Could not write WCS values to result')
-            wcs_header = self.image_WCS.to_header()
-            for entry in wcs_header:
-                self.logger.debug('{} {}'.format(entry, wcs_header[entry]))
+            if self.image_WCS:
+                for entry in self.image_WCS.to_header():
+                    self.logger.debug('{} {}'.format(entry, self.image_WCS.to_header()[entry]))
+            else:
+                self.logger.debug('No WCS read from header')
 
         try:
             obsdt = datetime.datetime.strptime(str(self.observation_date), '%Y-%m-%dT%H:%M:%S')
