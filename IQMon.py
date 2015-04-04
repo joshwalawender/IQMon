@@ -1952,9 +1952,6 @@ class Image(object):
 
             self.logger.info('  Using {} stars with {} catalog magnitude'.format(len(zero_points), self.catalog_filter))
 
-    #         self.zero_point_correlation = np.corrcoef(zip(list(entry['assoc_catmag']), list(entry['MAG_AUTO'])))
-    #         print(self.zero_point_correlation)
-
             if len(zero_points) < min_stars:
                 self.logger.warning('  Zero point not calculated.  Only {} catalog stars found.'.format(\
                                  len(zero_points)))
@@ -1963,8 +1960,8 @@ class Image(object):
                 self.zero_point_median = np.median(zero_points)
                 self.zero_point_average = np.average(zero_points, weights=weights)
                 self.zero_point_average_uncertainty = (np.sum(weights))**-0.5
-                self.logger.info('  Mode Zero Point = {:.2f}'.format(self.zero_point_mode))
-                self.logger.info('  Median Zero Point = {:.2f}'.format(self.zero_point_median))
+                self.logger.debug('  Mode Zero Point = {:.2f}'.format(self.zero_point_mode))
+                self.logger.debug('  Median Zero Point = {:.2f}'.format(self.zero_point_median))
                 self.logger.info('  Weighted Average Zero Point = {:.2f} +/- {:.2f}'.format(\
                                     self.zero_point_average,\
                                     self.zero_point_average_uncertainty))
