@@ -1612,7 +1612,7 @@ class Image(object):
             SCAMPCommand.append('{}'.format(SCAMP_params[key]))
         self.logger.info("Running SCAMP")
         if SCAMP_aheader:
-            self.logger.info("  Using SCAMP aheader file: {}".format(SCAMP_aheader))
+            self.logger.debug("  Using SCAMP aheader file: {}".format(SCAMP_aheader))
         self.logger.debug("  SCAMP command: {}".format(' '.join(SCAMPCommand)))
         try:
             SCAMP_STDOUT = subprocess.check_output(SCAMPCommand, timeout=timeout,\
@@ -1638,7 +1638,7 @@ class Image(object):
             for line in SCAMP_STDOUT.splitlines():
                 MatchVersion = re.search('SCAMP (\d+\.\d+\.\d+) started on', line)
                 if MatchVersion:
-                    self.logger.info('  SCAMP version = {}'.format(MatchVersion.group(1)))
+                    self.logger.debug('  SCAMP version = {}'.format(MatchVersion.group(1)))
                 if re.search('Astrometric stats \(external\)', line):
                     StartAstrometricStats = True
                 if re.search('Generating astrometric plots', line):
@@ -1717,7 +1717,7 @@ class Image(object):
             for line in SWarp_STDOUT.splitlines():
                 MatchVersion = re.search('SWarp (\d+\.\d+\.\d+) started on', line)
                 if MatchVersion:
-                    self.logger.info('  SWarp version = {}'.format(MatchVersion.group(1)))
+                    self.logger.debug('  SWarp version = {}'.format(MatchVersion.group(1)))
                 if not re.search('Resampling line', line) and not re.search('Setting up background map at', line):
                     self.logger.debug("  SWarp Output: "+line)
         ## Replace working_file with SWarp output file
