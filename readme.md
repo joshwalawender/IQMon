@@ -39,6 +39,11 @@ External Programs:
 
 ## Version History
 
+* __v1.4__
+    * Bug fixes
+    * Add `add_mongo_entry()` method
+    * Add `uncompress()` method to handle fpack compressed images
+    * Use subprocess32 and timeout for external calls to SCAMP, SExtractor, astrometry.net
 * __v1.3.4__
     * Various minor bug fixes.
     * Fixed bug in calculation of weights for FWHM and zero point calculations.  Very little actual impact on results.

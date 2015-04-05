@@ -15,13 +15,15 @@ import re
 import stat
 import shutil
 import datetime
-import subprocess
+import subprocess32 as subprocess
 import logging
 import yaml
 import math
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as pyplot
+import pymongo
+from pymongo import MongoClient
 
 
 ## Import Astronomy Specific Tools
@@ -266,6 +268,7 @@ class Image(object):
         return self
 
     def __exit__(self ,type, value, traceback):
+        logging.shutdown()
         self.__del__()
 
 
@@ -299,7 +302,7 @@ class Image(object):
         if clobber:
             if os.path.exists(logfile): os.remove(logfile)
         self.logger = logging.getLogger(self.raw_file_basename)
-        if len(self.logger.handlers) < 1:
+        if len(self.logger.handlers) == 0:
             self.logger.setLevel(logging.DEBUG)
             LogFileHandler = logging.FileHandler(logfile)
             LogFileHandler.setLevel(logging.DEBUG)
@@ -446,13 +449,13 @@ class Image(object):
                 self.logger.debug('    {}'.format(item))
 
         ## Determine PA of Image
-        if self.image_WCS:
-            self.orientation_from_wcs()
-            if self.position_angle:
-                self.logger.debug("  Position angle of WCS is {0:.1f} deg".format(\
-                                              self.position_angle.to(u.deg).value))
-                if self.image_flipped:
-                    self.logger.debug("  Image is mirrored.")
+#         if self.image_WCS:
+#             self.orientation_from_wcs()
+#             if self.position_angle:
+#                 self.logger.debug("  Position angle of WCS is {0:.1f} deg".format(\
+#                                               self.position_angle.to(u.deg).value))
+#                 if self.image_flipped:
+#                     self.logger.debug("  Image is mirrored.")
 
         ## Determine Alt, Az, Moon Sep, Moon Illum using ephem module
         if self.observation_date and self.latitude and self.longitude and self.coordinate_from_header:
@@ -514,17 +517,52 @@ class Image(object):
         Edit a single keyword in the image fits header.
         '''
         self.logger.info('Editing image header: {} = {}'.format(keyword, value))
-#         hdulist = fits.open(self.working_file,\
-#                             ignore_missing_end=True, mode='update')
         with fits.open(self.working_file, ignore_missing_end=True, mode='update') as hdulist:
             hdulist[0].header[keyword] = value
             hdulist.flush()
 
 
     ##-------------------------------------------------------------------------
+    ## Uncompress image
+    ##-------------------------------------------------------------------------
+    def uncompress(self, timeout=10):
+        if not self.working_file:
+            self.logger.warning('Must have working file to uncompress file')
+        else:
+            return False
+        
+        try:
+            result = subprocess.check_output(['fpack', '-L', self.working_file], timeout=timeout)
+        except subprocess.TimeoutExpired as e:
+            self.logger.warning('fpack timed out')
+        except:
+            self.logger.warning('Could not run fpack to check compression status')
+
+        found_compression_info = False
+        for line in result.split('\n'):
+            IsMatch = re.match('\s*\d+\s+IMAGE\s+([\w/=\.]+)\s(BITPIX=[\-\d]+)\s(\[.*\])\s([\w]+)', line)
+            if IsMatch:
+                self.logger.debug('  funpack -L Output: {}'.format(line))
+                if re.search('not_tiled', IsMatch.group(4)) and not re.search('no_pixels', IsMatch.group(3)):
+                    self.logger.debug('  Image is not compressed')
+                    found_compression_info = True
+                elif re.search('tiled_rice', IsMatch.group(4)):
+                    self.logger.debug('  Image is rice compressed.  Running funpack.')
+                    found_compression_info = True
+        if not found_compression_info:
+            self.logger.warning('Could not determine compression status')
+        else:
+            try:
+                subprocess.call(['funpack', '-F', self.working_file], timeout=timeout)
+            except subprocess.TimeoutExpired as e:
+                self.logger.warning('fpack timed out')
+            except:
+                self.logger.warning('Failed to run funpack')
+
+    ##-------------------------------------------------------------------------
     ## Read Image
     ##-------------------------------------------------------------------------
-    def read_image(self):
+    def read_image(self, timeout=10):
         '''
         Read the raw image and write out a working image in the IQMon temporary
         directory.
@@ -555,10 +593,12 @@ class Image(object):
                                                             self.raw_file_name))
             self.working_file = os.path.join(self.tel.temp_file_path,\
                                              self.raw_file_basename+'.fits')
-            shutil.copy2(self.raw_file, self.working_file)
+#             shutil.copy2(self.raw_file, self.working_file)
+            subprocess.call(['cp', self.raw_file, self.working_file], timeout=timeout)
             os.chmod(self.working_file, chmod_code)
             self.temp_files.append(self.working_file)
             self.file_ext = '.fits'
+            self.uncompress()
         ## fits extension:  make working copy
         elif self.file_ext == '.fits':
             self.logger.info('Making working copy of raw image: {}'.format(\
@@ -569,6 +609,7 @@ class Image(object):
             os.chmod(self.working_file, chmod_code)
             self.temp_files.append(self.working_file)
             self.file_ext = '.fits'
+            self.uncompress()
         ## DSLR file:  convert to fits
         elif self.file_ext in ['.dng', '.DNG', '.cr2', '.CR2']:
             self.logger.info('Converting {} to fits format'.format(\
@@ -583,7 +624,7 @@ class Image(object):
             ## Use dcraw to convert to ppm file
             command = ['dcraw', '-t', '2', '-4', self.working_file]
             self.logger.debug('Executing dcraw: {}'.format(repr(command)))
-            subprocess.call(command)
+            subprocess.call(command, timeout=timeout)
             ppm_file = os.path.join(self.tel.temp_file_path, self.raw_file_basename+'.ppm')
             if os.path.exists(ppm_file):
                 self.working_file = ppm_file
@@ -599,7 +640,7 @@ class Image(object):
                     command = '{} {} > {}'.format(conversion_tool, self.working_file, fits_file)
                     self.logger.debug('Trying {}: {}'.format(conversion_tool, command))
                     try:
-                        subprocess.call(command, shell=True)
+                        subprocess.call(command, shell=True, timeout=timeout)
                     except:
                         pass
             if os.path.exists(fits_file):
@@ -642,58 +683,56 @@ class Image(object):
         start_time = datetime.datetime.now()
         self.logger.info("Dark subtracting image.")
         self.logger.debug("  Opening image data.")
-        hdulist_image = fits.open(self.working_file, mode='update')
-        ## Load master dark if provided, but if multiple files input, combine
-        ## them in to master dark, then load combined master dark.
-        if len(Darks) == 1:
-            self.logger.debug("  Found master dark.  Opening master dark data.")
-            hdulist_dark = fits.open(Darks[0])
-            MasterDarkData = hdulist_dark[0].data
-            hdulist_dark.close()
-        elif len(Darks) > 1:
-            self.logger.info("  Median combining {0} darks.".format(len(Darks)))
-            ## Combine multiple darks frames
-            DarkData = []
-            for Dark in Darks:
-                hdulist = fits.open(Dark)
-                DarkData.append(hdulist[0].data)
-            DarkData = np.array(DarkData)
-            MasterDarkData = np.median(DarkData, axis=0)
-            ## Save Master Dark to Fits File
-            DataPath = os.path.split(self.raw_file)[0]
-            DataNightString = os.path.split(DataPath)[1]
-#             MasterDarkFilename = "MasterDark_"+self.tel.name+"_"+DataNightString+"_"+str(int(math.floor(self.exptime.to(u.s).value)))+".fits"
-            MasterDarkFilename = 'MasterDark_{}_{}_{}.fits'.format(\
-                                      self.tel.name,\
-                                      DataNightString,\
-                                      str(int(math.floor(self.exptime.to(u.s).value)))
-                                      )
-            MasterDarkFile  = os.path.join(self.tel.temp_file_path,\
-                                           MasterDarkFilename)
-            hdu_MasterDark = fits.PrimaryHDU(MasterDarkData)
-            hdulist_MasterDark = fits.HDUList([hdu_MasterDark])
-            hdulist_MasterDark.header = hdulist[0].header
-            hdulist_MasterDark.header['history'] = \
-                       "Combined {0} images to make this master dark.".format(\
-                                                                    len(Darks))
-            self.logger.debug("  Writing master dark file: {0}".format(\
-                                                               MasterDarkFile))
-            hdulist_MasterDark.writeto(MasterDarkFile)
-        else:
-            self.logger.error("No input dark files detected.")
-        ## Now Subtract MasterDark from Image
-        self.logger.debug("  Subtracting dark from image.")
-        ImageData = hdulist_image[0].data
-        DifferenceImage = ImageData - MasterDarkData
-        hdulist_image[0].data = DifferenceImage
-        hdulist_image.flush()
-        self.logger.debug("  Median level of image = {0}".format(
-                                                         np.median(ImageData)))
-        self.logger.debug("  Median level of dark = {0}".format(\
-                                                    np.median(MasterDarkData)))
-        self.logger.debug("  Median level of dark subtracted = {0}".format(\
-                                                   np.median(DifferenceImage)))
-        hdulist_image.close()
+        with fits.open(self.working_file, mode='update') as hdulist_image:
+            ## Load master dark if provided, but if multiple files input, combine
+            ## them in to master dark, then load combined master dark.
+            if len(Darks) == 1:
+                self.logger.debug("  Found master dark.  Opening master dark data.")
+                with fits.open(Darks[0]) as hdulist_dark:
+                    MasterDarkData = hdulist_dark[0].data
+            elif len(Darks) > 1:
+                self.logger.info("  Median combining {0} darks.".format(len(Darks)))
+                ## Combine multiple darks frames
+                DarkData = []
+                for Dark in Darks:
+                    with fits.open(Dark) as hdulist:
+                        DarkData.append(hdulist[0].data)
+                DarkData = np.array(DarkData)
+                MasterDarkData = np.median(DarkData, axis=0)
+                ## Save Master Dark to Fits File
+                DataPath = os.path.split(self.raw_file)[0]
+                DataNightString = os.path.split(DataPath)[1]
+    #             MasterDarkFilename = "MasterDark_"+self.tel.name+"_"+DataNightString+"_"+str(int(math.floor(self.exptime.to(u.s).value)))+".fits"
+                MasterDarkFilename = 'MasterDark_{}_{}_{}.fits'.format(\
+                                          self.tel.name,\
+                                          DataNightString,\
+                                          str(int(math.floor(self.exptime.to(u.s).value)))
+                                          )
+                MasterDarkFile  = os.path.join(self.tel.temp_file_path,\
+                                               MasterDarkFilename)
+                hdu_MasterDark = fits.PrimaryHDU(MasterDarkData)
+                hdulist_MasterDark = fits.HDUList([hdu_MasterDark])
+                hdulist_MasterDark.header = hdulist[0].header
+                hdulist_MasterDark.header['history'] = \
+                           "Combined {0} images to make this master dark.".format(\
+                                                                        len(Darks))
+                self.logger.debug("  Writing master dark file: {0}".format(\
+                                                                   MasterDarkFile))
+                hdulist_MasterDark.writeto(MasterDarkFile)
+            else:
+                self.logger.error("No input dark files detected.")
+            ## Now Subtract MasterDark from Image
+            self.logger.debug("  Subtracting dark from image.")
+            ImageData = hdulist_image[0].data
+            DifferenceImage = ImageData - MasterDarkData
+            hdulist_image[0].data = DifferenceImage
+            hdulist_image.flush()
+            self.logger.debug("  Median level of image = {0}".format(
+                                                             np.median(ImageData)))
+            self.logger.debug("  Median level of dark = {0}".format(\
+                                                        np.median(MasterDarkData)))
+            self.logger.debug("  Median level of dark subtracted = {0}".format(\
+                                                       np.median(DifferenceImage)))
         end_time = datetime.datetime.now()
         elapzed_time = end_time - start_time
         self.logger.info('  Done with dark subtraction in {:.1f} s'.format(elapzed_time.total_seconds()))
@@ -724,7 +763,6 @@ class Image(object):
             self.logger.debug("  Cropping Image To [{0}:{1},{2}:{3}]".format(\
                                                     self.crop_x1, self.crop_x2,\
                                                     self.crop_y1, self.crop_y2))
-#             hdulist = fits.open(self.working_file, mode="update")
             with fits.open(self.working_file, mode="update") as hdulist:
                 hdulist[0].data = hdulist[0].data[self.crop_y1:self.crop_y2,self.crop_x1:self.crop_x2]
                 hdulist.flush()
@@ -736,7 +774,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Solve Astrometry Using astrometry.net
     ##-------------------------------------------------------------------------
-    def solve_astrometry(self, timeout=None, downsample=4):
+    def solve_astrometry(self, downsample=4, timeout=60):
         '''
         Solve astrometry in the working image using the astrometry.net solver.
         '''
@@ -746,35 +784,19 @@ class Image(object):
                              "-L", str(self.tel.pixel_scale.value*0.75),
                              "-H", str(self.tel.pixel_scale.value*1.25),
                              "-u", "arcsecperpix", "-z", str(downsample), self.working_file]
-        AstrometrySTDOUT = open(os.path.join(self.tel.temp_file_path, 'astrometry_output.txt'), 'w')
-        self.temp_files.append(os.path.join(self.tel.temp_file_path, 'astrometry_output.txt'))
+        with open(os.path.join(self.tel.temp_file_path, 'astrometry_output.txt'), 'w') as AstrometrySTDOUT:
+            self.temp_files.append(os.path.join(self.tel.temp_file_path, 'astrometry_output.txt'))
+            self.logger.debug('  Calling astrometry.net with: {}'.format(' '.join(AstrometryCommand)))
 
-        self.logger.debug('  Calling astrometry.net with: {}'.format(' '.join(AstrometryCommand)))
-        if timeout:
             StartTime = datetime.datetime.now()
-            astrometry_process = subprocess.Popen(AstrometryCommand, stdout=AstrometrySTDOUT, stderr=AstrometrySTDOUT)
-            EndTime = datetime.datetime.now()
-            duration = EndTime - StartTime
+            try:
+                rtncode = subprocess.call(AstrometryCommand, stdout=AstrometrySTDOUT, stderr=AstrometrySTDOUT, timeout=timeout)
+            except subprocess.TimeoutExpired as e:
+                self.logger.warning('Astrometry.net timed out')
+                rtncode = 1
 
-            wait = True
-            while wait:
-                if astrometry_process.poll() == None:
-                    ## Process has not finished
-                    EndTime = datetime.datetime.now()
-                    duration = EndTime - StartTime
-                    if duration.seconds > timeout:
-                        astrometry_process.terminate()
-                        wait = False
-                        self.logger.warning("Astrometry.net timed out.")
-                else:
-                    ## Process finished
-                    wait = False
-            rtncode = astrometry_process.returncode
-        else:
-            StartTime = datetime.datetime.now()
-            rtncode = subprocess.call(AstrometryCommand, stdout=AstrometrySTDOUT, stderr=AstrometrySTDOUT)
-            EndTime = datetime.datetime.now()
-            duration = EndTime - StartTime
+        EndTime = datetime.datetime.now()
+        duration = EndTime - StartTime
 
         with open(os.path.join(self.tel.temp_file_path, 'astrometry_output.txt'), 'r') as AstrometrySTDOUT:
             output = AstrometrySTDOUT.readlines()
@@ -953,7 +975,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Run SExtractor
     ##-------------------------------------------------------------------------
-    def run_SExtractor(self, assoc=False):
+    def run_SExtractor(self, assoc=False, timeout=60):
         '''
         Run SExtractor on image.
         '''
@@ -1002,19 +1024,18 @@ class Image(object):
                                                    '{}.param'.format(self.raw_file_basename))
         if os.path.exists(sextractor_output_param_file):
             os.remove(sextractor_output_param_file)
-        defaultparamsFO = open(sextractor_output_param_file, 'w')
-        params = [
-                  'XWIN_IMAGE', 'YWIN_IMAGE', 
-                  'AWIN_IMAGE', 'BWIN_IMAGE', 'FWHM_IMAGE', 'THETAWIN_IMAGE',
-                  'ERRAWIN_IMAGE', 'ERRBWIN_IMAGE', 'ERRTHETAWIN_IMAGE',
-                  'ELONGATION', 'ELLIPTICITY',
-                  'FLUX_AUTO', 'FLUXERR_AUTO', 'MAG_AUTO', 'MAGERR_AUTO',
-                  'FLAGS', 'FLAGS_WEIGHT', 'FLUX_RADIUS'
-                 ]
-        if assoc: params.append('VECTOR_ASSOC(3)')
-        for param in params:
-            defaultparamsFO.write(param+'\n')
-        defaultparamsFO.close()
+        with open(sextractor_output_param_file, 'w') as defaultparamsFO:
+            params = [
+                      'XWIN_IMAGE', 'YWIN_IMAGE', 
+                      'AWIN_IMAGE', 'BWIN_IMAGE', 'FWHM_IMAGE', 'THETAWIN_IMAGE',
+                      'ERRAWIN_IMAGE', 'ERRBWIN_IMAGE', 'ERRTHETAWIN_IMAGE',
+                      'ELONGATION', 'ELLIPTICITY',
+                      'FLUX_AUTO', 'FLUXERR_AUTO', 'MAG_AUTO', 'MAGERR_AUTO',
+                      'FLAGS', 'FLAGS_WEIGHT', 'FLUX_RADIUS'
+                     ]
+            if assoc: params.append('VECTOR_ASSOC(3)')
+            for param in params:
+                defaultparamsFO.write(param+'\n')
         self.temp_files.append(sextractor_output_param_file)
 
         ## Compare input parameters dict to default
@@ -1076,12 +1097,24 @@ class Image(object):
         self.logger.info("Invoking SExtractor")
         self.logger.debug("  SExtractor command: {}".format(' '.join(SExtractorCommand)))
         try:
-            SExSTDOUT = subprocess.check_output(SExtractorCommand,\
+            SExSTDOUT = subprocess.check_output(SExtractorCommand, timeout=timeout,\
                              stderr=subprocess.STDOUT, universal_newlines=True)
+        except subprocess.TimeoutExpired as e:
+            self.logger.warning('SExtractor timed out')
+            self.SExtractor_results = None
+            self.SExtractor_background = None
+            self.SExtractor_background_RMS = None
+        except OSError as e:
+            if e.errno == 2:
+                self.logger.error('Could not find sextractor executable.  Is sextractor installed?')
+            self.logger.error("SExtractor failed. ErrNo: {}".format(e.errno))
+            self.logger.error("SExtractor failed. StrErr: {}".format(e.strerror))
+            self.SExtractor_results = None
+            self.SExtractor_background = None
+            self.SExtractor_background_RMS = None
         except subprocess.CalledProcessError as e:
-            self.logger.error("SExtractor failed.  Command: {}".format(e.cmd))
-            self.logger.error("SExtractor failed.  Returncode: {}".format(e.returncode))
-            self.logger.error("SExtractor failed.  Output: {}".format(e.output))
+            self.logger.error("SExtractor failed. Returncode: {}".format(e.returncode))
+            self.logger.error("SExtractor failed. Output: {}".format(e.output))
             self.SExtractor_results = None
             self.SExtractor_background = None
             self.SExtractor_background_RMS = None
@@ -1097,7 +1130,7 @@ class Image(object):
                 line.replace("[1M>", "")
                 MatchVersion = re.search('SExtractor (\d+\.\d+\.\d+) started on', line)
                 if MatchVersion:
-                    self.logger.info('  SExtractor version = {}'.format(MatchVersion.group(1)))
+                    self.logger.debug('  SExtractor version = {}'.format(MatchVersion.group(1)))
                 if not re.match(".*Setting up background map.*", line) and\
                    not re.match(".*Line:\s[0-9]*.*", line):
                     self.logger.debug("  SExtractor Output: {}".format(line))
@@ -1112,7 +1145,7 @@ class Image(object):
             IsSExBkgnd = re.match("\s*([0-9\.]+)\s*", SExSTDOUT[pos+11:pos+21])
             if IsSExBkgnd:
                 self.SExtractor_background = float(IsSExBkgnd.group(1))
-                self.logger.info("  SExtractor background is {0:.1f}".format(\
+                self.logger.debug("  SExtractor background is {0:.1f}".format(\
                                                    self.SExtractor_background))
             else:
                 self.SExtractor_background = None
@@ -1121,7 +1154,7 @@ class Image(object):
                                                    SExSTDOUT[pos+21:pos+37])
             if IsSExtractor_background_RMS:
                 self.SExtractor_background_RMS = float(IsSExtractor_background_RMS.group(1))
-                self.logger.info("  SExtractor background RMS is {0:.1f}".format(\
+                self.logger.debug("  SExtractor background RMS is {0:.1f}".format(\
                                                self.SExtractor_background_RMS))
             else:
                 self.SExtractor_background_RMS = None
@@ -1133,8 +1166,8 @@ class Image(object):
 
             ## Read FITS_LDAC SExtractor Catalog
             self.logger.debug("  Reading SExtractor output catalog.")
-            hdu = fits.open(self.SExtractor_catalogfile)
-            results = table.Table(hdu[2].data)
+            with fits.open(self.SExtractor_catalogfile) as hdu:
+                results = table.Table(hdu[2].data)
 
             rows_to_remove = []
             for i in range(0,len(results)):
@@ -1219,17 +1252,17 @@ class Image(object):
                 self.logger.debug("  Using {0} stars in central {1} to determine PSF quality.".format(\
                                                                 len(CentralFWHMs),\
                                                                 self.tel.PSF_measurement_radius))
-                self.logger.info("  Mode FWHM in inner region is {0:.2f} pixels".format(\
+                self.logger.debug("  Mode FWHM in inner region is {0:.2f} pixels".format(\
                                                         self.FWHM_mode.to(u.pix).value))
-                self.logger.info("  Median FWHM in inner region is {0:.2f} pixels".format(\
+                self.logger.debug("  Median FWHM in inner region is {0:.2f} pixels".format(\
                                                         self.FWHM_median.to(u.pix).value))
                 self.logger.info("  Average FWHM in inner region is {0:.2f} +/- {1:.2f} pixels".format(\
                                     self.FWHM_average.to(u.pix).value,\
                                     self.FWHM_average_uncertainty.to(u.pix).value))
 
-                self.logger.info("  Mode Ellipticity in inner region is {0:.2f}".format(\
+                self.logger.debug("  Mode Ellipticity in inner region is {0:.2f}".format(\
                                                                  self.ellipticity_mode))
-                self.logger.info("  Median Ellipticity in inner region is {0:.2f}".format(\
+                self.logger.debug("  Median Ellipticity in inner region is {0:.2f}".format(\
                                                                  self.ellipticity_median))
                 self.logger.info("  Average Ellipticity in inner region is {0:.2f}".format(\
                                                                  self.ellipticity_average))
@@ -1533,11 +1566,18 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Run SCAMP
     ##-------------------------------------------------------------------------
-    def run_SCAMP(self):
+    def run_SCAMP(self, timeout=90):
         '''
         Run SCAMP on SExtractor output catalog.
         '''
+        if not self.image_WCS:
+            self.logger.warning('No image WCS found.  Skipping SCAMP.')
+            self.SCAMP_successful = False
+            return self.SCAMP_successful
         start_time = datetime.datetime.now()
+        ## Change to tmp directory
+        origWD = os.getcwd()
+        os.chdir(self.tel.temp_file_path)
         ## Parameters for SCAMP
         if self.tel.SCAMP_aheader:
             SCAMP_aheader = self.tel.SCAMP_aheader
@@ -1572,11 +1612,18 @@ class Image(object):
             SCAMPCommand.append('{}'.format(SCAMP_params[key]))
         self.logger.info("Running SCAMP")
         if SCAMP_aheader:
-            self.logger.info("  Using SCAMP aheader file: {}".format(SCAMP_aheader))
+            self.logger.debug("  Using SCAMP aheader file: {}".format(SCAMP_aheader))
         self.logger.debug("  SCAMP command: {}".format(' '.join(SCAMPCommand)))
         try:
-            SCAMP_STDOUT = subprocess.check_output(SCAMPCommand,\
+            SCAMP_STDOUT = subprocess.check_output(SCAMPCommand, timeout=timeout,\
                              stderr=subprocess.STDOUT, universal_newlines=True)
+        except subprocess.TimeoutExpired as e:
+            self.logger.warning('SCAMP timed out')
+        except OSError as e:
+            if e.errno == 2:
+                self.logger.error('Could not find SCAMP executable.  Is SCAMP installed?')
+            self.logger.error("SCAMP failed. ErrNo: {}".format(e.errno))
+            self.logger.error("SCAMP failed. StrErr: {}".format(e.strerror))
         except subprocess.CalledProcessError as e:
             self.logger.error("SCAMP failed.  Command: {}".format(e.cmd))
             self.logger.error("SCAMP failed.  Returncode: {}".format(e.returncode))
@@ -1591,13 +1638,13 @@ class Image(object):
             for line in SCAMP_STDOUT.splitlines():
                 MatchVersion = re.search('SCAMP (\d+\.\d+\.\d+) started on', line)
                 if MatchVersion:
-                    self.logger.info('  SCAMP version = {}'.format(MatchVersion.group(1)))
+                    self.logger.debug('  SCAMP version = {}'.format(MatchVersion.group(1)))
                 if re.search('Astrometric stats \(external\)', line):
                     StartAstrometricStats = True
                 if re.search('Generating astrometric plots', line):
                     EndAstrometricStats = True
                 if StartAstrometricStats and not EndAstrometricStats:
-                    self.logger.info("  SCAMP Output: "+line)
+                    self.logger.debug("  SCAMP Output: "+line)
                 else:
                     self.logger.debug("  SCAMP Output: "+line)
 
@@ -1611,7 +1658,7 @@ class Image(object):
             missfits_cmd = 'missfits -SAVE_TYPE REPLACE -WRITE_XML N {}'.format(\
                                                              self.working_file)
             self.logger.debug('  Running: {}'.format(missfits_cmd))
-            output = subprocess.check_output(missfits_cmd, shell=True,\
+            output = subprocess.check_output(missfits_cmd, shell=True, timeout=timeout,\
                              stderr=subprocess.STDOUT, universal_newlines=True)
             output = str(output)
             for line in output.splitlines():
@@ -1621,6 +1668,7 @@ class Image(object):
             self.logger.critical('No .head file found from SCAMP.  SCAMP failed.')
             self.SCAMP_successful = False
 
+        os.chdir(origWD)
         end_time = datetime.datetime.now()
         elapzed_time = end_time - start_time
         self.logger.info('  Done running SCAMP in {:.1f} s'.format(elapzed_time.total_seconds()))
@@ -1633,7 +1681,7 @@ class Image(object):
     '''
     Run SWarp on the image (after SCAMP distortion solution) to de-distort it.
     '''
-    def run_SWarp(self):
+    def run_SWarp(self, timeout=30):
         start_time = datetime.datetime.now()
         ## Parameters for SWarp
         swarp_file = os.path.join(self.tel.temp_file_path, 'swarpped.fits')
@@ -1652,9 +1700,11 @@ class Image(object):
         self.logger.info("Running SWarp.")
         self.logger.debug("  SWarp command: {}".format(' '.join(SWarpCommand)))
         try:
-            SWarp_STDOUT = subprocess.check_output(SWarpCommand,\
+            SWarp_STDOUT = subprocess.check_output(SWarpCommand, timeout=timeout,\
                                                    stderr=subprocess.STDOUT,\
                                                    universal_newlines=True)
+        except subprocess.TimeoutExpired as e:
+            self.logger.warning('SWARP timed out')
         except subprocess.CalledProcessError as e:
             self.logger.error("SWarp failed.  Command: {}".format(e.cmd))
             self.logger.error("SWarp failed.  Returncode: {}".format(e.returncode))
@@ -1667,7 +1717,7 @@ class Image(object):
             for line in SWarp_STDOUT.splitlines():
                 MatchVersion = re.search('SWarp (\d+\.\d+\.\d+) started on', line)
                 if MatchVersion:
-                    self.logger.info('  SWarp version = {}'.format(MatchVersion.group(1)))
+                    self.logger.debug('  SWarp version = {}'.format(MatchVersion.group(1)))
                 if not re.search('Resampling line', line) and not re.search('Setting up background map at', line):
                     self.logger.debug("  SWarp Output: "+line)
         ## Replace working_file with SWarp output file
@@ -1761,7 +1811,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Get UCAC4 Catalog for Image from Local File
     ##-------------------------------------------------------------------------
-    def get_local_UCAC4(self,\
+    def get_local_UCAC4(self, timeout=30,\
                       local_UCAC_command="/Volumes/Data/UCAC4/access/u4test",\
                       local_UCAC_data="/Volumes/Data/UCAC4/u4b"):
         '''
@@ -1797,7 +1847,7 @@ class Image(object):
                            local_UCAC_data]
             self.logger.debug("  Using command: {}".format(' '.join(UCACcommand)))
             if os.path.exists("ucac4.txt"): os.remove("ucac4.txt")
-            result = subprocess.call(UCACcommand)
+            result = subprocess.call(UCACcommand, timeout=timeout)
             if os.path.exists('ucac4.txt'):
                 catalog_file_path = os.path.join(self.tel.temp_file_path,\
                                                       'ucac4.txt')
@@ -1805,7 +1855,7 @@ class Image(object):
                 self.temp_files.append(catalog_file_path)
             else:
                 self.logger.warning('  No ucac4.txt output file found.  Trying again.')
-                result = subprocess.call(UCACcommand)
+                result = subprocess.call(UCACcommand, timeout=timeout)
                 if os.path.exists('ucac4.txt'):
                     catalog_file_path = os.path.join(self.tel.temp_file_path,\
                                                           'ucac4.txt')
@@ -1902,9 +1952,6 @@ class Image(object):
 
             self.logger.info('  Using {} stars with {} catalog magnitude'.format(len(zero_points), self.catalog_filter))
 
-    #         self.zero_point_correlation = np.corrcoef(zip(list(entry['assoc_catmag']), list(entry['MAG_AUTO'])))
-    #         print(self.zero_point_correlation)
-
             if len(zero_points) < min_stars:
                 self.logger.warning('  Zero point not calculated.  Only {} catalog stars found.'.format(\
                                  len(zero_points)))
@@ -1913,8 +1960,8 @@ class Image(object):
                 self.zero_point_median = np.median(zero_points)
                 self.zero_point_average = np.average(zero_points, weights=weights)
                 self.zero_point_average_uncertainty = (np.sum(weights))**-0.5
-                self.logger.info('  Mode Zero Point = {:.2f}'.format(self.zero_point_mode))
-                self.logger.info('  Median Zero Point = {:.2f}'.format(self.zero_point_median))
+                self.logger.debug('  Mode Zero Point = {:.2f}'.format(self.zero_point_mode))
+                self.logger.debug('  Median Zero Point = {:.2f}'.format(self.zero_point_median))
                 self.logger.info('  Weighted Average Zero Point = {:.2f} +/- {:.2f}'.format(\
                                     self.zero_point_average,\
                                     self.zero_point_average_uncertainty))
@@ -2251,7 +2298,7 @@ class Image(object):
             im.thumbnail(size, Image.ANTIALIAS)
 
         ## Save to JPEG
-        self.logger.info('  Saving jpeg (p1={:.1f}, p2={:.1f}), binning={}, quality={:.0f}) to: {}'.format(p1, p2, binning, quality, jpeg_file_name))
+        self.logger.debug('  Saving jpeg (p1={:.1f}, p2={:.1f}), bin={}, q={:.0f}) to: {}'.format(p1, p2, binning, quality, jpeg_file_name))
         im.save(jpeg_file, 'JPEG', quality=quality)
         self.jpeg_file_names.append(jpeg_file_name)
 
@@ -2522,6 +2569,239 @@ class Image(object):
         HTML.write("</body>\n")
         HTML.write("</html>\n")
         HTML.close()
+
+
+    ##-------------------------------------------------------------------------
+    ## Append Line With Image Info to YAML Text File
+    ##-------------------------------------------------------------------------
+    def add_mongo_entry(self, address, db_name, collection_name, port=27017):
+        ## Connect to mongo database
+        self.logger.info('Writing results to mongo db at {}:{}'.format(address, port))
+        try:
+            client = MongoClient('192.168.1.101', 27017)
+            self.logger.debug('  Connected to client')
+        except:
+            self.logger.warning('  Failed to connect to client')
+            return False
+
+        try:
+            db = client[db_name]
+            self.logger.debug('  Connected to database: {}'.format(db_name))
+        except:
+            self.logger.warning('  Failed to connect to database')
+            return False
+
+        try:
+            data = db[collection_name]
+            self.logger.debug('  Found collection: {}'.format(collection_name))
+        except:
+            self.logger.warning('  Failed to find collection')
+            return False
+
+
+        ## Form datum to add
+        ## Form dictionary with new result info
+        new_result = {}
+        try:
+            new_result['filename'] = str(self.raw_file_name)
+            self.logger.debug('  Result: filename = {}'.format(new_result['filename']))
+        except: self.logger.warning('  Could not write filename to result')
+
+        try:
+            new_result['target name'] = str(self.object_name)
+            self.logger.debug('  Result: target name = {}'.format(new_result['target name']))
+        except: self.logger.warning('  Could not write target name to result')
+
+        try:
+            new_result['target RA'] = self.coordinate_from_header.to_string('hmsdms', sep=':').split()[0]
+            new_result['target Dec'] = self.coordinate_from_header.to_string('hmsdms', sep=':').split()[1]
+            self.logger.debug('  Result: target RA = {}'.format(new_result['target RA']))
+            self.logger.debug('  Result: target Dec = {}'.format(new_result['target Dec']))
+        except: self.logger.warning('  Could not write target RA and Dec to result')
+
+        try:
+            new_result['exposure time'] = self.exptime.value
+            self.logger.debug('  Result: exposure time = {}'.format(new_result['exposure time']))
+        except: self.logger.warning('  Could not write exposure time to result')
+
+        try:
+            new_result['filter'] = str(self.filter)
+            self.logger.debug('  Result: filter = {}'.format(new_result['filter']))
+        except: self.logger.warning('  Could not write filter to result')
+
+        try:
+            new_result['WCS RA'] = self.coordinate_of_center_pixel.to_string('hmsdms', sep=':', precision=1).split()[0]
+            new_result['WCS Dec'] = self.coordinate_of_center_pixel.to_string('hmsdms', sep=':', precision=0).split()[1]
+            self.logger.debug('  Result: WCS RA = {}'.format(new_result['WCS RA']))
+            self.logger.debug('  Result: WCS Dec = {}'.format(new_result['WCS Dec']))
+        except: self.logger.warning('  Could not write WCS RA and Dec to result')
+
+        try:
+            wcs_header = self.image_WCS.to_header()
+            new_result['CRPIX1'] = wcs_header['CRPIX1']
+            new_result['CRPIX2'] = wcs_header['CRPIX2']
+            new_result['CRVAL1'] = wcs_header['CRVAL1']
+            new_result['CRVAL2'] = wcs_header['CRVAL2']
+            new_result['PC1_1'] = wcs_header['PC1_1']
+            new_result['PC2_2'] = wcs_header['PC2_2']
+            self.logger.debug('  Result: WCS CRPIX1 = {}'.format(new_result['CRPIX1']))
+            self.logger.debug('  Result: WCS CRPIX2 = {}'.format(new_result['CRPIX2']))
+            self.logger.debug('  Result: WCS CRVAL1 = {}'.format(new_result['CRVAL1']))
+            self.logger.debug('  Result: WCS CRVAL2 = {}'.format(new_result['CRVAL2']))
+            self.logger.debug('  Result: WCS PC1_1 = {}'.format(new_result['PC1_1']))
+            self.logger.debug('  Result: WCS PC2_2 = {}'.format(new_result['PC2_2']))
+            if 'PC1_2' in wcs_header.keys():
+                new_result['PC1_2'] = wcs_header['PC1_2']
+                self.logger.debug('  Result: WCS PC1_2 = {}'.format(new_result['PC1_2']))
+            if 'PC2_1' in wcs_header.keys():
+                new_result['PC2_1'] = wcs_header['PC2_1']
+                self.logger.debug('  Result: WCS PC2_1 = {}'.format(new_result['PC2_1']))
+        except:
+            self.logger.warning('  Could not write WCS values to result')
+            if self.image_WCS:
+                for entry in self.image_WCS.to_header():
+                    self.logger.debug('{} {}'.format(entry, self.image_WCS.to_header()[entry]))
+            else:
+                self.logger.debug('No WCS read from header')
+
+        try:
+            obsdt = datetime.datetime.strptime(str(self.observation_date), '%Y-%m-%dT%H:%M:%S')
+            new_result['date'] = obsdt.strftime('%Y%m%dUT')
+            new_result['time'] = obsdt.strftime('%H:%M:%S')
+            new_result['exposure start'] = obsdt
+            self.logger.debug('  Result: date = {}'.format(new_result['date']))
+            self.logger.debug('  Result: time = {}'.format(new_result['time']))
+        except: self.logger.warning('  Could not write date and time to result')
+
+        try:
+            new_result['FWHM pix median'] = float(self.FWHM_median.to(u.pix).value)
+            self.logger.debug('  Result: FWHM pix median = {}'.format(new_result['FWHM pix median']))
+        except: self.logger.warning('  Could not write FWHM pix median to result')
+
+        try:
+            new_result['FWHM pix mode'] = float(self.FWHM_mode.to(u.pix).value)
+            self.logger.debug('  Result: FWHM pix mode = {}'.format(new_result['FWHM pix mode']))
+        except: self.logger.warning('  Could not write FWHM pix mode to result')
+
+        try:
+            new_result['FWHM pix'] = float(self.FWHM.to(u.pix).value)
+            self.logger.debug('  Result: FWHM pix = {}'.format(new_result['FWHM pix']))
+        except: self.logger.warning('  Could not write FWHM pix to result')
+
+        try:
+            new_result['ellipticity median'] = float(self.ellipticity_median)
+            self.logger.debug('  Result: ellipticity median = {}'.format(new_result['ellipticity median']))
+        except: self.logger.warning('  Could not write ellipticity median to result')
+
+        try:
+            new_result['ellipticity mode'] = float(self.ellipticity_mode)
+            self.logger.debug('  Result: ellipticity mode = {}'.format(new_result['ellipticity mode']))
+        except: self.logger.warning('  Could not write ellipticity mode to result')
+
+        try:
+            new_result['ellipticity'] = float(self.ellipticity)
+            self.logger.debug('  Result: ellipticity = {}'.format(new_result['ellipticity']))
+        except: self.logger.warning('  Could not write ellipticity to result')
+
+        try:
+            new_result['n_stars'] = int(self.n_stars_SExtracted)
+            self.logger.debug('  Result: n_stars = {}'.format(new_result['n_stars']))
+        except: self.logger.warning('  Could not write n_stars to result')
+
+        try:
+            new_result['background'] = float(self.SExtractor_background)
+            self.logger.debug('  Result: background = {}'.format(new_result['background']))
+        except: self.logger.warning('  Could not write background to result')
+
+        try:
+            new_result['background RMS'] = float(self.SExtractor_background_RMS)
+            self.logger.debug('  Result: background RMS = {}'.format(new_result['background RMS']))
+        except: self.logger.warning('  Could not write background RMS to result')
+
+        try:
+            new_result['pointing error arcmin'] = float(self.pointing_error.arcminute)
+            self.logger.debug('  Result: pointing error arcmin = {}'.format(new_result['pointing error arcmin']))
+        except: self.logger.warning('  Could not write pointing error arcmin to result')
+
+        if self.zero_point:
+            try:
+                new_result['zero point'] = float(self.zero_point)
+                self.logger.debug('  Result: zero point = {}'.format(new_result['zero point']))
+            except: self.logger.warning('  Could not write zero point to result')
+
+        try:
+            new_result['alt'] = float(self.target_alt.to(u.deg).value)
+            self.logger.debug('  Result: alt = {}'.format(new_result['alt']))
+        except: self.logger.warning('  Could not write alt to result')
+
+        try:
+            new_result['az'] = float(self.target_az.to(u.deg).value)
+            self.logger.debug('  Result: az = {}'.format(new_result['az']))
+        except: self.logger.warning('  Could not write az to result')
+
+        try:
+            new_result['airmass'] = float(self.airmass)
+            self.logger.debug('  Result: airmass = {}'.format(new_result['airmass']))
+        except: self.logger.warning('  Could not write airmass to result')
+
+        try:
+            new_result['moon separation'] = float(self.moon_sep.to(u.deg).value)
+            self.logger.debug('  Result: moon separation = {}'.format(new_result['moon separation']))
+        except: self.logger.warning('  Could not write moon separation to result')
+
+        try:
+            new_result['moon illumination'] = float(self.moon_phase)
+            self.logger.debug('  Result: moon illumination = {}'.format(new_result['moon illumination']))
+        except: self.logger.warning('  Could not write moon illumination to result')
+
+        try:
+            new_result['moon alt'] = float(self.moon_alt.value)
+            self.logger.debug('  Result: moon alt = {}'.format(new_result['moon alt']))
+        except: self.logger.warning('  Could not write moon alt to result')
+
+        if self.position_angle:
+            try:
+                new_result['WCS position angle'] = float(self.position_angle.to(u.deg).value)
+                self.logger.debug('  Result: WCS_position_angle = {}'.format(new_result['WCS position angle']))
+            except: self.logger.warning('  Could not write WCS position angle to result')
+
+        try:
+            new_result['flags'] = self.flags
+            self.logger.debug('  Result: flags = {}'.format(new_result['flags']))
+        except: self.logger.warning('  Could not write flags to result')
+
+        try:
+            new_result['IQMon Version'] = str(__version__)
+            self.logger.debug('  Result: IQMon Version = {}'.format(new_result['IQMon Version']))
+        except: self.logger.warning('  Could not write IQMon Version to result')
+
+        try:
+            new_result['IQMon processing time'] = float(self.total_process_time)
+            self.logger.debug('  Result: IQMon processing time = {}'.format(new_result['IQMon processing time']))
+        except: self.logger.warning('  Could not write IQMon processing time to result')
+
+        try:
+            new_result['IQMon start time'] = self.start_process_time + datetime.timedelta(0, 60*60*10)
+            self.logger.debug('  Result: IQMon Start Time = {}'.format(new_result['IQMon start time'].strftime('%Y%m%d %H:%M:%S')))
+        except: self.logger.warning('  Could not write IQMon start time to result')
+
+        ## Check if this image is already in the collection
+        matches = [item for item in data.find( {"filename" : new_result['filename']} )]
+
+        ## Add datum to collection
+        try:
+            id = data.insert(new_result)
+            self.logger.debug('  Inserted document with ID: {}'.format(id))
+            self.logger.debug('  Found {} previous entries for this file.  Deleting old entries.'.format(len(matches)))
+            for match in matches:
+                data.remove( {"_id" : match["_id"]} )
+                self.logger.debug('  Removed "_id": {}'.format(match["_id"]))
+        except:
+            self.logger.warning('  Failed to insert document')
+            return False
+
+        return True
+
 
 
     ##-------------------------------------------------------------------------
