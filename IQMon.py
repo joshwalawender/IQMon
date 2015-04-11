@@ -2268,7 +2268,10 @@ class Image(object):
                 xy = zip(indices[1], indices[0])
                 draw.point(xy, fill=saturated_color)
 
-        ## Flip jpeg
+        ## Flip JPEG to account for difference in origins of FITS and jpg images
+        im = im.transpose(Image.FLIP_TOP_BOTTOM)
+        
+        ## Flip JPG if requested
         if transform:
             self.logger.debug('  Transforming (flipping/rotating) jpeg: {}'.format(transform))
             if transform == 'flip_vertical':
