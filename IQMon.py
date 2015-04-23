@@ -68,6 +68,8 @@ class Telescope(object):
         self.temp_file_path = None
         self.plot_file_path = None
         self.logs_file_path = None
+        self.mongo_collection = None
+        self.mongo_db = None
         ## Telescope Properties
         self.name = None
         self.focal_length = None
@@ -113,6 +115,10 @@ class Telescope(object):
             self.plot_file_path = os.path.expanduser(config['plot_file_path'])
         if 'logs_file_path' in config.keys():
             self.logs_file_path = os.path.expanduser(config['logs_file_path'])
+        if 'mongo_collection' in config.keys():
+            self.mongo_collection = config['mongo_collection']
+        if 'mongo_db' in config.keys():
+            self.mongo_db = config['mongo_db']
         if 'focal_length' in config.keys(): self.focal_length = config['focal_length'] * u.mm
         if 'pixel_size' in config.keys(): self.pixel_size = config['pixel_size'] * u.um
         if 'aperture' in config.keys(): self.aperture = config['aperture'] * u.mm
