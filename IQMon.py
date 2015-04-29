@@ -2590,14 +2590,14 @@ class Image(object):
     ## Append Line With Image Info to YAML Text File
     ##-------------------------------------------------------------------------
     def add_mongo_entry(self):
-        assert self.tel.config.mongo_address
-        assert self.tel.config.mongo_port
-        assert self.tel.config.mongo_db
-        assert self.tel.config.mongo_collection
-        address = self.tel.config.mongo_address
-        port = self.tel.config.mongo_port
-        db_name = self.tel.config.mongo_db
-        collection_name = self.tel.config.mongo_collection
+        assert self.tel.mongo_address
+        assert self.tel.mongo_port
+        assert self.tel.mongo_db
+        assert self.tel.mongo_collection
+        address = self.tel.mongo_address
+        port = self.tel.mongo_port
+        db_name = self.tel.mongo_db
+        collection_name = self.tel.mongo_collection
         ## Connect to mongo database
         self.logger.info('Writing results to mongo db at {}:{}'.format(address, port))
         try:
