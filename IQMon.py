@@ -68,6 +68,8 @@ class Telescope(object):
         self.temp_file_path = None
         self.plot_file_path = None
         self.logs_file_path = None
+        self.mongo_address = None
+        self.mongo_port = None
         self.mongo_collection = None
         self.mongo_db = None
         ## Telescope Properties
@@ -115,6 +117,10 @@ class Telescope(object):
             self.plot_file_path = os.path.expanduser(config['plot_file_path'])
         if 'logs_file_path' in config.keys():
             self.logs_file_path = os.path.expanduser(config['logs_file_path'])
+        if 'mongo_address' in config.keys():
+            self.mongo_address = config['mongo_address']
+        if 'mongo_port' in config.keys():
+            self.mongo_port = config['mongo_port']
         if 'mongo_collection' in config.keys():
             self.mongo_collection = config['mongo_collection']
         if 'mongo_db' in config.keys():
@@ -2583,11 +2589,19 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Append Line With Image Info to YAML Text File
     ##-------------------------------------------------------------------------
-    def add_mongo_entry(self, address, db_name, collection_name, port=27017):
+    def add_mongo_entry(self):
+        assert self.tel.config.mongo_address
+        assert self.tel.config.mongo_port
+        assert self.tel.config.mongo_db
+        assert self.tel.config.mongo_collection
+        address = self.tel.config.mongo_address
+        port = self.tel.config.mongo_port
+        db_name = self.tel.config.mongo_db
+        collection_name = self.tel.config.mongo_collection
         ## Connect to mongo database
         self.logger.info('Writing results to mongo db at {}:{}'.format(address, port))
         try:
-            client = MongoClient('192.168.1.101', 27017)
+            client = MongoClient(address, port)
             self.logger.debug('  Connected to client')
         except:
             self.logger.warning('  Failed to connect to client')
