@@ -113,31 +113,61 @@
                 {{ '{:.0f} %'.format(image['moon illumination']) }}
             {% end %}<br>
         </td>
-        <td style={{ 'text-align:right;background-color:{};'.format(image['FWHM color']) }}>
-            {% if 'FWHM' in image.keys() %}
-                {{ '{:.2f}'.format(image['FWHM']) }}
-            {% end %}<br>
+
+        {% if 'FWHM pix' in image.keys() %}
+            {% if image['flags']['FWHM'] %}
+                <td style={{ 'text-align:right;background-color:#FF5C33;' }}>
+            {% else %}
+                <td style={{ 'text-align:right;background-color:#70DB70;' }}>
+            {% end %}
+            {{ '{:.2f}'.format(image['FWHM pix']*FWHM_multiplier) }}
+        {% else %}
+        <td>
+        {% end %}
         </td>
-        <td style={{ 'text-align:right;background-color:{};'.format(image['ellipticity color']) }}>
-            {% if 'ellipticity' in image.keys() %}
-                {{ '{:.2f}'.format(image['ellipticity']) }}
-            {% end %}<br>
+
+        {% if 'ellipticity' in image.keys() %}
+            {% if image['flags']['ellipticity'] %}
+                <td style={{ 'text-align:right;background-color:#FF5C33;' }}>
+            {% else %}
+                <td style={{ 'text-align:right;background-color:#70DB70;' }}>
+            {% end %}
+            {{ '{:.2f}'.format(image['ellipticity']) }}
+        {% else %}
+        <td>
+        {% end %}
         </td>
-        <td style={{ 'text-align:right;background-color:{};'.format(image['pointing error color']) }}>
-            {% if 'pointing error arcmin' in image.keys() %}
-                {{ '{:.1f}'.format(image['pointing error arcmin']) }}
-            {% end %}<br>
+
+        {% if 'pointing error arcmin' in image.keys() %}
+            {% if image['flags']['pointing error'] %}
+                <td style={{ 'text-align:right;background-color:#FF5C33;' }}>
+            {% else %}
+                <td style={{ 'text-align:right;background-color:#70DB70;' }}>
+            {% end %}
+            {{ '{:.2f}'.format(image['pointing error arcmin']) }}
+        {% else %}
+        <td>
+        {% end %}
         </td>
-        <td style={{ 'text-align:right;background-color:{};'.format(image['zero point color']) }}>
-            {% if 'zero point' in image.keys() %}
-                {{ '{:.2f}'.format(image['zero point']) }}
-            {% end %}<br>
+
+        {% if 'zero point' in image.keys() %}
+            {% if image['flags']['zero point'] %}
+                <td style={{ 'text-align:right;background-color:#FF5C33;' }}>
+            {% else %}
+                <td style={{ 'text-align:right;background-color:#70DB70;' }}>
+            {% end %}
+            {{ '{:.2f}'.format(image['zero point']) }}
+        {% else %}
+        <td>
+        {% end %}
         </td>
+
         <td style='text-align:right;'>
             {% if 'n_stars' in image.keys() %}
                 {{ '{:d}'.format(image['n_stars']) }}
             {% end %}<br>
         </td>
+
         <td style='text-align:right;'>
             {% if 'IQMon processing time' in image.keys() %}
                 {{ '{:.0f} s'.format(image['IQMon processing time']) }}

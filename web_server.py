@@ -87,46 +87,6 @@ class ListOfImages(RequestHandler):
                     self.write('<tr><td><a href="{0}">{0}</a></td><td>{1:d}</td></tr>'.format(target, len(target_images)))
                 self.write('</table></html>')
 
-        tlog.app_log.info('  Looping over images for colors')
-        for image in image_list:
-            ## Set FWHM color
-            image['FWHM color'] = ""
-            if 'FWHM pix' in image.keys():
-                ## Convert FWHM to units
-                if tel.units_for_FWHM == u.arcsec:
-                    image['FWHM'] = image['FWHM pix'] * tel.pixel_scale.value
-                elif tel.units_for_FWHM == u.pix:
-                    image['FWHM'] = image['FWHM pix']
-                image['FWHM color'] = "#70DB70" # green
-                if 'flags' in image.keys():
-                    if 'FWHM' in image['flags'].keys():
-                        if image['flags']['FWHM']:
-                            image['FWHM color'] = "#FF5C33" # red
-            ## Set ellipticity color
-            image['ellipticity color'] = ""
-            if 'ellipticity' in image.keys():
-                image['ellipticity color'] = "#70DB70" # green
-                if 'flags' in image.keys():
-                    if 'ellipticity' in image['flags'].keys():
-                        if image['flags']['ellipticity']:
-                            image['ellipticity color'] = "#FF5C33" # red
-            ## Set pointing error color
-            image['pointing error color'] = ""
-            if 'pointing error arcmin' in image.keys():
-                image['pointing error color'] = "#70DB70" # green
-                if 'flags' in image.keys():
-                    if 'pointing error' in image['flags'].keys():
-                        if image['flags']['pointing error']:
-                            image['pointing error color'] = "#FF5C33" # red
-            ## Set zero point color
-            image['zero point color'] = ""
-            if 'zero point' in image.keys():
-                image['zero point color'] = "#70DB70" # green
-                if 'flags' in image.keys():
-                    if 'zero point' in image['flags'].keys():
-                        if image['flags']['zero point']:
-                            image['zero point color'] = "#FF5C33" # red
-        tlog.app_log.info('  Done')
 
         tlog.app_log.info('  Looping over images and plots for files')
         for image in image_list:
@@ -158,15 +118,22 @@ class ListOfImages(RequestHandler):
                     image['ZP plot'] = '/static/{}'.format(match_static_path.group(1))
         tlog.app_log.info('  Done.')
 
+        if tel.units_for_FWHM == u.arcsec:
+            FWHM_multiplier = tel.pixel_scale.value
+        elif tel.units_for_FWHM == u.pix:
+            FWHM_multiplier = 1.0
+        else:
+            FWHM_multiplier = 1.0
 
         if len(image_list) > 0:
             tlog.app_log.info('  Rendering ListOfImages')
             self.render("image_list.html", title="{} Results".format(telescopename),\
                         telescope = telescope,\
-                        FWHM_units = tel.units_for_FWHM.to_string(),\
                         telescopename = telescopename,\
                         subject = subject,\
                         image_list = image_list,\
+                        FWHM_units = tel.units_for_FWHM.to_string(),\
+                        FWHM_multiplier = FWHM_multiplier,\
                        )
             tlog.app_log.info('  Done.')
 
