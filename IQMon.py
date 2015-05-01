@@ -2808,13 +2808,20 @@ class Image(object):
             self.logger.debug('  Result: IQMon Start Time = {}'.format(new_result['IQMon start time'].strftime('%Y%m%d %H:%M:%S')))
         except: self.logger.warning('  Could not write IQMon start time to result')
 
-        new_result['IQMon jpegs'] = self.jpeg_file_names
+        new_result['jpegs'] = self.jpeg_file_names
         self.logger.debug('  Result: IQMon JPEGs = {}'.format(new_result['IQMon jpegs']))
 
-        new_result['IQMon plots'] = []
-        if self.PSF_plot_file: new_result['IQMon plots'].append(self.PSF_plot_file)
-        if self.zero_point_plotfile: new_result['IQMon plots'].append(self.zero_point_plotfile)
-        self.logger.debug('  Result: IQMon Plots = {}'.format(new_result['IQMon plots']))
+        if self.PSF_plot_file:
+            new_result['PSF plot'] = self.PSF_plot_file
+        else:
+            new_result['PSF plot'] = None
+        self.logger.debug('  Result: IQMon PSF Plot = {}'.format(new_result['PSF plot']))
+
+        if self.zero_point_plotfile:
+            new_result['ZP plot'] = self.zero_point_plotfile
+        else:
+            new_result['ZP plot'] = None
+        self.logger.debug('  Result: IQMon ZP Plot = {}'.format(new_result['ZP plot']))
 
         ## Check if this image is already in the collection
         matches = [item for item in data.find( {"filename" : new_result['filename']} )]
