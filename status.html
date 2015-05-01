@@ -1,0 +1,392 @@
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+
+<html>
+<head>
+    <title>VYSOS Status</title>
+    <meta HTTP-EQUIV="refresh" CONTENT="300">
+    <meta http-equiv="content-type"
+    content="text/html; charset=ISO-8859-1">
+
+    <style>
+        table
+        {
+        border-collapse:collapse;
+        margin-left: auto;
+        margin-right: auto;
+        }
+        table,th,td
+        {
+        border:1px solid black;
+        vertical-align: top;
+        text-align: center; 
+        padding-top: 5px;
+        padding-right: 5px;
+        padding-bottom: 5px;
+        padding-left: 5px;        
+        }
+    </style>
+
+</head>
+
+<body>
+
+<table>
+<!-- ###################################### -->
+<!-- Status Header -->
+<!-- ###################################### -->
+<tr>
+    <td colspan=3 style="text-align: left;">
+        {{ nowut.strftime('%Y/%m/%d %H:%M:%S UT') }}
+    </td>
+    <td width="410px" style="text-align: left;">
+        {{ now.strftime('%Y/%m/%d %H:%M:%S HST') }}
+    </td>
+    <td style="text-align: left;"></td>
+    <td style="text-align: left;"></td>
+</tr>
+<tr>
+    <td colspan=3 style="text-align: left;">
+        {{ 'It is currently {} (Sun alt = {:.0f})'.format(sun['now'], sun['alt']) }}<br>
+    </td>
+    <td width="410px" style="text-align: left;">
+        {% if sun['rise'] < sun['set'] %}
+            {{ 'Next sunrise is at {}'.format(sun['rise'].strftime('%Y/%m/%d %H:%M:%S UT')) }}
+        {% else %}
+            {{ 'Next sunset is at {}'.format(sun['set'].strftime('%Y/%m/%d %H:%M:%S UT')) }}
+        {% end %} 
+    </td>
+    <td width="215px" style="text-align: left;">
+        {% if 'Drobo' in disks.keys() %}
+            {% if disks['Drobo'][1] < 300 %}
+                <font color="red"> 
+            {% else %}
+                <font color="black"> 
+            {% end %}
+            Drobo: {{ '{:.0f}% used, {:.0f} GB avail.'.format(disks['Drobo'][2], disks['Drobo'][1]) }}
+        {% end %}
+    </td>
+    <td width="215px" style="text-align: left;">
+        {% if 'Data' in disks.keys() %}
+            {% if disks['Data'][1] < 40 %}
+                <font color="red"> 
+            {% else %}
+                <font color="black"> 
+            {% end %}
+            Data: {{ '{:.0f}% used, {:.0f} GB avail.'.format(disks['Data'][2], disks['Data'][1]) }}</font>
+        {% end %}
+    </td>
+</tr>
+<tr>
+    <td colspan=3 style="text-align: left;">
+        {{ 'A {:.0f}% illuminated moon is {}'.format(moon['phase'], moon['now']) }}
+    </td>
+    <td style="text-align: left;">
+        {% if sun['rise'] > sun['set'] %}
+            {{ 'Next sunrise is at {}'.format(sun['rise'].strftime('%Y/%m/%d %H:%M:%S UT')) }}
+        {% else %}
+            {{ 'Next sunset is at {}'.format(sun['set'].strftime('%Y/%m/%d %H:%M:%S UT')) }}
+        {% end %} 
+    </td>
+    <td width="215px" style="text-align: left;">
+        {% if 'Vega' in disks.keys() %}
+            {% if disks['Vega'][1] < 40 %}
+                <font color="red"> 
+            {% else %}
+                <font color="black"> 
+            {% end %}
+            Vega: {{ '{:.0f}% used, {:.0f} GB avail.'.format(disks['Vega'][2], disks['Vega'][1]) }}
+        {% end %}
+    </td>
+    <td width="215px" style="text-align: left;">
+        {% if 'Black' in disks.keys() %}
+            {% if disks['Black'][1] < 40 %}
+                <font color="red"> 
+            {% else %}
+                <font color="black"> 
+            {% end %}
+            Black: {{ '{:.0f}% used, {:.0f} GB avail.'.format(disks['Black'][2], disks['Black'][1]) }}</font>
+        {% end %}
+    </td>
+</tr>
+<!-- ###################################### -->
+<!-- Weather -->
+<!-- ###################################### -->
+<tr>
+    <th colspan=6><br><br>Weather</th>
+</tr>
+<tr>
+    <td><u>Boltwood Data</u></td>
+    <td><u>VYSOS-20</u></td>
+    <td><u>VYSOS-5</u></td>
+    <td><u>Weather Plot</u></td>
+    <td colspan=2><u>Atlas All Sky Image (Color)</u></td>
+</tr>
+<tr>
+    <td style="text-align: right;">
+        Ambient Temp<br>
+        Sky Temp<br>
+        Wind Speed<br>
+        Humidity<br>
+        Rain Status<br>
+        Wet Status<br>
+        Cloud Condition<br>
+        Wind Condition<br>
+        Rain Condition<br>
+        Day Condition<br>
+        Roof Close<br>
+        Clarity Data Age<br>
+    </td>
+    <td style="text-align: left;">
+        {% if 'boltwood ambient temp' in v20data.keys() %}           {{ '{:.1f} {}'.format(v20data['boltwood ambient temp'], v20data['boltwood temp units']) }} {% end %}<br>
+        {% if 'boltwood sky temp' in v20data.keys() %}               {{ '{:.1f} {}'.format(v20data['boltwood sky temp'], v20data['boltwood temp units']) }} {% end %}<br>
+        {% if 'boltwood wind speed' in v20data.keys() %}             {{ '{:.1f} {}'.format(v20data['boltwood wind speed'], v20data['boltwood wind units']) }} {% end %}<br>
+        {% if 'boltwood humidity' in v20data.keys() %}               {{ '{:.1f} %'.format(v20data['boltwood humidity']) }} {% end %}<br>
+
+        {% if 'boltwood rain status string' in v20data.keys() %}
+            <font color="{{ '{}'.format(v20data['boltwood rain status color']) }}">
+            {{ '{}'.format(v20data['boltwood rain status string']) }}
+            </font>
+        {% end %}<br>
+
+        {% if 'boltwood wet status string' in v20data.keys() %}
+            <font color="{{ '{}'.format(v20data['boltwood wet status color']) }}">
+            {{ '{}'.format(v20data['boltwood wet status string']) }}
+            </font>
+        {% end %}<br>
+
+        {% if 'boltwood cloud condition string' in v20data.keys() %}
+            <font color="{{ '{}'.format(v20data['boltwood cloud color']) }}">
+            {{ '{}'.format(v20data['boltwood cloud condition string']) }}
+            </font>
+        {% end %}<br>
+
+        {% if 'boltwood wind condition string' in v20data.keys() %}
+            <font color="{{ '{}'.format(v20data['boltwood wind color']) }}">
+            {{ '{}'.format(v20data['boltwood wind condition string']) }}
+            </font>
+        {% end %}<br>
+
+        {% if 'boltwood rain condition string' in v20data.keys() %}
+            <font color="{{ '{}'.format(v20data['boltwood rain color']) }}">
+            {{ '{}'.format(v20data['boltwood rain condition string']) }}
+            </font>
+        {% end %}<br>
+
+        {% if 'boltwood day condition string' in v20data.keys() %}
+            <font color="{{ '{}'.format(v20data['boltwood day color']) }}">
+            {{ '{}'.format(v20data['boltwood day condition string']) }}
+            </font>
+        {% end %}<br>
+
+        {% if 'boltwood roof close string' in v20data.keys() %}
+            <font color="{{ '{}'.format(v20data['boltwood roof close color']) }}">
+            {{ '{}'.format(v20data['boltwood roof close string']) }}
+            </font>
+        {% end %}<br>
+
+        <font color="{{ '{}'.format(v20clarity_color) }}">
+        {{ '{:.0f} sec'.format(v20clarity_age) }}<br>
+        </font>
+    </td>
+    <td style="text-align: left;">
+        {% if 'boltwood ambient temp' in v5data.keys() %}           {{ '{:.1f} {}'.format(v5data['boltwood ambient temp'], v5data['boltwood temp units']) }} {% end %}<br>
+        {% if 'boltwood sky temp' in v5data.keys() %}               {{ '{:.1f} {}'.format(v5data['boltwood sky temp'], v5data['boltwood temp units']) }} {% end %}<br>
+        {% if 'boltwood wind speed' in v5data.keys() %}             {{ '{:.1f} {}'.format(v5data['boltwood wind speed'], v5data['boltwood wind units']) }} {% end %}<br>
+        {% if 'boltwood humidity' in v5data.keys() %}               {{ '{:.1f} %'.format(v5data['boltwood humidity']) }} {% end %}<br>
+
+        {% if 'boltwood rain status string' in v5data.keys() %}
+            <font color="{{ '{}'.format(v5data['boltwood rain status color']) }}">
+            {{ '{}'.format(v5data['boltwood rain status string']) }}
+            </font>
+        {% end %}<br>
+
+        {% if 'boltwood wet status string' in v5data.keys() %}
+            <font color="{{ '{}'.format(v5data['boltwood wet status color']) }}">
+            {{ '{}'.format(v5data['boltwood wet status string']) }}
+            </font>
+        {% end %}<br>
+
+        {% if 'boltwood cloud condition string' in v5data.keys() %}
+            <font color="{{ '{}'.format(v5data['boltwood cloud color']) }}">
+            {{ '{}'.format(v5data['boltwood cloud condition string']) }}
+            </font>
+        {% end %}<br>
+
+        {% if 'boltwood wind condition string' in v5data.keys() %}
+            <font color="{{ '{}'.format(v5data['boltwood wind color']) }}">
+            {{ '{}'.format(v5data['boltwood wind condition string']) }}
+            </font>
+        {% end %}<br>
+
+        {% if 'boltwood rain condition string' in v5data.keys() %}
+            <font color="{{ '{}'.format(v5data['boltwood rain color']) }}">
+            {{ '{}'.format(v5data['boltwood rain condition string']) }}
+            </font>
+        {% end %}<br>
+
+        {% if 'boltwood day condition string' in v5data.keys() %}
+            <font color="{{ '{}'.format(v5data['boltwood day color']) }}">
+            {{ '{}'.format(v5data['boltwood day condition string']) }}
+            </font>
+        {% end %}<br>
+
+        {% if 'boltwood roof close string' in v5data.keys() %}
+            <font color="{{ '{}'.format(v5data['boltwood roof close color']) }}">
+            {{ '{}'.format(v5data['boltwood roof close string']) }}
+            </font>
+        {% end %}<br>
+
+        <font color="{{ '{}'.format(v5clarity_color) }}">
+        {{ '{:.0f} sec'.format(v5clarity_age) }}<br>
+        </font>
+
+    </td>
+    <td style="vertical-align: middle;">
+        <a href="../static/nights/recent_V5.png">
+            <img width=400 src="../static/nights/recent_V5.png">
+        </a><br>
+        <a href="../static/nights/recent_V20.png">
+            <img width=400 src="../static/nights/recent_V20.png">
+        </a><br>
+        <a href="../static/Weather_VYSOS5.gif">VYSOS-5 Boltwood Plot</a>
+    </td>
+    <td colspan=2 style="vertical-align: middle;">
+        <table style="border:0px; border-style: none;">
+            <tr style="border:0px; border-style: none;">
+                <td style="border:0px; border-style: none; vertical-align: middle;">S</td>
+                <td style="border:0px; border-style: none;">
+                    E<br>
+                    <a href="http://www.fallingstar.com/weather/mlo/">
+                        <img width=400 height=330 src="http://www.fallingstar.com/weather/mlo/latest_clr400.jpg">
+                    </a><br>
+                    W
+                </td>
+                <td style="border:0px; border-style: none; vertical-align: middle;">N</td>
+            </tr>
+        </table>
+    </td>
+<tr>
+<!-- ###################################### -->
+<!-- VYSOS-20 -->
+<!-- ###################################### -->
+<tr>
+    <th colspan=6>
+        <br><br>
+        VYSOS-20<br>
+        <a href="V20/">List of Nights</a> | 
+        <a href="V20/targets">List of Targets</a> | 
+
+        <a href="{{ '/V20/{}'.format(link_date_string) }}">
+            Images from {{ link_date_string }}</a> | 
+        <a href="{{ '/static/nights/{}_V20.png'.format(link_date_string) }}">
+            Night Summary Plot for {{ link_date_string }}</a>
+    </th>
+</tr>
+<tr>
+    <td colspan=3><u>VYSOS-20 Status</u></td>
+    <td>VYSOS-20 External</td>
+    <td colspan=2>VYSOS-20 Internal</td>
+</tr>
+<tr>
+    <td style="text-align: right;">
+        ACP Connected<br>
+        Status<br>
+        Alt<br>
+        Az<br>
+        Target RA<br>
+        Target Dec<br>
+        ACP Data Age<br>
+    </td>
+    <td style="text-align: left;" colspan=2>
+        {% if 'ACP connected' in v20data.keys() %}
+            <font color="{{ '{}'.format(v20data['ACP connected color']) }}">
+            {{ '{}'.format(v20data['ACP connected string']) }}
+            </font>
+        {% end %}<br>
+
+        {% if 'ACP status string' in v20data.keys() %}
+            <font color="{{ '{}'.format(v20data['ACP status color']) }}">
+            {{ '{}'.format(v20data['ACP status string']) }}
+            </font>
+        {% end %}<br>
+        
+        {% if 'ACP alt' in v20data.keys() %} {{ '{:.1f}'.format(v20data['ACP alt']) }} {% end %}<br>
+        {% if 'ACP az' in v20data.keys() %}  {{ '{:.1f}'.format(v20data['ACP az']) }} {% end %}<br>
+        {% if len(v20coord.split(' ')) == 2 %} {{ v20coord.split(' ')[0] }} {% end %}<br>
+        {% if len(v20coord.split(' ')) == 2 %} {{ v20coord.split(' ')[1] }} {% end %}<br>
+        <font color="{{ '{}'.format(v20data_color) }}">
+        {{ '{:.0f} sec'.format(v20data_age) }}<br>
+        </font>
+    </td>
+    <td>
+        <a href="http://166.122.71.162:8083/0.jpg"><img width=400 height=267 src="http://166.122.71.162:8083/0.jpg"><br>
+    </td>
+    <td colspan=2>
+        <a href="http://166.122.71.162:8083/2.jpg"><img width=400 height=267 src="http://166.122.71.162:8083/2.jpg"></a><br>
+    </td>
+</tr>
+<!-- ###################################### -->
+<!-- VYSOS-5 -->
+<!-- ###################################### -->
+<tr>
+    <th colspan=6>
+        <br><br>
+        VYSOS-5<br>
+        <a href="V5/">List of Nights</a> | 
+        <a href="V5/targets">List of Targets</a> | 
+        <a href="{{ '/V5/{}'.format(link_date_string) }}">
+            Images from {{ link_date_string }}</a> | 
+        <a href="{{ '/static/nights/{}_V5.png'.format(link_date_string) }}">
+            Night Summary Plot for {{ link_date_string }}</a>
+    </th>
+</tr>
+<tr>
+    <td colspan=3><u>VYSOS-5 Status</u></td>
+    <td>VYSOS-5 External</td>
+    <td colspan=2>VYSOS-5 Internal</td>
+</tr>
+<tr>
+    <td style="text-align: right;">
+        ACP Connected<br>
+        Status<br>
+        Alt<br>
+        Az<br>
+        Target RA<br>
+        Target Dec<br>
+        ACP Data Age<br>
+    </td>
+    <td style="text-align: left;" colspan=2>
+        {% if 'ACP connected' in v5data.keys() %}
+            <font color="{{ '{}'.format(v5data['ACP connected color']) }}">
+            {{ '{}'.format(v5data['ACP connected string']) }}
+            </font>
+        {% end %}<br>
+
+        {% if 'ACP status string' in v5data.keys() %}
+            <font color="{{ '{}'.format(v5data['ACP status color']) }}">
+            {{ '{}'.format(v5data['ACP status string']) }}
+            </font>
+        {% end %}<br>
+        
+        {% if 'ACP alt' in v5data.keys() %} {{ '{:.1f}'.format(v5data['ACP alt']) }} {% end %}<br>
+        {% if 'ACP az' in v5data.keys() %}  {{ '{:.1f}'.format(v5data['ACP az']) }} {% end %}<br>
+        {% if len(v5coord.split(' ')) == 2 %} {{ v5coord.split(' ')[0] }} {% end %}<br>
+        {% if len(v5coord.split(' ')) == 2 %} {{ v5coord.split(' ')[1] }} {% end %}<br>
+        <font color="{{ '{}'.format(v5data_color) }}">
+        {{ '{:.0f} sec'.format(v5data_age) }}<br>
+        </font>
+    </td>
+    <td>
+        <a href="http://166.122.71.162:8083/4.jpg"><img width=400 height=267 src="http://166.122.71.162:8083/4.jpg"></a><br>
+    </td>
+    <td colspan=2>
+        <a href="http://166.122.71.162:8083/6.jpg"><img width=400 height=267 src="http://166.122.71.162:8083/6.jpg"></a><br>
+    </td>
+</tr>
+</table>
+
+<br><br>
+
+</body>
+</html>
