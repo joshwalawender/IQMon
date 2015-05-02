@@ -2809,18 +2809,18 @@ class Image(object):
         except: self.logger.warning('  Could not write IQMon start time to result')
 
         new_result['jpegs'] = self.jpeg_file_names
-        self.logger.debug('  Result: IQMon JPEGs = {}'.format(new_result['IQMon jpegs']))
+        self.logger.debug('  Result: IQMon JPEGs = {}'.format(new_result['jpegs']))
 
         if self.PSF_plot_file:
-            new_result['PSF plot'] = self.PSF_plot_file
+            new_result['PSF plot'] = os.path.split(self.PSF_plot_file)[1]
         else:
-            new_result['PSF plot'] = None
+            new_result['PSF plot'] = ''
         self.logger.debug('  Result: IQMon PSF Plot = {}'.format(new_result['PSF plot']))
 
         if self.zero_point_plotfile:
-            new_result['ZP plot'] = self.zero_point_plotfile
+            new_result['ZP plot'] = os.path.split(self.zero_point_plotfile)[1]
         else:
-            new_result['ZP plot'] = None
+            new_result['ZP plot'] = ''
         self.logger.debug('  Result: IQMon ZP Plot = {}'.format(new_result['ZP plot']))
 
         ## Check if this image is already in the collection

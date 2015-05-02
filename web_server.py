@@ -87,37 +87,6 @@ class ListOfImages(RequestHandler):
                     self.write('<tr><td><a href="{0}">{0}</a></td><td>{1:d}</td></tr>'.format(target, len(target_images)))
                 self.write('</table></html>')
 
-
-        tlog.app_log.info('  Looping over images and plots for files')
-        for image in image_list:
-            ## Check for jpegs
-            image_basename = os.path.splitext(image['filename'])[0]
-            jpegs = glob.glob(os.path.join(tel.plot_file_path, '{}*.jpg'.format(image_basename)))
-            image['jpegs'] = []
-            for jpeg in jpegs:
-                match_static_path = re.match('/var/www/([\w\/\.\-]+)', jpeg)
-                if match_static_path:
-                    image['jpegs'].append('/static/{}'.format(match_static_path.group(1)))
-            ## Check for IQMon log file
-            log_file = os.path.join(tel.logs_file_path, '{}_IQMon.log'.format(image_basename))
-            if os.path.exists(log_file):
-                match_static_path = re.match('/var/www/([\w\/\.\-]+)', log_file)
-                if match_static_path:
-                    image['logfile'] = '/static/{}'.format(match_static_path.group(1))
-            ## Check for PSFinfo plot
-            psf_plot_file = os.path.join(tel.plot_file_path, '{}_PSFinfo.png'.format(image_basename))
-            if os.path.exists(psf_plot_file):
-                match_static_path = re.match('/var/www/([\w\/\.\-]+)', psf_plot_file)
-                if match_static_path:
-                    image['PSF plot'] = '/static/{}'.format(match_static_path.group(1))
-            ## Check for zero point plot
-            zp_plot_file = os.path.join(tel.plot_file_path, '{}_ZeroPoint.png'.format(image_basename))
-            if os.path.exists(zp_plot_file):
-                match_static_path = re.match('/var/www/([\w\/\.\-]+)', zp_plot_file)
-                if match_static_path:
-                    image['ZP plot'] = '/static/{}'.format(match_static_path.group(1))
-        tlog.app_log.info('  Done.')
-
         if tel.units_for_FWHM == u.arcsec:
             FWHM_multiplier = tel.pixel_scale.value
         elif tel.units_for_FWHM == u.pix:

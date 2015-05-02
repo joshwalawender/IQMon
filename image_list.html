@@ -63,23 +63,27 @@
         </td>
         <td style='text-align:left;'>
             {% if 'filename' in image.keys() %}
-                {% if len(image['jpegs']) > 0 %}
-                    <a href="{{ image['jpegs'].pop() }}">{{ image['filename'] }}</a>
+                {% if 'jpegs' in image.keys() %}
+                    {% if len(image['jpegs']) > 0 %}
+                        <a href="/static/plots/{{ telescope }}/{{ image['jpegs'].pop() }}">{{ image['filename'] }}</a>
+                    {% else %}
+                        {{ image['filename'] }}
+                    {% end %}
+                    {% for jpeg in image['jpegs'] %}
+                        (<a href="/static/plots/{{ telescope }}/{{ jpeg }}">JPEG</a>)
+                    {% end %}
                 {% else %}
                     {{ image['filename'] }}
                 {% end %}
-                {% for jpeg in image['jpegs'] %}
-                    (<a href="{{ jpeg }}">JPEG</a>)
-                {% end %}
             {% end %}
             {% if 'PSF plot' in image.keys() %}
-                 (<a href="{{ image['PSF plot'] }}">PSF</a>)
+                 (<a href="/static/plots/{{ telescope }}/{{ image['PSF plot'] }}">PSF</a>)
             {% end %}
             {% if 'ZP plot' in image.keys() %}
-                 (<a href="{{ image['ZP plot'] }}">ZP</a>)
+                 (<a href="/static/plots/{{ telescope }}/{{ image['ZP plot'] }}">ZP</a>)
             {% end %}
             {% if 'logfile' in image.keys() %}
-                 (<a href="{{ image['logfile'] }}">log</a>)
+                 (<a href="/static/logs/{{ telescope }}/{{ image['logfile'] }}">log</a>)
             {% end %}
         </td>
         <td style='text-align:right;'>
