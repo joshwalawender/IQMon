@@ -183,7 +183,7 @@ def main():
                        url(r"/(\w+)/(\w+)", ListOfImages),
                        (r"/static/(.*)", MyStaticFileHandler, {"path": "/var/www"}),
                      ])
-    app.listen(8001)
+    app.listen(80)
     IOLoop.current().start()
 
 if __name__ == '__main__':
