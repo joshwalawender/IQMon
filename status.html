@@ -42,8 +42,33 @@
     <td width="410px" style="text-align: left;">
         {{ now.strftime('%Y/%m/%d %H:%M:%S HST') }}
     </td>
-    <td style="text-align: left;"></td>
-    <td style="text-align: left;"></td>
+    <td width="215px" style="text-align: left;">
+        {% if 'Drobo' in disks.keys() %}
+            {% if disks['Drobo'][1] < 300 %}
+                <font color="red"> 
+            {% else %}
+                <font color="black"> 
+            {% end %}
+            Drobo: {{ '{:.0f}% used, {:.0f} GB avail.'.format(disks['Drobo'][2], disks['Drobo'][1]) }}
+        {% end %}
+    </td>
+    <td width="215px" style="text-align: left;">
+        {% if 'USB Drive B' in disks.keys() %}
+            {% if disks['USB Drive B'][1] < 40 %}
+                <font color="red"> 
+            {% else %}
+                <font color="black"> 
+            {% end %}
+            USB(B): {{ '{:.0f}% used, {:.0f} GB avail.'.format(disks['USB Drive B'][2], disks['USB Drive B'][1]) }}</font>
+        {% elif 'USB Drive C' in disks.keys() %}
+            {% if disks['USB Drive C'][1] < 40 %}
+                <font color="red"> 
+            {% else %}
+                <font color="black"> 
+            {% end %}
+            USB(C): {{ '{:.0f}% used, {:.0f} GB avail.'.format(disks['USB Drive C'][2], disks['USB Drive C'][1]) }}</font>
+        {% end %}
+    </td>
 </tr>
 <tr>
     <td colspan=3 style="text-align: left;">
@@ -57,16 +82,6 @@
         {% end %} 
     </td>
     <td width="215px" style="text-align: left;">
-        {% if 'Drobo' in disks.keys() %}
-            {% if disks['Drobo'][1] < 300 %}
-                <font color="red"> 
-            {% else %}
-                <font color="black"> 
-            {% end %}
-            Drobo: {{ '{:.0f}% used, {:.0f} GB avail.'.format(disks['Drobo'][2], disks['Drobo'][1]) }}
-        {% end %}
-    </td>
-    <td width="215px" style="text-align: left;">
         {% if 'Data' in disks.keys() %}
             {% if disks['Data'][1] < 40 %}
                 <font color="red"> 
@@ -75,6 +90,8 @@
             {% end %}
             Data: {{ '{:.0f}% used, {:.0f} GB avail.'.format(disks['Data'][2], disks['Data'][1]) }}</font>
         {% end %}
+    </td>
+    <td width="215px" style="text-align: left;">
     </td>
 </tr>
 <tr>

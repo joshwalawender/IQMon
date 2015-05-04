@@ -379,8 +379,8 @@ class Status(RequestHandler):
         ##---------------------------------------------------------------------
         paths = {'Drobo': os.path.join('/', 'Volumes', 'Drobo'),\
                  'Data': os.path.expanduser('~'),\
-                 'Ext Drive B': os.path.join('/', 'Volumes', 'WD500B'),\
-                 'Ext Drive C': os.path.join('/', 'Volumes', 'WD500_C'),\
+                 'USB Drive B': os.path.join('/', 'Volumes', 'WD500B'),\
+                 'USB Drive C': os.path.join('/', 'Volumes', 'WD500_C'),\
                  'Vega': os.path.join('/', 'Volumes', 'Data_V5'),\
                  'Black': os.path.join('/', 'Volumes', 'Data_V20'),\
                 }
