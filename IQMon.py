@@ -72,8 +72,6 @@ class Telescope(object):
         self.mongo_port = None
         self.mongo_db = None
         self.mongo_collection = None
-        self.mongo_jpegs = None
-        self.mongo_plots = None
         ## Telescope Properties
         self.name = None
         self.focal_length = None
@@ -127,10 +125,6 @@ class Telescope(object):
             self.mongo_db = config['mongo_db']
         if 'mongo_collection' in config.keys():
             self.mongo_collection = config['mongo_collection']
-        if 'mongo_jpegs' in config.keys():
-            self.mongo_jpegs = config['mongo_jpegs']
-        if 'mongo_plots' in config.keys():
-            self.mongo_plots = config['mongo_plots']
         if 'focal_length' in config.keys(): self.focal_length = config['focal_length'] * u.mm
         if 'pixel_size' in config.keys(): self.pixel_size = config['pixel_size'] * u.um
         if 'aperture' in config.keys(): self.aperture = config['aperture'] * u.mm
