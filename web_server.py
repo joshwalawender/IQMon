@@ -7,7 +7,8 @@ import sys
 import os
 import argparse
 import logging
-import datetime
+import datetime.datetime as dt
+import datetime.timedelta as tdelta
 import re
 import glob
 
@@ -54,13 +55,18 @@ class ListOfImages(RequestHandler):
         tlog.app_log.info('  Retrieved collection.')
 
         tlog.app_log.info('  Getting list of images from mongo')
-        ## If subject matches a date, then get images from a date
+
+        ##---------------------------------------------------------------------
+        ## If subject is formatted like a date, then get images from a date
+        ##---------------------------------------------------------------------
         if re.match('\d{8}UT', subject):
             image_list = [entry for entry in\
                           collection.find({"date": subject}).sort(\
                           [('time', pymongo.ASCENDING)])]
             tlog.app_log.info('  Got list of {} images for night.'.format(len(image_list)))
-        ## If subject matches a target name, then get images from a date
+        ##---------------------------------------------------------------------
+        ## If subject matches a target name, then get images for that target
+        ##---------------------------------------------------------------------
         else:
             tlog.app_log.info('    Getting list of target names from mongo')
             target_name_list = sorted(collection.distinct("target name"))
@@ -71,6 +77,9 @@ class ListOfImages(RequestHandler):
                               [('date', pymongo.DESCENDING),\
                               ('time', pymongo.DESCENDING)])]
                 tlog.app_log.info('  Got list of {} images for target.'.format(len(image_list)))
+        ##---------------------------------------------------------------------
+        ## If subject is not a date or target, then render a list of targets
+        ##---------------------------------------------------------------------
             else:
                 image_list = []
                 self.write('<html><head><style>')
@@ -125,12 +134,12 @@ class ListOfNights(RequestHandler):
         collection = db[tel.mongo_collection]
 
         first_date_string = sorted(collection.distinct("date"), reverse=False)[0]
-        first_date = datetime.datetime.strptime('{} 00:00:00'.format(first_date_string), '%Y%m%dUT %H:%M:%S')
-        oneday = datetime.timedelta(1, 0)
+        first_date = dt.strptime('{} 00:00:00'.format(first_date_string), '%Y%m%dUT %H:%M:%S')
+        oneday = tdelta(1, 0)
         
         tlog.app_log.info('  Building date_list')
         date_list = []
-        thisdate = datetime.datetime.utcnow()
+        thisdate = dt.utcnow()
         while thisdate >= first_date:
             date_list.append(thisdate.strftime('%Y%m%dUT'))
             thisdate -= oneday
