@@ -653,8 +653,9 @@ class Image(object):
             self.logger.warning("Object and Moon positions not calculated.")
 
         end_time = datetime.datetime.now()
-        elapzed_time = end_time - start_time
-        self.logger.info('  Done reading image header in {:.1f} s'.format(elapzed_time.total_seconds()))
+        elapsed_time = end_time - start_time
+        self.logger.info('  Done reading image header in {:.1f} s'.format(\
+                            elapsed_time.total_seconds()))
 
 
     ##-------------------------------------------------------------------------
@@ -810,11 +811,12 @@ class Image(object):
                                                                 self.file_ext))
             self.working_file = os.path.join(self.tel.temp_file_path,\
                                              self.raw_file_name)
-            sys.exit(1)
+            raise IOError('Unrecognixed file extension: {}'.format(self.file_ext))
 
         end_time = datetime.datetime.now()
-        elapzed_time = end_time - start_time
-        self.logger.info('  Done making working copy of image in {:.1f} s'.format(elapzed_time.total_seconds()))
+        elapsed_time = end_time - start_time
+        self.logger.info('  Done making working copy of image in {:.1f} s'.format(\
+                            elapsed_time.total_seconds()))
 
 
     ##-------------------------------------------------------------------------
@@ -883,7 +885,8 @@ class Image(object):
                                                        np.median(DifferenceImage)))
         end_time = datetime.datetime.now()
         elapsed_time = end_time - start_time
-        self.logger.info('  Done with dark subtraction in {:.1f} s'.format(elapsed_time.total_seconds()))
+        self.logger.info('  Done with dark subtraction in {:.1f} s'.format(\
+                         elapsed_time.total_seconds()))
 
 
     ##-------------------------------------------------------------------------
@@ -936,12 +939,16 @@ class Image(object):
                              "-H", str(self.tel.pixel_scale.value*1.25),
                              "-u", "arcsecperpix", "-z", str(downsample), self.working_file]
         with open(os.path.join(self.tel.temp_file_path, 'astrometry_output.txt'), 'w') as AstrometrySTDOUT:
-            self.temp_files.append(os.path.join(self.tel.temp_file_path, 'astrometry_output.txt'))
-            self.logger.debug('  Calling astrometry.net with: {}'.format(' '.join(AstrometryCommand)))
+            self.temp_files.append(os.path.join(self.tel.temp_file_path,\
+                                   'astrometry_output.txt'))
+            self.logger.debug('  Calling astrometry.net with: {}'.format(\
+                              ' '.join(AstrometryCommand)))
 
             StartTime = datetime.datetime.now()
             try:
-                rtncode = subprocess.call(AstrometryCommand, stdout=AstrometrySTDOUT, stderr=AstrometrySTDOUT, timeout=timeout)
+                rtncode = subprocess.call(AstrometryCommand,\
+                              stdout=AstrometrySTDOUT, stderr=AstrometrySTDOUT,\
+                              timeout=timeout)
             except subprocess.TimeoutExpired as e:
                 self.logger.warning('Astrometry.net timed out')
                 rtncode = 1
@@ -1002,8 +1009,9 @@ class Image(object):
                                       self.raw_file_basename+"-indx.xyls"))
 
         end_time = datetime.datetime.now()
-        elapzed_time = end_time - start_time
-        self.logger.info('  Done with astrometry.net in {:.1f} s'.format(elapzed_time.total_seconds()))
+        elapsed_time = end_time - start_time
+        self.logger.info('  Done with astrometry.net in {:.1f} s'.format(\
+                            elapsed_time.total_seconds()))
 
 
     ##-----------------------------------------------------------------------------
@@ -1357,8 +1365,9 @@ class Image(object):
                 self.tel.SExtractor_params = original_params
 
         end_time = datetime.datetime.now()
-        elapzed_time = end_time - start_time
-        self.logger.info('  Done running SExtractor in {:.1f} s'.format(elapzed_time.total_seconds()))
+        elapsed_time = end_time - start_time
+        self.logger.info('  Done running SExtractor in {:.1f} s'.format(\
+                            elapsed_time.total_seconds()))
 
 
     ##-------------------------------------------------------------------------
@@ -1643,8 +1652,9 @@ class Image(object):
                 pyplot.close(fig)
 
             end_time = datetime.datetime.now()
-            elapzed_time = end_time - start_time
-            self.logger.info('  Done making PSF plot in {:.1f} s'.format(elapzed_time.total_seconds()))
+            elapsed_time = end_time - start_time
+            self.logger.info('  Done making PSF plot in {:.1f} s'.format(\
+                                elapsed_time.total_seconds()))
 
     ##-------------------------------------------------------------------------
     ## Is the Image Blank
@@ -1819,8 +1829,9 @@ class Image(object):
 
         os.chdir(origWD)
         end_time = datetime.datetime.now()
-        elapzed_time = end_time - start_time
-        self.logger.info('  Done running SCAMP in {:.1f} s'.format(elapzed_time.total_seconds()))
+        elapsed_time = end_time - start_time
+        self.logger.info('  Done running SCAMP in {:.1f} s'.format(
+                            elapsed_time.total_seconds()))
         return self.SCAMP_successful
 
 
@@ -1878,8 +1889,9 @@ class Image(object):
             assert os.path.exists(self.working_file)
 
         end_time = datetime.datetime.now()
-        elapzed_time = end_time - start_time
-        self.logger.info('  Done running SWarp in {:.1f} s'.format(elapzed_time.total_seconds()))
+        elapsed_time = end_time - start_time
+        self.logger.info('  Done running SWarp in {:.1f} s'.format(\
+                            elapsed_time.total_seconds()))
 
 
     ##-------------------------------------------------------------------------
@@ -1953,8 +1965,9 @@ class Image(object):
             self.catalog_data = None
 
         end_time = datetime.datetime.now()
-        elapzed_time = end_time - start_time
-        self.logger.info('  Done retrieving Vizier catalog in {:.1f} s'.format(elapzed_time.total_seconds()))
+        elapsed_time = end_time - start_time
+        self.logger.info('  Done retrieving Vizier catalog in {:.1f} s'.format(\
+                            elapsed_time.total_seconds()))
 
 
     ##-------------------------------------------------------------------------
@@ -2065,8 +2078,9 @@ class Image(object):
             self.logger.info("  Retrieved {} stars from UCAC catalog.".format(nUCACStars))
 
         end_time = datetime.datetime.now()
-        elapzed_time = end_time - start_time
-        self.logger.info('  Done retrieving local UCAC4 catalog in {:.1f} s'.format(elapzed_time.total_seconds()))
+        elapsed_time = end_time - start_time
+        self.logger.info('  Done retrieving local UCAC4 catalog in {:.1f} s'.format(\
+                            elapsed_time.total_seconds()))
 
 
     ##-------------------------------------------------------------------------
@@ -2126,8 +2140,9 @@ class Image(object):
                     self.flags['zero point'] = False
 
                 end_time = datetime.datetime.now()
-                elapzed_time = end_time - start_time
-                self.logger.info('  Done measuring zero point in {:.1f} s'.format(elapzed_time.total_seconds()))
+                elapsed_time = end_time - start_time
+                self.logger.info('  Done measuring zero point in {:.1f} s'.format(\
+                                    elapsed_time.total_seconds()))
 
                 ## Make Plot if Requested
                 if plot:
@@ -2275,8 +2290,9 @@ class Image(object):
         pyplot.close(fig)
 
         end_time = datetime.datetime.now()
-        elapzed_time = end_time - start_time
-        self.logger.info('  Done making zero point plot in {:.1f} s'.format(elapzed_time.total_seconds()))
+        elapsed_time = end_time - start_time
+        self.logger.info('  Done making zero point plot in {:.1f} s'.format(\
+                            elapsed_time.total_seconds()))
 
 
 
@@ -2450,13 +2466,15 @@ class Image(object):
             im.thumbnail(size, Image.ANTIALIAS)
 
         ## Save to JPEG
-        self.logger.debug('  Saving jpeg (p1={:.1f}, p2={:.1f}), bin={}, q={:.0f}) to: {}'.format(p1, p2, binning, quality, jpeg_file_name))
+        self.logger.debug('  Saving jpeg (p1={:.1f}, p2={:.1f}), bin={}, q={:.0f}) to: {}'.format(\
+                             p1, p2, binning, quality, jpeg_file_name))
         im.save(jpeg_file, 'JPEG', quality=quality)
         self.jpeg_file_names.append(jpeg_file_name)
 
         end_time = datetime.datetime.now()
-        elapzed_time = end_time - start_time
-        self.logger.info('  Done making JPEG in {:.1f} s'.format(elapzed_time.total_seconds()))
+        elapsed_time = end_time - start_time
+        self.logger.info('  Done making JPEG in {:.1f} s'.format(\
+                            elapsed_time.total_seconds()))
 
 
     ##-------------------------------------------------------------------------
