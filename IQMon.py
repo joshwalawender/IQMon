@@ -153,11 +153,7 @@ class Telescope(object):
     '''
     def __init__(self, config_file):
         self.site = ephem.Observer()
-        self.nXPix = None
-        self.nYPix = None
-        self.original_nXPix = None
-        self.original_nYPix = None
-        self.cropped = False
+
         ## Read YAML Config File
         if not os.path.exists(config_file):
             raise TelescopeConfigError('Configuration file {} not found'.format(config_file))
@@ -297,11 +293,11 @@ class Telescope(object):
             self.catalog_info = None
 
         ## create paths
-        assert self.temp_file_path
-        assert self.plot_file_path
-        assert self.logs_file_path
-        paths_to_check = [self.temp_file_path, self.plot_file_path, self.logs_file_path]
+        paths_to_check = []
         paths_to_create = []
+        if self.temp_file_path: paths_to_check.append(self.temp_file_path)
+        if self.plot_file_path: paths_to_check.append(self.plot_file_path)
+        if self.logs_file_path: paths_to_check.append(self.logs_file_path)
         for path in paths_to_check:
             while not os.path.exists(path):
                 paths_to_create.append(path)
