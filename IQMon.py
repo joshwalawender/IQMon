@@ -43,6 +43,19 @@ __version__ = '1.4'
 ## Mode Function
 ##-----------------------------------------------------------------------------
 def mode(data, binsize):
+    '''Function to calculate the mode of a distribution given the distribution
+    and a binsize.
+    
+    Parameters
+    ----------
+    data : input list of values
+    binsize : size of the bins in to which the data will be sorted
+    
+    Returns
+    -------
+    (n, center) : tuple containing the number of data points in the most common
+        bin (n) and the central value of that bin (center)
+    '''
     bmin = math.floor(min(data)/binsize)*binsize - binsize/2.
     bmax = math.ceil(max(data)/binsize)*binsize + binsize/2.
     bins = np.arange(bmin,bmax,binsize)
@@ -52,33 +65,58 @@ def mode(data, binsize):
     return max(foo)[1]
 
 
+class TelescopeConfigError(Exception):
+    pass
 
 ##-----------------------------------------------------------------------------
 ## Define Telescope object to hold telescope information
 ##-----------------------------------------------------------------------------
 class Telescope(object):
-    '''
-    Contains information about the telescope that can be passed to methods and
-    functions.  The concept for operation is that the user will write a simple
-    script which creates a telescope object and assigned values to all its
-    properties (or sets them to None).
+    '''Object which contains information about the telescope which took the
+    Image (see IQMon.Image object definition).
+    
+    The telescope properties are definied on initialization when a configuration
+    file is read.  The configuration file is a YAML formatted text file which
+    can contain the following entries:
+    
+    name : string containing the name of the telescope
+    
+    logs_file_path : the path in to which log files will be written
+    
+    plot_file_path : the path in to which the plots (e.g. those from the
+        image.make_PSF_plot() or image.make_zero_point_plot() methods) will be
+        written.
+    
+    temp_file_path : the path used for temporary files created by the program
+
+    mongo_address : string containing the address to connecto to the mongo server
+        which, if used, will contain a database of image analysis results.
+
+    mongo_port : integer containing the port number of the mongo server
+
+    mongo_db : string containing the name of the mongo database to use
+
+    mongo_collection : string containing the name of the mongo collection to use
+
+    pixel_scale : float containing the pixel scale in arcseconds per pixel.  If
+        either the pixel_scale or both the focal_length and pixel_size are
+        required to be in the configuration file.
+
+    focal_length : interger containing the focal length of the telescope in mm.
+        This is used in estimating the pixel scale prior to plate solving.
+
+    pixel_size : float containing the size of a pixel in microns.  This is used
+        in estimating the pixel scale prior to plate solving.
+
+    gain : float with the estimated gain (electroncs per ADU) of the detector.
+        This value is used by source extractor.  If it is not present a default
+        value of 1.0 will be used.
+
+    saturation : float with the saturation level of the detector in ADU.  This
+        is used in optionally marking saturated pixels in the jpegs made by the
+        make_JPEG() method of the Image object.
     '''
     def __init__(self, config_file):
-        ## System Properties
-        self.temp_file_path = None
-        self.plot_file_path = None
-        self.logs_file_path = None
-        self.mongo_address = None
-        self.mongo_port = None
-        self.mongo_db = None
-        self.mongo_collection = None
-        ## Telescope Properties
-        self.name = None
-        self.focal_length = None
-        self.pixel_size = None
-        self.aperture = None
-        self.gain = None
-        self.saturation = None
         self.site = ephem.Observer()
         ## Preferences
         self.threshold_FWHM = None
@@ -101,35 +139,83 @@ class Telescope(object):
 
         ## Read YAML Config File
         if not os.path.exists(config_file):
-            print('WARNING: Configuration file {} not found'.format(config_file))
-            raise IOError
+            raise TelescopeConfigError('Configuration file {} not found'.format(config_file))
         with open(config_file, 'r') as yaml_string:
             config = yaml.load(yaml_string)
         if not isinstance(config, dict):
-            print('Configuration file {} not parsed as dict'.format(config_file))
-            sys.exit(1)
+            raise TelescopeConfigError('Configuration file contents not parsed as dict')
         self.config = config
+
         ## Populate Configured Properties
-        if 'name' in config.keys(): self.name = str(config['name'])
+        if 'name' in config.keys():
+            self.name = str(config['name'])
+        else:
+            self.name = 'telescope'
+
         if 'temp_file_path' in config.keys():
             self.temp_file_path = os.path.expanduser(config['temp_file_path'])
+        else:
+            self.temp_file_path = os.path.join('/', 'tmp')
+
         if 'plot_file_path' in config.keys():
             self.plot_file_path = os.path.expanduser(config['plot_file_path'])
+        else:
+            self.plot_file_path = os.path.join('/', 'tmp')
+
         if 'logs_file_path' in config.keys():
             self.logs_file_path = os.path.expanduser(config['logs_file_path'])
+        else:
+            self.logs_file_path = os.path.join('/', 'tmp')
+
         if 'mongo_address' in config.keys():
             self.mongo_address = config['mongo_address']
+        else:
+            self.mongo_address = None
+
         if 'mongo_port' in config.keys():
             self.mongo_port = config['mongo_port']
+        else:
+            self.mongo_port = 27017 ## Use default mongo port
+
         if 'mongo_db' in config.keys():
             self.mongo_db = config['mongo_db']
+        else:
+            self.mongo_db = None
+
         if 'mongo_collection' in config.keys():
             self.mongo_collection = config['mongo_collection']
-        if 'focal_length' in config.keys(): self.focal_length = config['focal_length'] * u.mm
-        if 'pixel_size' in config.keys(): self.pixel_size = config['pixel_size'] * u.um
-        if 'aperture' in config.keys(): self.aperture = config['aperture'] * u.mm
-        if 'gain' in config.keys(): self.gain = config['gain'] / u.adu
-        if 'saturation' in config.keys(): self.saturation = config['saturation'] * u.adu
+        else:
+            self.mongo_collection = None
+
+        ## Define astropy.units Equivalency for Arcseconds and Pixels
+        self.pixel_scale_equivalency = [(u.pix, u.arcsec,
+             lambda pix: (pix*u.radian.to(u.arcsec) * self.pixel_size / self.focal_length).decompose().value,
+             lambda arcsec: (arcsec/u.radian.to(u.arcsec) * self.focal_length / self.pixel_size).decompose().value
+             )]
+
+        if not 'pixel_scale' in config.keys():
+            if ('focal_length' in config.keys()) and ('pixel_size' in config.keys()):
+                self.focal_length = config['focal_length'] * u.mm
+                self.pixel_size = config['pixel_size'] * u.um
+                self.pixel_scale = self.pixel_size.to(u.mm)/self.focal_length.to(u.mm)*u.radian.to(u.arcsec)*u.arcsec/u.pix
+            else:
+                raise TelescopeConfigError('Configuration file does not contain information to determine pixel_scale')
+        else:
+            self.focal_length = None
+            self.pixel_size = None
+            self.pixel_scale = config['pixel_scale'] * u.arcsec/u.pix
+
+        if 'gain' in config.keys():
+            self.gain = config['gain'] / u.adu
+        else:
+            self.gain = 1.0 / u.adu
+
+        if 'saturation' in config.keys():
+            self.saturation = config['saturation'] * u.adu
+        else:
+            self.saturation = None
+
+
         if 'threshold_FWHM' in config.keys(): self.threshold_FWHM = config['threshold_FWHM'] * u.pix
         if 'threshold_pointing_err' in config.keys(): self.threshold_pointing_err = config['threshold_pointing_err'] * u.arcmin
         if 'threshold_ellipticity' in config.keys(): self.threshold_ellipticity = config['threshold_ellipticity']
@@ -144,18 +230,6 @@ class Telescope(object):
         if 'SCAMP_params' in config.keys(): self.SCAMP_params = config['SCAMP_params']
         if 'catalog' in config.keys(): self.catalog_info = config['catalog']
 
-        ## Determine Pixel Scale and F-Ratio
-        assert self.pixel_size
-        assert self.focal_length
-        self.pixel_scale = self.pixel_size.to(u.mm)/self.focal_length.to(u.mm)*u.radian.to(u.arcsec)*u.arcsec/u.pix
-        self.f_ratio = self.focal_length.to(u.mm)/self.aperture.to(u.mm)
-
-        ## Define astropy.units Equivalency for Arcseconds and Pixels
-        self.pixel_scale_equivalency = [(u.pix, u.arcsec,
-             lambda pix: (pix*u.radian.to(u.arcsec) * self.pixel_size / self.focal_length).decompose().value,
-             lambda arcsec: (arcsec/u.radian.to(u.arcsec) * self.focal_length / self.pixel_size).decompose().value
-             )]
-
         ## create paths
         assert self.temp_file_path
         assert self.plot_file_path
@@ -168,10 +242,6 @@ class Telescope(object):
                 path = os.path.split(path)[0]
         while len(paths_to_create) > 0:
             os.mkdir(paths_to_create.pop())
-
-        ## Assert required properties
-        assert self.name
-
 
 
     def __del__(self):
@@ -992,8 +1062,6 @@ class Image(object):
         Run SExtractor on image.
         '''
         start_time = datetime.datetime.now()
-        assert type(self.tel.gain) == u.quantity.Quantity
-        assert type(self.tel.pixel_scale) == u.quantity.Quantity
 
         if assoc and self.catalog_data:
             self.catalog_filter = None
