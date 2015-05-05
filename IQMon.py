@@ -136,7 +136,10 @@ class Telescope(object):
         on the web page.  Also often used by customized scripts for displaying
         IQMon results.
 
-    ROI : 
+    ROI : string representing the region of interest in pixels which the image
+        should be cropped to.  Format is "[x1:x2,y1:y2]" where x1 is the minimum
+        x pixel, x2 is the maximum x pixel, y1 is the minimum y pixel, and y2 is
+        the maximum y pixel.  All pixel values will be forced to integers.
 
     PSF_measurement_radius : 
 
@@ -152,7 +155,9 @@ class Telescope(object):
         self.site = ephem.Observer()
         self.nXPix = None
         self.nYPix = None
-
+        self.original_nXPix = None
+        self.original_nYPix = None
+        self.cropped = False
         ## Read YAML Config File
         if not os.path.exists(config_file):
             raise TelescopeConfigError('Configuration file {} not found'.format(config_file))
@@ -888,30 +893,33 @@ class Image(object):
         '''
         Crop working image to region of interest.
         '''
-        assert self.tel.ROI
-        
-        self.logger.info('Cropping image to {}'.format(self.tel.ROI))
-        ## Parse ROI String
-        try:
-            MatchROI = re.match("\[?(\d{1,5}):(\d{1,5}),(\d{1,5}):(\d{1,5})\]?",\
+        if self.tel.ROI:
+            MatchROI = re.match("\[?(\d{1,6}):(\d{1,6}),(\d{1,6}):(\d{1,6})\]?",\
                                 self.tel.ROI)
-        except:
-            self.logger.warning("Could not parse ROI string: {}".format(\
-                                                                 self.tel.ROI))
+            if MatchROI:
+                self.logger.info('Cropping image to {}'.format(self.tel.ROI))
+
+                crop_x1 = int(MatchROI.group(1))
+                crop_x2 = int(MatchROI.group(2))
+                crop_y1 = int(MatchROI.group(3))
+                crop_y2 = int(MatchROI.group(4))
+                self.logger.debug("  Cropping Image To [{0}:{1},{2}:{3}]".format(\
+                                  crop_x1, crop_x2, crop_y1, crop_y2))
+                with fits.open(self.working_file, mode="update") as hdulist:
+                    hdulist[0].data = hdulist[0].data[crop_y1:crop_y2,\
+                                                      crop_x1:crop_x2]
+                    hdulist.flush()
+                self.cropped = True
+                self.original_nXPix = self.nXPix
+                self.original_nYPix = self.nYPix
+                self.read_header()
+            else:
+                self.logger.warning('Can not crop image. ROI "{}" not parsed.'.format(\
+                                    self.tel.ROI))
+                return False
         else:
-            self.crop_x1 = int(MatchROI.group(1))
-            self.crop_x2 = int(MatchROI.group(2))
-            self.crop_y1 = int(MatchROI.group(3))
-            self.crop_y2 = int(MatchROI.group(4))
-            self.logger.debug("  Cropping Image To [{0}:{1},{2}:{3}]".format(\
-                                                    self.crop_x1, self.crop_x2,\
-                                                    self.crop_y1, self.crop_y2))
-            with fits.open(self.working_file, mode="update") as hdulist:
-                hdulist[0].data = hdulist[0].data[self.crop_y1:self.crop_y2,self.crop_x1:self.crop_x2]
-                hdulist.flush()
-            self.cropped = True
-            self.original_nXPix = self.nXPix
-            self.original_nYPix = self.nYPix
+            self.logger.warning('Can not crop image. No region of interest defined.')
+            return False
 
 
     ##-------------------------------------------------------------------------
