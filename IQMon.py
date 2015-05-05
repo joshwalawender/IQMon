@@ -882,8 +882,8 @@ class Image(object):
             self.logger.debug("  Median level of dark subtracted = {0}".format(\
                                                        np.median(DifferenceImage)))
         end_time = datetime.datetime.now()
-        elapzed_time = end_time - start_time
-        self.logger.info('  Done with dark subtraction in {:.1f} s'.format(elapzed_time.total_seconds()))
+        elapsed_time = end_time - start_time
+        self.logger.info('  Done with dark subtraction in {:.1f} s'.format(elapsed_time.total_seconds()))
 
 
     ##-------------------------------------------------------------------------
