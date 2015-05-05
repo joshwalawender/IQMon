@@ -115,27 +115,43 @@ class Telescope(object):
     saturation : float with the saturation level of the detector in ADU.  This
         is used in optionally marking saturated pixels in the jpegs made by the
         make_JPEG() method of the Image object.
+
+    threshold_FWHM : float value (in units of pixels) with the threshold FWHM
+        value.  If the image FWHM is above this value, the FWHM flag will be
+        set.
+
+    threshold_pointing_err : float value (in units of arcmin) with the threshold
+        pointing error.  If the pointing error is above this value, the pointing
+        error flag will be set.
+
+    threshold_ellipticity : float value (unitless) with the threshold
+        ellipticity.  If the ellipticity is above this value, the ellipticity
+        flag will be set.
+
+    threshold_zeropoint : float value (in magnitudes) with the threshold zero
+        point.  If the zero point is above this value, the zero point flag will
+        be set.
+
+    units_for_FWHM : The units which will be used when displaying the FWHM value
+        on the web page.  Also often used by customized scripts for displaying
+        IQMon results.
+
+    ROI : 
+
+    PSF_measurement_radius : 
+
+    pointing_marker_size : 
+
+    SExtractor_params : 
+
+    SCAMP_params : 
+
+    catalog : 
     '''
     def __init__(self, config_file):
         self.site = ephem.Observer()
-        ## Preferences
-        self.threshold_FWHM = None
-        self.threshold_pointing_err = None
-        self.threshold_ellipticity = None
-        self.threshold_zeropoint = None
-        self.SCAMP_aheader = None
-        self.units_for_FWHM = None
-        self.ROI = None
-        self.PSF_measurement_radius = None
-        self.pointing_marker_size = None
-        self.SExtractor_params = None
-        self.SCAMP_params = None
-        self.catalog_info = None
-        ## Derived Properties
         self.nXPix = None
         self.nYPix = None
-        self.pixel_scale = None
-        self.f_ratio = None
 
         ## Read YAML Config File
         if not os.path.exists(config_file):
@@ -189,17 +205,22 @@ class Telescope(object):
 
         ## Define astropy.units Equivalency for Arcseconds and Pixels
         self.pixel_scale_equivalency = [(u.pix, u.arcsec,
-             lambda pix: (pix*u.radian.to(u.arcsec) * self.pixel_size / self.focal_length).decompose().value,
-             lambda arcsec: (arcsec/u.radian.to(u.arcsec) * self.focal_length / self.pixel_size).decompose().value
+             lambda pix: (pix*u.radian.to(u.arcsec) * self.pixel_size\
+                         / self.focal_length).decompose().value,
+             lambda arcsec: (arcsec/u.radian.to(u.arcsec) * self.focal_length\
+                            / self.pixel_size).decompose().value
              )]
 
         if not 'pixel_scale' in config.keys():
             if ('focal_length' in config.keys()) and ('pixel_size' in config.keys()):
                 self.focal_length = config['focal_length'] * u.mm
                 self.pixel_size = config['pixel_size'] * u.um
-                self.pixel_scale = self.pixel_size.to(u.mm)/self.focal_length.to(u.mm)*u.radian.to(u.arcsec)*u.arcsec/u.pix
+                self.pixel_scale = self.pixel_size.to(u.mm)\
+                                   /self.focal_length.to(u.mm)\
+                                   *u.radian.to(u.arcsec)*u.arcsec/u.pix
             else:
-                raise TelescopeConfigError('Configuration file does not contain information to determine pixel_scale')
+                raise TelescopeConfigError('Configuration file does not contain\
+                                          information to determine pixel_scale')
         else:
             self.focal_length = None
             self.pixel_size = None
@@ -215,20 +236,60 @@ class Telescope(object):
         else:
             self.saturation = None
 
+        if 'threshold_FWHM' in config.keys():
+            self.threshold_FWHM = config['threshold_FWHM'] * u.pix
+        else:
+            self.threshold_FWHM = None
 
-        if 'threshold_FWHM' in config.keys(): self.threshold_FWHM = config['threshold_FWHM'] * u.pix
-        if 'threshold_pointing_err' in config.keys(): self.threshold_pointing_err = config['threshold_pointing_err'] * u.arcmin
-        if 'threshold_ellipticity' in config.keys(): self.threshold_ellipticity = config['threshold_ellipticity']
-        if 'threshold_zeropoint' in config.keys(): self.threshold_zeropoint = config['threshold_zeropoint']
-        if 'SCAMP_aheader' in config.keys():
-            self.SCAMP_aheader = os.path.expanduser(config['SCAMP_aheader'])
-        if 'units_for_FWHM' in config.keys(): self.units_for_FWHM = getattr(u, config['units_for_FWHM'])
-        if 'ROI' in config.keys(): self.ROI = str(config['ROI'])
-        if 'PSF_measurement_radius' in config.keys(): self.PSF_measurement_radius = config['PSF_measurement_radius'] * u.pix
-        if 'pointing_marker_size' in config.keys(): self.pointing_marker_size = config['pointing_marker_size'] * u.arcmin
-        if 'SExtractor_params' in config.keys(): self.SExtractor_params = config['SExtractor_params']
-        if 'SCAMP_params' in config.keys(): self.SCAMP_params = config['SCAMP_params']
-        if 'catalog' in config.keys(): self.catalog_info = config['catalog']
+        if 'threshold_pointing_err' in config.keys():
+            self.threshold_pointing_err = config['threshold_pointing_err'] * u.arcmin
+        else:
+            self.threshold_pointing_err = None
+
+        if 'threshold_ellipticity' in config.keys():
+            self.threshold_ellipticity = config['threshold_ellipticity']
+        else:
+            self.threshold_ellipticity = None
+
+        if 'threshold_zeropoint' in config.keys():
+            self.threshold_zeropoint = config['threshold_zeropoint']
+        else:
+            self.threshold_zeropoint = None
+
+        if 'units_for_FWHM' in config.keys():
+            self.units_for_FWHM = getattr(u, config['units_for_FWHM'])
+        else:
+            self.units_for_FWHM = u.pix
+
+        if 'ROI' in config.keys():
+            self.ROI = str(config['ROI'])
+        else:
+            self.ROI = None
+
+        if 'PSF_measurement_radius' in config.keys():
+            self.PSF_measurement_radius = config['PSF_measurement_radius'] * u.pix
+        else:
+            self.PSF_measurement_radius = None
+
+        if 'pointing_marker_size' in config.keys():
+            self.pointing_marker_size = config['pointing_marker_size'] * u.arcmin
+        else:
+            self.pointing_marker_size = 1 * u.arcmin
+
+        if 'SExtractor_params' in config.keys():
+            self.SExtractor_params = config['SExtractor_params']
+        else:
+            self.SExtractor_params = None
+
+        if 'SCAMP_params' in config.keys():
+            self.SCAMP_params = config['SCAMP_params']
+        else:
+            self.SCAMP_params = None
+
+        if 'catalog' in config.keys():
+            self.catalog_info = config['catalog']
+        else:
+            self.catalog_info = None
 
         ## create paths
         assert self.temp_file_path
