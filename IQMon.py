@@ -141,7 +141,11 @@ class Telescope(object):
         x pixel, x2 is the maximum x pixel, y1 is the minimum y pixel, and y2 is
         the maximum y pixel.  All pixel values will be forced to integers.
 
-    PSF_measurement_radius : 
+    PSF_measurement_radius : Radius in pixels of central region for which the
+        image quality measurements of stars are used in determining the image
+        FWHM and ellipticity.  This parameter allows the user to ignore the
+        corners of the image if they wish to ignore the optical aberrations in
+        that region.
 
     pointing_marker_size : 
 
@@ -1376,10 +1380,12 @@ class Image(object):
         if self.n_stars_SExtracted > 1:
             self.logger.info('Analyzing SExtractor results to determine typical image quality.')
             if not self.tel.PSF_measurement_radius:
-                IQRadiusFactor = 1.0
                 DiagonalRadius = math.sqrt((self.nXPix/2)**2+(self.nYPix/2)**2)
-                self.tel.PSF_measurement_radius = DiagonalRadius*IQRadiusFactor
+                self.tel.PSF_measurement_radius = DiagonalRadius * u.pix
                 self.logger.info('  Using all stars in image.')
+            else:
+                self.logger.info('  Using stars within {:d} pix for IQ measurement'.format(\
+                                    int(self.tel.PSF_measurement_radius.to(u.pix).value)))
 
             CentralFWHMs = [star['FWHM_IMAGE']\
                             for star in self.SExtractor_results\
