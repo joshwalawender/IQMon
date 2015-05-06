@@ -172,16 +172,15 @@ class Telescope(object):
         
         Remaining parameters are the dictionary which link the filter names in
         the fits header to the filter names in the Vizier catalog that is
-        retrieved.  For example, if I want to use the 'rmag' filter magnitudes
-        from the UCAC4 catalog with images which have the FILTER header keyword
-        set to 'PSr', then I would have the following lines in the configuration
-        file:
+        retrieved.  For example, if I want to compare the source extractor
+        catalog with the UCAC4 catalog limited to stars brighter than magnitude
+        15 and I want to compare the 'rmag' filter magnitudes from the catalog 
+        to my images which have the FILTER header keyword set to 'PSr', then I
+        would have a configuration file which contains the following:
 
         catalog:
             name: 'UCAC4'
-            columns: ['_RAJ2000', '_DEJ2000', 'UCAC4', 'Bmag', 'Vmag', 'gmag', 'rmag', 'imag']
             magmax: 15.0
-            PSi: 'imag'
             PSr: 'rmag'
     '''
     def __init__(self, config_file):
