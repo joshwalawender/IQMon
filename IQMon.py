@@ -654,7 +654,9 @@ class Image(object):
                                              self.target_alt.to(u.deg).value,\
                                              self.target_az.to(u.deg).value))
             self.target_zenith_angle = 90.*u.deg - self.target_alt
-            self.airmass = 1.0/math.cos(self.target_zenith_angle.to(u.radian).value)*(1.0 - 0.0012*(1.0/(math.cos(self.target_zenith_angle.to(u.radian).value)**2 - 1.0)))
+            self.airmass = 1.0/math.cos(self.target_zenith_angle.to(u.radian).value)\
+                           * (1.0 - 0.0012*(1.0/(math.cos(\
+                           self.target_zenith_angle.to(u.radian).value)**2 - 1.0)))
             self.logger.debug("  Target airmass (calculated) = {0:.2f}".format(\
                                                                  self.airmass))
             ## Calculate Moon Position and Illumination
@@ -881,7 +883,6 @@ class Image(object):
                 ## Save Master Dark to Fits File
                 DataPath = os.path.split(self.raw_file)[0]
                 DataNightString = os.path.split(DataPath)[1]
-    #             MasterDarkFilename = "MasterDark_"+self.tel.name+"_"+DataNightString+"_"+str(int(math.floor(self.exptime.to(u.s).value)))+".fits"
                 MasterDarkFilename = 'MasterDark_{}_{}_{}.fits'.format(\
                                           self.tel.name,\
                                           DataNightString,\
@@ -1144,8 +1145,12 @@ class Image(object):
                                               frame='icrs')
             self.pointing_error = self.coordinate_of_center_pixel.separation(\
                                                    self.coordinate_from_header)
-            self.logger.debug("  Header Coordinate: {}".format(self.coordinate_from_header.to_string(style='hmsdms', precision=1)))
-            self.logger.debug("  Center Coordinate: {}".format(self.coordinate_of_center_pixel.to_string(style='hmsdms', precision=1)))
+            self.logger.debug("  Header Coordinate: {}".format(\
+                              self.coordinate_from_header.to_string(\
+                              style='hmsdms', precision=1)))
+            self.logger.debug("  Center Coordinate: {}".format(\
+                              self.coordinate_of_center_pixel.to_string(\
+                              style='hmsdms', precision=1)))
             self.logger.info("  Pointing Error is {:.2f} arcmin".format(\
                                                 self.pointing_error.arcminute))
         except:
@@ -1456,7 +1461,9 @@ class Image(object):
                 self.logger.info("  Average Ellipticity in inner region is {0:.2f}".format(\
                                                                  self.ellipticity_average))
             else:
-                self.logger.warning("  Only detected {} stars in central region.  No FWHM or ellipticity calculated.".format(len(CentralFWHMs)))
+                self.logger.warning("  Only detected {} stars in central region.".format(\
+                                    len(CentralFWHMs)))
+                self.logger.warning("  No FWHM or ellipticity calculated.")
                 self.FWHM_mode = None
                 self.FWHM_median = None
                 self.FWHM_average = None
@@ -1476,7 +1483,8 @@ class Image(object):
             self.ellipticity = None
         ## Flag FWHM
         try:
-            if self.FWHM > self.tel.threshold_FWHM.to(u.pix, equivalencies=self.tel.pixel_scale_equivalency):
+            if self.FWHM > self.tel.threshold_FWHM.to(u.pix,\
+                           equivalencies=self.tel.pixel_scale_equivalency):
                 self.flags['FWHM'] = True
             else:
                 self.flags['FWHM'] = False
@@ -1515,14 +1523,28 @@ class Image(object):
             self.PSF_plot_file = os.path.join(self.tel.plot_file_path, self.PSF_plot_filename)
 
             ellip_threshold = 0.15
-            star_angles = [star['THETAWIN_IMAGE'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
-            image_angles = [star['AngleInImage'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
-            star_x = [star['XWIN_IMAGE'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
-            star_y = [star['YWIN_IMAGE'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
-            uncorrected_diffs = [star['THETAWIN_IMAGE']-star['AngleInImage'] for star in self.SExtractor_results if star['ELLIPTICITY'] >= ellip_threshold]
+            star_angles = [star['THETAWIN_IMAGE']\
+                           for star in self.SExtractor_results\
+                           if star['ELLIPTICITY'] >= ellip_threshold]
+            image_angles = [star['AngleInImage']\
+                            for star in self.SExtractor_results\
+                            if star['ELLIPTICITY'] >= ellip_threshold]
+            star_x = [star['XWIN_IMAGE']\
+                      for star in self.SExtractor_results\
+                      if star['ELLIPTICITY'] >= ellip_threshold]
+            star_y = [star['YWIN_IMAGE']\
+                      for star in self.SExtractor_results\
+                      if star['ELLIPTICITY'] >= ellip_threshold]
+            uncorrected_diffs = [star['THETAWIN_IMAGE']-star['AngleInImage']\
+                                 for star in self.SExtractor_results\
+                                 if star['ELLIPTICITY'] >= ellip_threshold]
 
-            CentralFWHMs = [star['FWHM_IMAGE'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius.to(u.pix).value)]
-            CentralEllipticities = [star['ELLIPTICITY'] for star in self.SExtractor_results if (star['ImageRadius'] <= self.tel.PSF_measurement_radius.to(u.pix).value)]
+            CentralFWHMs = [star['FWHM_IMAGE']\
+                            for star in self.SExtractor_results\
+                            if (star['ImageRadius'] <= self.tel.PSF_measurement_radius.to(u.pix).value)]
+            CentralEllipticities = [star['ELLIPTICITY']\
+                                    for star in self.SExtractor_results\
+                                    if (star['ImageRadius'] <= self.tel.PSF_measurement_radius.to(u.pix).value)]
 
             nstars = len(star_angles)
             self.logger.debug('  Found {} stars with ellipticity greater than {:.2f}.'.format(\
@@ -1573,11 +1595,14 @@ class Image(object):
                 TopLeft = pyplot.axes([0.000, 0.750, 0.465, 0.235])
                 pyplot.title('Histogram of FWHM Values for {}'.format(self.raw_file_name), size=10)
                 pyplot.bar(fwhm_centers, fwhm_hist, align='center', width=0.7*fwhm_binsize)
-                pyplot.plot([self.FWHM_mode.to(u.pix).value, self.FWHM_mode.to(u.pix).value], [0, 1.1*max(fwhm_hist)],\
+                pyplot.plot([self.FWHM_mode.to(u.pix).value, self.FWHM_mode.to(u.pix).value],\
+                            [0, 1.1*max(fwhm_hist)],\
                             'ro-', linewidth=2, label='Mode FWHM', alpha=0.4)
-                pyplot.plot([self.FWHM_median.to(u.pix).value, self.FWHM_median.to(u.pix).value], [0, 1.1*max(fwhm_hist)],\
+                pyplot.plot([self.FWHM_median.to(u.pix).value, self.FWHM_median.to(u.pix).value],\
+                            [0, 1.1*max(fwhm_hist)],\
                             'go-', linewidth=2, label='Median FWHM', alpha=0.4)
-                pyplot.plot([self.FWHM_average.to(u.pix).value, self.FWHM_average.to(u.pix).value], [0, 1.1*max(fwhm_hist)],\
+                pyplot.plot([self.FWHM_average.to(u.pix).value, self.FWHM_average.to(u.pix).value],\
+                            [0, 1.1*max(fwhm_hist)],\
                             'bo-', linewidth=2, label='Mode FWHM', alpha=1.0)
                 pyplot.xlabel('FWHM (pixels)', size=10)
                 pyplot.ylabel('N Stars', size=10)
@@ -1602,7 +1627,9 @@ class Image(object):
 
                 MiddleLeft = pyplot.axes([0.000, 0.375, 0.465, 0.320])
                 MiddleLeft.set_aspect('equal')
-                pyplot.title('Average FWHM scaled from {:.1f} pix to {:.1f} pix'.format(0.8*self.FWHM.to(u.pix).value, 2.0*self.FWHM.to(u.pix).value), size=10)
+                pyplot.title('Average FWHM scaled from {:.1f} pix to {:.1f} pix'.format(\
+                             0.8*self.FWHM.to(u.pix).value,\
+                             2.0*self.FWHM.to(u.pix).value), size=10)
                 if self.n_stars_SExtracted > 20000:
                     gridsize = 20
                 else:
@@ -1679,7 +1706,8 @@ class Image(object):
                 pyplot.ylim(-100,100)
                 pyplot.yticks(30*(np.arange(7)-3), size=10)
 
-                pyplot.savefig(self.PSF_plot_file, dpi=100, bbox_inches='tight', pad_inches=0.10)
+                pyplot.savefig(self.PSF_plot_file, dpi=100,\
+                               bbox_inches='tight', pad_inches=0.10)
                 pyplot.close(fig)
 
             end_time = datetime.datetime.now()
@@ -1725,17 +1753,21 @@ class Image(object):
         if dt:
             self.tel.SExtractor_params['DETECT_THRESH'] = dt
         else:
-            if 'DETECT_THRESH' in self.tel.SExtractor_params: del self.tel.SExtractor_params['DETECT_THRESH']
+            if 'DETECT_THRESH' in self.tel.SExtractor_params:
+                del self.tel.SExtractor_params['DETECT_THRESH']
         if at:
             self.tel.SExtractor_params['ANALYSIS_THRESH'] = at
         else:
-            if 'ANALYSIS_THRESH' in self.tel.SExtractor_params: del self.tel.SExtractor_params['ANALYSIS_THRESH']
+            if 'ANALYSIS_THRESH' in self.tel.SExtractor_params:
+                del self.tel.SExtractor_params['ANALYSIS_THRESH']
         if da:
             self.tel.SExtractor_params['DETECT_MINAREA'] = da
         else:
-            if 'DETECT_MINAREA' in self.tel.SExtractor_params: del self.tel.SExtractor_params['DETECT_MINAREA']
+            if 'DETECT_MINAREA' in self.tel.SExtractor_params:
+                del self.tel.SExtractor_params['DETECT_MINAREA']
 
-        ## Reset all SExtractor results to None, so we don't confuse these results with meaningful ones
+        ## Reset all SExtractor results to None, so we don't confuse these
+        ## results with meaningful ones
         self.SExtractor_catalogfile = None
         self.SExtractor_results = None
         self.n_stars_SExtracted = None
@@ -1744,7 +1776,8 @@ class Image(object):
 
         ## If few stars found, the image is blank
         if len(stars) < nstars_threshold:
-            self.logger.warning('  Only {} bright stars detected.  Image appears blank'.format(len(filtered_stars)))
+            self.logger.warning('  Only {} bright stars detected. Image appears blank'.format(\
+                                len(filtered_stars)))
             self.flags['other'] = True
             return True
         else:
@@ -2658,7 +2691,9 @@ class Image(object):
             else:
                 ZPplot_html = ""
             log_html = " (<a href='{}'>log</a>)".format(os.path.join("..", "..", "Logs", self.tel.config['name'], self.logfilename))
-            htmlline = "      <td style='color:black;text-align:left'>" + JPEG1_html + "{}</a>".format(self.raw_file_basename) + JPEG2_html + JPEG3_html + PSFplot_html + ZPplot_html + log_html + "</td>\n"
+            htmlline = "      <td style='color:black;text-align:left'>" + JPEG1_html\
+                       + "{}</a>".format(self.raw_file_basename) + JPEG2_html\
+                       + JPEG3_html + PSFplot_html + ZPplot_html + log_html + "</td>\n"
             HTML.write(htmlline)
         ## Write Target Name
         if "Target" in fields:
@@ -2849,8 +2884,10 @@ class Image(object):
         except: self.logger.warning('  Could not write filter to result')
 
         try:
-            new_result['WCS RA'] = self.coordinate_of_center_pixel.to_string('hmsdms', sep=':', precision=1).split()[0]
-            new_result['WCS Dec'] = self.coordinate_of_center_pixel.to_string('hmsdms', sep=':', precision=0).split()[1]
+            new_result['WCS RA'] = self.coordinate_of_center_pixel.to_string(\
+                                   'hmsdms', sep=':', precision=1).split()[0]
+            new_result['WCS Dec'] = self.coordinate_of_center_pixel.to_string(\
+                                    'hmsdms', sep=':', precision=0).split()[1]
             self.logger.debug('  Result: WCS RA = {}'.format(new_result['WCS RA']))
             self.logger.debug('  Result: WCS Dec = {}'.format(new_result['WCS Dec']))
         except: self.logger.warning('  Could not write WCS RA and Dec to result')
@@ -3001,7 +3038,8 @@ class Image(object):
 
         try:
             new_result['IQMon start time'] = self.start_process_time + datetime.timedelta(0, 60*60*10)
-            self.logger.debug('  Result: IQMon Start Time = {}'.format(new_result['IQMon start time'].strftime('%Y%m%d %H:%M:%S')))
+            self.logger.debug('  Result: IQMon Start Time = {}'.format(\
+                              new_result['IQMon start time'].strftime('%Y%m%d %H:%M:%S')))
         except: self.logger.warning('  Could not write IQMon start time to result')
 
         new_result['jpegs'] = self.jpeg_file_names
@@ -3026,7 +3064,8 @@ class Image(object):
         try:
             id = data.insert(new_result)
             self.logger.debug('  Inserted document with ID: {}'.format(id))
-            self.logger.debug('  Found {} previous entries for this file.  Deleting old entries.'.format(len(matches)))
+            self.logger.debug('  Found {} previous entries.  Deleting old entries.'.format(\
+                              len(matches)))
             for match in matches:
                 data.remove( {"_id" : match["_id"]} )
                 self.logger.debug('  Removed "_id": {}'.format(match["_id"]))
