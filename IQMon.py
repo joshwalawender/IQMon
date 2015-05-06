@@ -1801,13 +1801,8 @@ class Image(object):
         origWD = os.getcwd()
         os.chdir(self.tel.temp_file_path)
         ## Parameters for SCAMP
-        if self.tel.SCAMP_aheader:
-            SCAMP_aheader = self.tel.SCAMP_aheader
-        else:
-            SCAMP_aheader = 'scamp.ahead'
 
         SCAMP_default = {
-                        'AHEADER_GLOBAL': SCAMP_aheader,
                         'SAVE_REFCATALOG': 'N',
                         'REFOUT_CATPATH': self.tel.temp_file_path,
                         'MERGEDOUTCAT_NAME': os.path.join(self.tel.temp_file_path, 'scamp.cat'),
@@ -1833,8 +1828,6 @@ class Image(object):
             SCAMPCommand.append('-{}'.format(key))
             SCAMPCommand.append('{}'.format(SCAMP_params[key]))
         self.logger.info("Running SCAMP")
-        if SCAMP_aheader:
-            self.logger.debug("  Using SCAMP aheader file: {}".format(SCAMP_aheader))
         self.logger.debug("  SCAMP command: {}".format(' '.join(SCAMPCommand)))
         try:
             SCAMP_STDOUT = subprocess.check_output(SCAMPCommand, timeout=timeout,\
@@ -1974,9 +1967,9 @@ class Image(object):
             if 'columns' in self.tel.catalog_info.keys():
                 columns = self.tel.catalog_info['columns']
             else:
-                if catalog = 'UCAC4': columns = ['_RAJ2000', '_DEJ2000',\
-                                                 'UCAC4', 'Bmag', 'Vmag',\
-                                                 'gmag', 'rmag', 'imag']
+                if catalog == 'UCAC4': columns = ['_RAJ2000', '_DEJ2000',\
+                                                  'UCAC4', 'Bmag', 'Vmag',\
+                                                  'gmag', 'rmag', 'imag']
                 else: columns = []
             self.logger.debug('  Getting columns: {}'.format(columns))
 
