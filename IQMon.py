@@ -473,6 +473,11 @@ class Image(object):
         '''Add an existing logger object to the Image object.  Use this if
         calling from another program which has its own logger object, pass
         that logger to IQMon with this method.
+        
+        Parameters
+        ----------
+        logger : logging.logger object
+            The logger which you wish to use with this image.
         '''
         self.logger = logger
 
@@ -483,7 +488,8 @@ class Image(object):
 
 
     def make_logger(self, logfile=None, clobber=False, verbose=False):
-        '''Create a logger object to use with this image.  
+        '''Create a logger object to use with this image.  The logger object
+        will be available as self.logger.
         
         Parameters
         ----------
@@ -556,8 +562,6 @@ class Image(object):
                 self.nYPix, self.nXPix = hdulist[0].data.shape
                 self.logger.debug('  Image size is: {},{}'.format(\
                                                            self.nXPix, self.nYPix))
-
-
 
         ## Get exposure time from header (assumes seconds)
         try:
@@ -909,12 +913,16 @@ class Image(object):
     ## Dark Subtract Image
     ##-------------------------------------------------------------------------
     def dark_subtract(self, Darks):
-        '''
-        Create master dark and subtract from image.
-        
-        Input the filename of the appropriate master dark or a list of filenames
-        which will be median combined to make the master dark.
-        
+        '''Create a master dark and subtract from image.
+
+        Input
+        -----
+        Darks : list or string
+            If a list of filenames is provided, then the fits files listed will
+            be read in and median combined to form a master dark file.  If only
+            a single filename is provided, then that will be treated as the
+            master dark file.  The master dark is then subtracted from the
+            working file.
         '''
         start_time = datetime.datetime.now()
         self.logger.info("Dark subtracting image.")
@@ -922,40 +930,58 @@ class Image(object):
         with fits.open(self.working_file, mode='update') as hdulist_image:
             ## Load master dark if provided, but if multiple files input, combine
             ## them in to master dark, then load combined master dark.
-            if len(Darks) == 1:
-                self.logger.debug("  Found master dark.  Opening master dark data.")
-                with fits.open(Darks[0]) as hdulist_dark:
-                    MasterDarkData = hdulist_dark[0].data
-            elif len(Darks) > 1:
-                self.logger.info("  Median combining {0} darks.".format(len(Darks)))
-                ## Combine multiple darks frames
-                DarkData = []
-                for Dark in Darks:
-                    with fits.open(Dark) as hdulist:
-                        DarkData.append(hdulist[0].data)
-                DarkData = np.array(DarkData)
-                MasterDarkData = np.median(DarkData, axis=0)
-                ## Save Master Dark to Fits File
-                DataPath = os.path.split(self.raw_file)[0]
-                DataNightString = os.path.split(DataPath)[1]
-                MasterDarkFilename = 'MasterDark_{}_{}_{}.fits'.format(\
-                                          self.tel.name,\
-                                          DataNightString,\
-                                          str(int(math.floor(self.exptime.to(u.s).value)))
-                                          )
-                MasterDarkFile  = os.path.join(self.tel.temp_file_path,\
-                                               MasterDarkFilename)
-                hdu_MasterDark = fits.PrimaryHDU(MasterDarkData)
-                hdulist_MasterDark = fits.HDUList([hdu_MasterDark])
-                hdulist_MasterDark.header = hdulist[0].header
-                hdulist_MasterDark.header['history'] = \
-                           "Combined {0} images to make this master dark.".format(\
-                                                                        len(Darks))
-                self.logger.debug("  Writing master dark file: {0}".format(\
-                                                                   MasterDarkFile))
-                hdulist_MasterDark.writeto(MasterDarkFile)
+            if type(Darks) == str:
+                if os.path.exists(Darks):
+                    self.logger.debug("  Found master dark.  Opening master dark data.")
+                    with fits.open(Darks) as hdulist_dark:
+                        MasterDarkData = hdulist_dark[0].data
+                else:
+                    self.logger.warning('  Could not find master dark {}'.format(Darks))
+                    return False
+            elif type(Darks) == list:
+                if len(Darks) == 0:
+                    self.logger.warning('  No input darks found')
+                    return False
+                if len(Darks) == 1:
+                    if os.path.exists(Darks[0]):
+                        self.logger.debug("  Found master dark.  Opening master dark data.")
+                        with fits.open(Darks[0]) as hdulist_dark:
+                            MasterDarkData = hdulist_dark[0].data
+                    else:
+                        self.logger.warning('  Could not find master dark {}'.format(Darks[0]))
+                        return False
+                else:
+                    self.logger.info("  Median combining {0} darks.".format(len(Darks)))
+                    ## Combine multiple darks frames
+                    DarkData = []
+                    for Dark in Darks:
+                        with fits.open(Dark) as hdulist:
+                            DarkData.append(hdulist[0].data)
+                    DarkData = np.array(DarkData)
+                    MasterDarkData = np.median(DarkData, axis=0)
+                    ## Save Master Dark to Fits File
+                    DataPath = os.path.split(self.raw_file)[0]
+                    DataNightString = os.path.split(DataPath)[1]
+                    MasterDarkFilename = 'MasterDark_{}_{}_{}.fits'.format(\
+                                              self.tel.name,\
+                                              DataNightString,\
+                                              str(int(math.floor(self.exptime.to(u.s).value)))
+                                              )
+                    MasterDarkFile  = os.path.join(self.tel.temp_file_path,\
+                                                   MasterDarkFilename)
+                    hdu_MasterDark = fits.PrimaryHDU(MasterDarkData)
+                    hdulist_MasterDark = fits.HDUList([hdu_MasterDark])
+                    hdulist_MasterDark.header = hdulist[0].header
+                    hdulist_MasterDark.header['history'] = \
+                               "Combined {0} images to make this master dark.".format(\
+                                                                            len(Darks))
+                    self.logger.debug("  Writing master dark file: {0}".format(\
+                                                                       MasterDarkFile))
+                    hdulist_MasterDark.writeto(MasterDarkFile)
             else:
-                self.logger.error("No input dark files detected.")
+                self.logger.error("  Could not find master dark file(s) {}".format(Darks))
+                return False
+
             ## Now Subtract MasterDark from Image
             self.logger.debug("  Subtracting dark from image.")
             ImageData = hdulist_image[0].data
