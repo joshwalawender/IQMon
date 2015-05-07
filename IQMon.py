@@ -353,24 +353,29 @@ class Telescope(object):
 ## Define Image object which holds information and methods for analysis
 ##-----------------------------------------------------------------------------
 class Image(object):
+    '''Object which represents a single image to be analyzed.  When defined, the
+    image objects requires a filename to a valid image (.fits or .cr2) file.
+    
+    Input
+    -----
+    file : The path to the file to be analyzed.
+    
+    tel : An IQMon.Telescope object which describes the telescope which took
+        the image.
     '''
-    The Image object represents a single input image to the IQMon process.
-
-    When defined, the image objects requires a filename to a valid fits file.
-    '''
-    def __init__(self, input, tel):
+    def __init__(self, file, tel):
         self.start_process_time = datetime.datetime.now()
-        if os.path.exists(input):
-            fits_file_directory, fits_filename = os.path.split(input)
-            self.raw_file = input
-            self.raw_file_name = fits_filename
-            self.raw_file_directory = fits_file_directory
-            self.raw_file_basename, self.file_ext = os.path.splitext(fits_filename)
+        if os.path.exists(file):
+            file_directory, filename = os.path.split(file)
+            self.raw_file = file
+            self.raw_file_name = filename
+            self.raw_file_directory = file_directory
+            self.raw_file_basename, self.file_ext = os.path.splitext(filename)
         else:
             self.raw_file = None
             self.raw_file_name = None
             self.raw_file_directory = None
-            raise IOError("File {0} does not exist".format(input))
+            raise IOError("File {0} does not exist".format(file))
         ## Confirm that input tel is an IQMon.Telescope object
         assert isinstance(tel, Telescope)
         self.tel = tel
@@ -452,8 +457,8 @@ class Image(object):
     ## Make Logger Object
     ##-------------------------------------------------------------------------
     def get_logger(self, logger):
-        '''
-        If calling from another program which has its own logger object, pass
+        '''Add an existing logger object to the Image object.  Use this if
+        calling from another program which has its own logger object, pass
         that logger to IQMon with this method.
         '''
         self.logger = logger
@@ -465,8 +470,19 @@ class Image(object):
 
 
     def make_logger(self, logfile=None, clobber=False, verbose=False):
-        '''
-        Create the logger object to use when processing.  Takes as input the
+        '''Create a logger object to use with this image.  
+        
+        Parameters
+        -----
+        logfile : file to write log to
+        
+        clobber : defaults to False.  If clobber is True, the old log file will
+            be deleted.
+        
+        verbose : Defaults to False.  If verbose is true, it sets the logging
+            level to DEBUG (otherwise level is INFO).
+        
+        Takes as input the
         full path to the file to write the log to and verboase, a boolean value
         which will increase the verbosity of the concole log (the file log will
         always be at debug level).
@@ -512,10 +528,12 @@ class Image(object):
     ## Read Header
     ##-------------------------------------------------------------------------
     def read_header(self):
-        '''
-        Read information from the image fits header.
+        '''Reads information from the image fits header.
         '''
         start_time = datetime.datetime.now()
+        if self.file_ext.lower() not in ['.fts', '.fits', '.fit']:
+            self.logger.warning('Can not read fits header from non-fits file.')
+            return False
         self.logger.info("Reading image header.")
         if not self.working_file:
             with fits.open(self.raw_file, ignore_missing_end=True) as hdulist:
