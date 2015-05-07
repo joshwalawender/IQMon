@@ -711,7 +711,8 @@ class Image(object):
     ## Edit Header
     ##-------------------------------------------------------------------------
     def edit_header(self, keyword, value, comment=None):
-        '''Edit a single keyword in the image fits header.
+        '''Edit a single keyword in the image fits header.  File must have a
+        .fts, .fits, or .fit extension.
         
         Input
         -----
@@ -723,6 +724,9 @@ class Image(object):
         ----------
         comment : comment string for the keyword entry
         '''
+        if self.file_ext.lower() not in ['.fts', '.fits', '.fit']:
+            self.logger.warning('Can not read fits header from non-fits file.')
+            return False
         self.logger.info('Editing image header: {} = {}'.format(keyword, value))
         with fits.open(self.working_file, ignore_missing_end=True, mode='update') as hdulist:
             hdulist[0].header[keyword] = value
@@ -734,12 +738,22 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Uncompress image
     ##-------------------------------------------------------------------------
-    def uncompress(self, timeout=10):
+    def uncompress(self, timeout=20):
+        '''Method to use funpack to uncompress a compressed fits image.  File
+        must have a .fts, .fits, or .fit extension.
+
+        Parameters
+        ----------
+        timeout : Seconds before the funpack command is considered frozen and
+            the process call times out.  Default is 20.
+        '''
         if not self.working_file:
             self.logger.warning('Must have working file to uncompress file')
-        else:
             return False
-        
+        if self.file_ext.lower() not in ['.fts', '.fits', '.fit']:
+            self.logger.warning('Can funpack a non-fits file.')
+            return False
+
         try:
             result = subprocess.check_output(['fpack', '-L', self.working_file], timeout=timeout)
         except subprocess.TimeoutExpired as e:
@@ -751,7 +765,7 @@ class Image(object):
         for line in result.split('\n'):
             IsMatch = re.match('\s*\d+\s+IMAGE\s+([\w/=\.]+)\s(BITPIX=[\-\d]+)\s(\[.*\])\s([\w]+)', line)
             if IsMatch:
-                self.logger.debug('  funpack -L Output: {}'.format(line))
+                self.logger.debug('  fpack -L Output: {}'.format(line))
                 if re.search('not_tiled', IsMatch.group(4)) and not re.search('no_pixels', IsMatch.group(3)):
                     self.logger.debug('  Image is not compressed')
                     found_compression_info = True
@@ -764,40 +778,42 @@ class Image(object):
             try:
                 subprocess.call(['funpack', '-F', self.working_file], timeout=timeout)
             except subprocess.TimeoutExpired as e:
-                self.logger.warning('fpack timed out')
+                self.logger.warning('funpack timed out')
             except:
                 self.logger.warning('Failed to run funpack')
 
     ##-------------------------------------------------------------------------
     ## Read Image
     ##-------------------------------------------------------------------------
-    def read_image(self, timeout=10):
-        '''
-        Read the raw image and write out a working image in the IQMon temporary
-        directory.
+    def read_image(self, timeout=20):
+        '''Read the raw image and write out a working image in the IQMon
+        temporary directory.
         
-        - For the moment, this only copies a fits file from the original
-          location to the IQMon tmp directory.
-        - Later implement file format conversion from CRW, CR2, DNG, etc to
-          fits using dcraw.
-          
-        Notes on reading raw files:
-        * dcraw converts to ppm file, then pamtofits converts to fits (pamtofits 
-          sends output to STDOUT, so must redirect to a fits file).
-        * pamtofits is part of netpbm, but need to install netpbm-bin on fink
-          to get the command line programs
+        If the raw file is a fits file (.fit, .fts, or .fits extension), the
+        working file will be standardized to have a .fits file extension
         
-        dcraw options:
-        * -4 makes linear file
-        * -D makes totally raw file (Without -D option, color interpolation is
-             done.  Without -D option, get raw pixel values).
+        If the raw file is a fits file and is found to be fpack compressed,
+        the working file will be uncompressed.
+        
+        If the raw file is a DSLR raw file (.cr2 or .dng), then the working file
+        will be converted to a fits file.  First, dcraw is called to convert to
+        a .ppm file using the -4 option which forces a linear conversion (no
+        gamma correction) of the pixel values to 16 bit integers.  Then the .ppm
+        file is ocnverted to a fits image using either the pamtofits or
+        pnmtofits tools.  The final fits file will be three dimensional with the
+        third dimension being the color channels (R, G, B).
+        
+        Parameters
+        ----------
+        timeout : Seconds before the command is considered frozen and the
+            process call times out.  Default is 20.
         '''
         start_time = datetime.datetime.now()
         chmod_code = stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH | stat.S_IWOTH
         if self.working_file:
             if os.path.exists(self.working_file): os.remove(self.working_file)
         ## fts extension:  make working copy and rename to .fits
-        if self.file_ext == '.fts':
+        if self.file_ext in ['.fts', '.fit']:
             self.logger.info('Making working copy of raw image: {}'.format(\
                                                             self.raw_file_name))
             self.working_file = os.path.join(self.tel.temp_file_path,\
@@ -820,7 +836,7 @@ class Image(object):
             self.file_ext = '.fits'
             self.uncompress()
         ## DSLR file:  convert to fits
-        elif self.file_ext in ['.dng', '.DNG', '.cr2', '.CR2']:
+        elif self.file_ext.lower() in ['.dng', '.cr2']:
             self.logger.info('Converting {} to fits format'.format(\
                                                             self.raw_file_name))
             ## Make copy of raw file
