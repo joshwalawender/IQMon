@@ -48,13 +48,17 @@ def mode(data, binsize):
     
     Parameters
     ----------
-    data : input list of values
-    binsize : size of the bins in to which the data will be sorted
+    data : list
+        list of values to be analyzed
+
+    binsize : float
+        size of the bins in to which the data will be sorted
     
     Returns
     -------
-    (n, center) : tuple containing the number of data points in the most common
-        bin (n) and the central value of that bin (center)
+    (n, center) : tuple
+        tuple containing the number of data points in the most common bin (n)
+        and the central value of that bin (center)
     '''
     bmin = math.floor(min(data)/binsize)*binsize - binsize/2.
     bmax = math.ceil(max(data)/binsize)*binsize + binsize/2.
@@ -75,113 +79,122 @@ class Telescope(object):
     '''Object which contains information about the telescope which took the
     Image (see IQMon.Image object definition).
     
-    The telescope properties are definied on initialization when a configuration
-    file is read.  The configuration file is a YAML formatted text file which
-    can contain the following entries:
-    
-    name : string containing the name of the telescope
-    
-    logs_file_path : the path in to which log files will be written
-    
-    plot_file_path : the path in to which the plots (e.g. those from the
-        image.make_PSF_plot() or image.make_zero_point_plot() methods) will be
-        written.
-    
-    temp_file_path : the path used for temporary files created by the program
+    Parameters
+    ----------
+    config_file : string
+        Path to the configuration file to be read.  The telescope properties are
+        definied when a configuration file is read.  The configuration file is a
+        YAML formatted text file which can contain the following entries:
 
-    mongo_address : string containing the address to connecto to the mongo server
-        which, if used, will contain a database of image analysis results.
+        name : string containing the name of the telescope
 
-    mongo_port : integer containing the port number of the mongo server
+        logs_file_path : the path in to which log files will be written
 
-    mongo_db : string containing the name of the mongo database to use
+        plot_file_path : the path in to which the plots (e.g. those from the
+            image.make_PSF_plot() or image.make_zero_point_plot() methods) will
+            be written.
 
-    mongo_collection : string containing the name of the mongo collection to use
+        temp_file_path : the path used for temporary files created by the
+            program
 
-    pixel_scale : float containing the pixel scale in arcseconds per pixel.  If
-        either the pixel_scale or both the focal_length and pixel_size are
-        required to be in the configuration file.
+        mongo_address : string containing the address to connecto to the mongo
+            server which, if used, will contain a database of image analysis
+            results.
 
-    focal_length : interger containing the focal length of the telescope in mm.
-        This is used in estimating the pixel scale prior to plate solving.
+        mongo_port : integer containing the port number of the mongo server
 
-    pixel_size : float containing the size of a pixel in microns.  This is used
-        in estimating the pixel scale prior to plate solving.
+        mongo_db : string containing the name of the mongo database to use
 
-    gain : float with the estimated gain (electroncs per ADU) of the detector.
-        This value is used by source extractor.  If it is not present a default
-        value of 1.0 will be used.
+        mongo_collection : string containing the name of the mongo collection to
+            use
 
-    saturation : float with the saturation level of the detector in ADU.  This
-        is used in optionally marking saturated pixels in the jpegs made by the
-        make_JPEG() method of the Image object.
+        pixel_scale : float containing the pixel scale in arcseconds per pixel.
+            If either the pixel_scale or both the focal_length and pixel_size
+            are required to be in the configuration file.
 
-    threshold_FWHM : float value (in units of pixels) with the threshold FWHM
-        value.  If the image FWHM is above this value, the FWHM flag will be
-        set.
+        focal_length : interger containing the focal length of the telescope in
+            mm.  This is used in estimating the pixel scale prior to plate
+            solving.
 
-    threshold_pointing_err : float value (in units of arcmin) with the threshold
-        pointing error.  If the pointing error is above this value, the pointing
-        error flag will be set.
+        pixel_size : float containing the size of a pixel in microns.  This is
+            used in estimating the pixel scale prior to plate solving.
 
-    threshold_ellipticity : float value (unitless) with the threshold
-        ellipticity.  If the ellipticity is above this value, the ellipticity
-        flag will be set.
+        gain : float with the estimated gain (electroncs per ADU) of the
+            detector.  This value is used by source extractor.  If it is not
+            present a default value of 1.0 will be used.
 
-    threshold_zeropoint : float value (in magnitudes) with the threshold zero
-        point.  If the zero point is above this value, the zero point flag will
-        be set.
+        saturation : float with the saturation level of the detector in ADU.
+            This is used in optionally marking saturated pixels in the jpegs
+            made by the make_JPEG() method of the Image object.
 
-    units_for_FWHM : The units which will be used when displaying the FWHM value
-        on the web page.  Also often used by customized scripts for displaying
-        IQMon results.
+        threshold_FWHM : float value (in units of pixels) with the threshold
+            FWHM value.  If the image FWHM is above this value, the FWHM flag
+            will be set.
 
-    ROI : string representing the region of interest in pixels which the image
-        should be cropped to.  Format is "[x1:x2,y1:y2]" where x1 is the minimum
-        x pixel, x2 is the maximum x pixel, y1 is the minimum y pixel, and y2 is
-        the maximum y pixel.  All pixel values will be forced to integers.
+        threshold_pointing_err : float value (in units of arcmin) with the
+            threshold pointing error.  If the pointing error is above this
+            value, the pointing error flag will be set.
 
-    PSF_measurement_radius : Radius in pixels of central region for which the
-        image quality measurements of stars are used in determining the image
-        FWHM and ellipticity.  This parameter allows the user to ignore the
-        corners of the image if they wish to ignore the optical aberrations in
-        that region.
+        threshold_ellipticity : float value (unitless) with the threshold
+            ellipticity.  If the ellipticity is above this value, the
+            ellipticity flag will be set.
 
-    pointing_marker_size : Diameter (in arcminutes) of the pointing marker
-        symbol on the image jpegs generated by the make_JPEG() method.
+        threshold_zeropoint : float value (in magnitudes) with the threshold
+            zero point.  If the zero point is above this value, the zero point
+            flag will be set.
 
-    SExtractor_params : Dictionary of source extractor parameters to be used
-        when source extractor is called.  For example, when you want to set the
-        CATALOG_TYPE to FITS_LDAC, use {'CATALOG_TYPE': 'FITS_LDAC'}.
+        units_for_FWHM : The units which will be used when displaying the FWHM
+            value on the web page.  Also often used by customized scripts for
+            displaying IQMon results.
 
-    SCAMP_params : Dictionary of SCAMP parameters to be used when SCAMP is
-        called.
+        ROI : string representing the region of interest in pixels which the
+            image should be cropped to.  Format is "[x1:x2,y1:y2]" where x1 is
+            the minimum x pixel, x2 is the maximum x pixel, y1 is the minimum y
+            pixel, and y2 is the maximum y pixel.  All pixel values will be
+            forced to integers.
 
-    catalog : Dictionary containing information about the stellar catalog which
-        is matched to the detected stars to determine the zero point.  The
-        get_catalog() method will query Vizier using these parameters.
+        PSF_measurement_radius : Radius in pixels of central region for which
+            the image quality measurements of stars are used in determining the
+            image FWHM and ellipticity.  This parameter allows the user to
+            ignore the corners of the image if they wish to ignore the optical
+            aberrations in that region.
+
+        pointing_marker_size : Diameter (in arcminutes) of the pointing marker
+            symbol on the image jpegs generated by the make_JPEG() method.
+
+        SExtractor_params : Dictionary of source extractor parameters to be used
+            when source extractor is called.  For example, when you want to set
+            the CATALOG_TYPE to FITS_LDAC, use {'CATALOG_TYPE': 'FITS_LDAC'}.
+
+        SCAMP_params : Dictionary of SCAMP parameters to be used when SCAMP is
+            called.
+
+        catalog : Dictionary containing information about the stellar catalog
+            which is matched to the detected stars to determine the zero point.
+            The get_catalog() method will query Vizier using these parameters.
         
-        name : The name of the catalog which will be passed to a
-            astroquery.vizier.Vizier() instance.
+            name : The name of the catalog which will be passed to a
+                astroquery.vizier.Vizier() instance.
         
-        columns : List of the column names to retrieve.  Defaults to
-            ['_RAJ2000','_DEJ2000','UCAC4','Bmag','Vmag','gmag','rmag','imag']
-            if the catalog is UCAC4.
+            columns : List of the column names to retrieve.  Defaults to
+                ['_RAJ2000','_DEJ2000','UCAC4','Bmag','Vmag','gmag','rmag','imag']
+                if the catalog is UCAC4.
         
-        magmax : Maximum magnitude to retrieve.
+            magmax : Maximum magnitude to retrieve.
         
-        Remaining parameters are the dictionary which link the filter names in
-        the fits header to the filter names in the Vizier catalog that is
-        retrieved.  For example, if I want to compare the source extractor
-        catalog with the UCAC4 catalog limited to stars brighter than magnitude
-        15 and I want to compare the 'rmag' filter magnitudes from the catalog 
-        to my images which have the FILTER header keyword set to 'PSr', then I
-        would have a configuration file which contains the following:
+            Remaining parameters are the dictionary which link the filter names
+            in the fits header to the filter names in the Vizier catalog that is
+            retrieved.  For example, if I want to compare the source extractor
+            catalog with the UCAC4 catalog limited to stars brighter than
+            magnitude 15 and I want to compare the 'rmag' filter magnitudes from
+            the catalog to my images which have the FILTER header keyword set to
+            'PSr', then I would have a configuration file which contains the
+            following:
 
-        catalog:
-            name: 'UCAC4'
-            magmax: 15.0
-            PSr: 'rmag'
+            catalog:
+                name: 'UCAC4'
+                magmax: 15.0
+                PSr: 'rmag'
     '''
     def __init__(self, config_file):
         self.site = ephem.Observer()
@@ -481,11 +494,6 @@ class Image(object):
         
         verbose : Defaults to False.  If verbose is true, it sets the logging
             level to DEBUG (otherwise level is INFO).
-        
-        Takes as input the
-        full path to the file to write the log to and verboase, a boolean value
-        which will increase the verbosity of the concole log (the file log will
-        always be at debug level).
         '''
         if not logfile:
             logfile = os.path.join(self.tel.logs_file_path, '{}_IQMon.log'.format(self.raw_file_basename))
@@ -528,8 +536,8 @@ class Image(object):
     ## Read Header
     ##-------------------------------------------------------------------------
     def read_header(self):
-        '''Reads information from the image fits header.  File must have a .fts,
-        .fits, or .fit extension.
+        '''Reads information from the image fits header and stores values as
+        properties of itself.  File must have a .fts, .fits, or .fit extension.
         '''
         start_time = datetime.datetime.now()
         if self.file_ext.lower() not in ['.fts', '.fits', '.fit']:
@@ -744,8 +752,9 @@ class Image(object):
 
         Parameters
         ----------
-        timeout : Seconds before the funpack command is considered frozen and
-            the process call times out.  Default is 20.
+        timeout : int, optional
+            Seconds before the command is considered frozen and the process call
+            times out.  Default is 20.
         '''
         if not self.working_file:
             self.logger.warning('Must have working file to uncompress file')
@@ -805,8 +814,9 @@ class Image(object):
         
         Parameters
         ----------
-        timeout : Seconds before the command is considered frozen and the
-            process call times out.  Default is 20.
+        timeout : int, optional
+            Seconds before the command is considered frozen and the process call
+            times out.  Default is 20.
         '''
         start_time = datetime.datetime.now()
         chmod_code = stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH | stat.S_IWOTH
