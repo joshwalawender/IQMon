@@ -473,7 +473,7 @@ class Image(object):
         '''Create a logger object to use with this image.  
         
         Parameters
-        -----
+        ----------
         logfile : file to write log to
         
         clobber : defaults to False.  If clobber is True, the old log file will
@@ -528,7 +528,8 @@ class Image(object):
     ## Read Header
     ##-------------------------------------------------------------------------
     def read_header(self):
-        '''Reads information from the image fits header.
+        '''Reads information from the image fits header.  File must have a .fts,
+        .fits, or .fit extension.
         '''
         start_time = datetime.datetime.now()
         if self.file_ext.lower() not in ['.fts', '.fits', '.fit']:
@@ -709,13 +710,24 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Edit Header
     ##-------------------------------------------------------------------------
-    def edit_header(self, keyword, value):
-        '''
-        Edit a single keyword in the image fits header.
+    def edit_header(self, keyword, value, comment=None):
+        '''Edit a single keyword in the image fits header.
+        
+        Input
+        -----
+        keyword : a string representing a valid FITS keyword.
+        
+        value : The value to enter for that keyword.
+        
+        Parameters
+        ----------
+        comment : comment string for the keyword entry
         '''
         self.logger.info('Editing image header: {} = {}'.format(keyword, value))
         with fits.open(self.working_file, ignore_missing_end=True, mode='update') as hdulist:
             hdulist[0].header[keyword] = value
+            if comment:
+                hdulist[0].header.comments[keyword] = comment
             hdulist.flush()
 
 
