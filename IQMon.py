@@ -200,6 +200,7 @@ class Telescope(object):
         self.site = ephem.Observer()
 
         ## Read YAML Config File
+        config_file = os.path.expanduser(config_file)
         if not os.path.exists(config_file):
             raise TelescopeConfigError('Configuration file {} not found'.format(config_file))
         with open(config_file, 'r') as yaml_string:
@@ -378,6 +379,7 @@ class Image(object):
     '''
     def __init__(self, file, tel):
         self.start_process_time = datetime.datetime.now()
+        file = os.path.expanduser(file)
         if os.path.exists(file):
             file_directory, filename = os.path.split(file)
             self.raw_file = file
