@@ -1488,7 +1488,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Determine Image FWHM from SExtractor Catalog
     ##-------------------------------------------------------------------------
-    def determine_FWHM(self):
+    def determine_FWHM(self, plot=False):
         '''
         Determine typical FWHM of image from SExtractor results.
         '''
@@ -1579,6 +1579,10 @@ class Image(object):
                 self.flags['ellipticity'] = False
         except:
             pass
+
+        ## Make Plot if Requested
+        if plot:
+            self.make_PSF_plot()
 
 
     ##-------------------------------------------------------------------------
