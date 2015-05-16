@@ -778,10 +778,12 @@ class Image(object):
 
         found_compression_info = False
         for line in result.split('\n'):
-            IsMatch = re.match('\s*\d+\s+IMAGE\s+([\w/=\.]+)\s(BITPIX=[\-\d]+)\s(\[.*\])\s([\w]+)', line)
+            regexp = '\s*\d+\s+IMAGE\s+([\w/=\.]+)\s(BITPIX=[\-\d]+)\s(\[.*\])\s([\w]+)'
+            IsMatch = re.match(regexp, line)
             if IsMatch:
                 self.logger.debug('  fpack -L Output: {}'.format(line))
-                if re.search('not_tiled', IsMatch.group(4)) and not re.search('no_pixels', IsMatch.group(3)):
+                if re.search('not_tiled', IsMatch.group(4)) and\
+                   not re.search('no_pixels', IsMatch.group(3)):
                     self.logger.debug('  Image is not compressed')
                     found_compression_info = True
                 elif re.search('tiled_rice', IsMatch.group(4)):
@@ -1082,7 +1084,9 @@ class Image(object):
             total_process_time = (EndTime - StartTime).total_seconds()
             self.logger.debug("  Astrometry.net Processing Time: {:.1f} s".format(\
                                                            total_process_time))
-            IsFieldCenter = re.search("Field center:\s\(RA\sH:M:S,\sDec D:M:S\)\s=\s\((\d{1,2}:\d{2}:\d{2}\.\d+,\s[+-]?\d{1,2}:\d{2}:\d{2}\.\d+)\)", ''.join(output))
+            regexp = "Field center:\s\(RA\sH:M:S,\sDec D:M:S\)\s=\s"+\
+                     "\((\d{1,2}:\d{2}:\d{2}\.\d+,\s[+-]?\d{1,2}:\d{2}:\d{2}\.\d+)\)"
+            IsFieldCenter = re.search(regexp, ''.join(output))
             if IsFieldCenter:
                 self.logger.info("  Astrometry.net field center is: {}".format(\
                                                     IsFieldCenter.group(1)))
@@ -2025,7 +2029,8 @@ class Image(object):
                 MatchVersion = re.search('SWarp (\d+\.\d+\.\d+) started on', line)
                 if MatchVersion:
                     self.logger.debug('  SWarp version = {}'.format(MatchVersion.group(1)))
-                if not re.search('Resampling line', line) and not re.search('Setting up background map at', line):
+                if not re.search('Resampling line', line) and\
+                   not re.search('Setting up background map at', line):
                     self.logger.debug("  SWarp Output: "+line)
         ## Replace working_file with SWarp output file
         if os.path.exists(swarp_file):
