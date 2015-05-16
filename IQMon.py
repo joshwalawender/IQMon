@@ -1880,7 +1880,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Run SCAMP
     ##-------------------------------------------------------------------------
-    def run_SCAMP(self, timeout=90):
+    def run_SCAMP(self, params=None, timeout=90):
         '''
         Run SCAMP on SExtractor output catalog.
         '''
@@ -1907,13 +1907,13 @@ class Image(object):
                         'XML_NAME': os.path.join(self.tel.temp_file_path, 'scamp.xml'),
                         }
 
-        if not self.tel.SCAMP_params:
-            SCAMP_params = SCAMP_default
-        else:
-            SCAMP_params = self.tel.SCAMP_params
-            for key in SCAMP_default.keys():
-                if not key in self.tel.SCAMP_params.keys():
-                    SCAMP_params[key] = SCAMP_default[key]
+        SCAMP_params = SCAMP_default
+        if self.tel.SCAMP_params:
+            for key in self.tel.SCAMP_params.keys():
+                SCAMP_params[key] = self.tel.SCAMP_params[key]
+        if params:
+            for key in params.keys():
+                SCAMP_params[key] = params[key]
 
         SCAMPCommand = ["scamp", self.SExtractor_catalogfile]
         for key in SCAMP_params.keys():
