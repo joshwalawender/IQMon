@@ -5,7 +5,8 @@ import sys
 import os
 import argparse
 import logging
-import datetime
+from datetime import datetime as dt
+from datetime import timedelta as tdelta
 import re
 import glob
 
@@ -39,8 +40,8 @@ def free_space(path):
 class Status(RequestHandler):
     def get(self):
         tlog.app_log.info('Get request for Status recieved')
-        nowut = datetime.datetime.utcnow()
-        now = nowut - datetime.timedelta(0,10*60*60)
+        nowut = dt.utcnow()
+        now = nowut - tdelta(0,10*60*60)
 
         client = MongoClient('192.168.1.101', 27017)
 
@@ -86,25 +87,28 @@ class Status(RequestHandler):
         else:
             moon['now'] = 'down'
 
+        tlog.app_log.info('  Ephem data calculated')
+
         ##---------------------------------------------------------------------
         ## Get Latest V20 Data
         ##---------------------------------------------------------------------
         v20status = client.vysos['V20.status']
         v20entries = []
-        while (len(v20entries) < 1) and (nowut > datetime.datetime(2015,1,1)):
+        while (len(v20entries) < 1) and (nowut > dt(2015,1,1)):
             v20entries = [entry for entry\
                           in v20status.find(\
                           {"UT date" : nowut.strftime('%Y%m%dUT')}\
                           ).sort([('UT time', pymongo.ASCENDING)])]
             if len(v20entries) > 0: v20data = v20entries[-1]
-            else: nowut = nowut - datetime.timedelta(1, 0)
-        nowut = datetime.datetime.utcnow()
+            else: nowut = nowut - tdelta(1, 0)
+        nowut = dt.utcnow()
+        tlog.app_log.info('  v20data retrieved')
 
         try:
             try:
                 v20clarity_time = v20data['boltwood timestamp']
             except:
-                v20clarity_time = datetime.datetime.strptime('{} {}'.format(\
+                v20clarity_time = dt.strptime('{} {}'.format(\
                                   v20data['boltwood date'],\
                                   v20data['boltwood time'][:-3]),\
                                   '%Y-%m-%d %H:%M:%S')        
@@ -114,12 +118,13 @@ class Status(RequestHandler):
         except:
             v20clarity_age = float('nan')
             v20clarity_color = 'red'
+        tlog.app_log.info('  v20clarity_color determined')
 
         try:
             try:
                 v20data_time = v20data['UT timestamp']
             except:
-                v20data_time = datetime.datetime.strptime('{} {}'.format(\
+                v20data_time = dt.strptime('{} {}'.format(\
                                v20data['UT date'],\
                                v20data['UT time']),\
                                '%Y%m%dUT %H:%M:%S')
@@ -129,24 +134,26 @@ class Status(RequestHandler):
         except:
             v20data_age = float('nan')
             v20data_color = 'red'
+        tlog.app_log.info('  v20data_color determined')
 
         ##---------------------------------------------------------------------
         ## Get Latest V5 Data
         ##---------------------------------------------------------------------
         v5status = client.vysos['V5.status']
         v5entries = []
-        while (len(v5entries) < 1) and (nowut > datetime.datetime(2015,1,1)):
+        while (len(v5entries) < 1) and (nowut > dt(2015,1,1)):
             v5entries = [entry for entry\
                           in v5status.find( {"UT date" : nowut.strftime('%Y%m%dUT')} ).sort([('UT time', pymongo.ASCENDING)])]
             if len(v5entries) > 0: v5data = v5entries[-1]
-            else: nowut = nowut - datetime.timedelta(1, 0)
-        nowut = datetime.datetime.utcnow()
+            else: nowut = nowut - tdelta(1, 0)
+        nowut = dt.utcnow()
+        tlog.app_log.info('  v5data retrieved')
 
         try:
             try:
                 v5clarity_time = v5data['boltwood timestamp']
             except:
-                v5clarity_time = datetime.datetime.strptime('{} {}'.format(\
+                v5clarity_time = dt.strptime('{} {}'.format(\
                                   v5data['boltwood date'],\
                                   v5data['boltwood time'][:-3]),\
                                   '%Y-%m-%d %H:%M:%S')        
@@ -156,12 +163,13 @@ class Status(RequestHandler):
         except:
             v5clarity_age = float('nan')
             v5clarity_color = 'red'
+        tlog.app_log.info('  v5clarity_color determined')
 
         try:
             try:
                 v5data_time = v5data['UT timestamp']
             except:
-                v5data_time = datetime.datetime.strptime('{} {}'.format(\
+                v5data_time = dt.strptime('{} {}'.format(\
                                v5data['UT date'],\
                                v5data['UT time']),\
                                '%Y%m%dUT %H:%M:%S')
@@ -171,7 +179,8 @@ class Status(RequestHandler):
         except:
             v5data_age = float('nan')
             v5data_color = 'red'
-        
+        tlog.app_log.info('  v5clarity_color determined')
+
         ##---------------------------------------------------------------------
         ## Format and Color Code Boltwood Data
         ##---------------------------------------------------------------------
@@ -279,6 +288,7 @@ class Status(RequestHandler):
             elif v5data['boltwood roof close'] == 1: v5data['boltwood roof close color'] = 'red'
             else: v5data['boltwood roof close color'] = ''
             v5data['boltwood roof close string'] = roof_close[v5data['boltwood roof close']]
+        tlog.app_log.info('  colors determined')
 
         ##---------------------------------------------------------------------
         ## Format and Color Code ACP Data
@@ -327,6 +337,10 @@ class Status(RequestHandler):
             else:
                 v20data['ACP connected color'] = ''
                 v20coord = ''
+        else:
+            v20data['ACP connected color'] = ''
+            v20coord = ''
+        tlog.app_log.info('  V20 ACP Connected Color determined')
 
         if 'ACP connected' in v5data.keys():
             v5data['ACP connected string'] = ACP_connected[v5data['ACP connected']]
@@ -373,6 +387,7 @@ class Status(RequestHandler):
         else:
             v5data['ACP connected color'] = ''
             v5coord = ''
+        tlog.app_log.info('  V5 ACP Connected Color determined')
 
         ##---------------------------------------------------------------------
         ## Get disk use info
@@ -395,6 +410,7 @@ class Status(RequestHandler):
                     pcnt_used = float(size_GB - avail_GB)/float(size_GB) * 100
                 disks[disk] = [size_GB, avail_GB, pcnt_used]
 
+        tlog.app_log.info('  Disk use data determined')
 
         ##---------------------------------------------------------------------
         ## Render
@@ -402,7 +418,10 @@ class Status(RequestHandler):
         if nowut.hour >= 4:
             link_date_string = nowut.strftime('%Y%m%dUT')
         else:
-            link_date_string = (nowut - datetime.timedelta(1,0)).strftime('%Y%m%dUT')
+            link_date_string = (nowut - tdelta(1,0)).strftime('%Y%m%dUT')
+
+        print(v20coord)
+        print(v20data_color)
 
         tlog.app_log.info('  Rendering Status')
         self.render("status.html", title="VYSOS Status",\

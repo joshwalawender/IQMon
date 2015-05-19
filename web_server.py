@@ -7,8 +7,8 @@ import sys
 import os
 import argparse
 import logging
-import datetime.datetime as dt
-import datetime.timedelta as tdelta
+from datetime import datetime as dt
+from datetime import timedelta as tdelta
 import re
 import glob
 
