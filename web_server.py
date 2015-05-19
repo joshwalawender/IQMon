@@ -9,6 +9,7 @@ import argparse
 import logging
 from datetime import datetime as dt
 from datetime import timedelta as tdelta
+from argparse import ArgumentParser
 import re
 import glob
 
@@ -25,7 +26,6 @@ from astropy.coordinates import SkyCoord
 import ephem
 
 import IQMon
-import custom_handlers
 
 class MyStaticFileHandler(StaticFileHandler):
     def set_extra_headers(self, path):
@@ -174,6 +174,17 @@ class ListOfNights(RequestHandler):
 ## Main
 ##-----------------------------------------------------------------------------
 def main():
+    ##-------------------------------------------------------------------------
+    ## Parse Command Line Arguments
+    ##-------------------------------------------------------------------------
+    ## create a parser object for understanding command-line arguments
+    parser = ArgumentParser(description="Describe the script")
+    ## add flags
+    parser.add_argument("--with-status",
+        action="store_true", dest="status",
+        default=False, help="Use status handler from custom_handlers.py")
+    args = parser.parse_args()
+
     LogConsoleHandler = logging.StreamHandler()
     LogConsoleHandler.setLevel(logging.DEBUG)
     LogFormat = logging.Formatter('%(asctime)23s %(levelname)8s: %(message)s')
@@ -185,13 +196,24 @@ def main():
     tlog.gen_log.addHandler(LogConsoleHandler)
     tlog.gen_log.setLevel(logging.DEBUG)
 
+    list_of_handlers = [
+                        url(r"/(\w+/?$)", ListOfNights),
+                        url(r"/(\w+)/(\w+)", ListOfImages),
+                        (r"/static/(.*)", MyStaticFileHandler, {"path": "/var/www"}),
+                       ]
 
-    app = Application([
-                       url(r"/", custom_handlers.Status),
-                       url(r"/(\w+/?$)", ListOfNights),
-                       url(r"/(\w+)/(\w+)", ListOfImages),
-                       (r"/static/(.*)", MyStaticFileHandler, {"path": "/var/www"}),
-                     ])
+    if args.status:
+        tlog.app_log.info('Importing status handler')
+        try:
+            from custom_handlers import Status
+            list_of_handlers.append(url(r"/", Status))
+            tlog.app_log.info('  Done')
+        except:
+            tlog.app_log.warning('  Failed')
+            pass
+
+
+    app = Application(list_of_handlers)
     app.listen(80)
     IOLoop.current().start()
 
