@@ -489,7 +489,7 @@ class Image(object):
             self.logger.debug('  {} = {}'.format(entry, self.tel.config[entry]))
 
 
-    def make_logger(self, logfile=None, clobber=False, verbose=False):
+    def make_logger(self, logfile=None, clobber=False, verbose=False, nofile=False):
         '''Create a logger object to use with this image.  The logger object
         will be available as self.logger.
         
@@ -503,33 +503,34 @@ class Image(object):
         verbose : Defaults to False.  If verbose is true, it sets the logging
             level to DEBUG (otherwise level is INFO).
         '''
-        if not logfile:
-            logfile = os.path.join(self.tel.logs_file_path, '{}_IQMon.log'.format(self.raw_file_basename))
-        self.logfile = logfile
-        self.logfilename = os.path.split(self.logfile)[1]
-        if clobber:
-            if os.path.exists(logfile): os.remove(logfile)
-        self.logger = logging.getLogger(self.raw_file_basename)
+        self.logger = logging.getLogger(self.raw_file_basename.replace('.', '_'))
         if len(self.logger.handlers) == 0:
             self.logger.setLevel(logging.DEBUG)
-            LogFileHandler = logging.FileHandler(logfile)
-            LogFileHandler.setLevel(logging.DEBUG)
-            LogConsoleHandler = logging.StreamHandler()
+            LogFormat = logging.Formatter('%(asctime)23s %(levelname)8s: %(message)s')
+            ## Log to a file
+            if not nofile:
+                if not logfile:
+                    logfile = os.path.join(self.tel.logs_file_path, '{}_IQMon.log'.format(self.raw_file_basename))
+                self.logfile = logfile
+                self.logfilename = os.path.split(self.logfile)[1]
+                if clobber:
+                    if os.path.exists(logfile): os.remove(logfile)
+                LogFileHandler = logging.FileHandler(logfile)
+                LogFileHandler.setLevel(logging.DEBUG)
+                LogFileHandler.setFormatter(LogFormat)
+                self.logger.addHandler(LogFileHandler)
+            ## Log to console
+            LogConsoleHandler = logging.StreamHandler(stream=sys.stdout)
             if verbose:
                 LogConsoleHandler.setLevel(logging.DEBUG)
             else:
                 LogConsoleHandler.setLevel(logging.INFO)
-            LogFormat = logging.Formatter('%(asctime)23s %(levelname)8s: %(message)s')
-            LogFileHandler.setFormatter(LogFormat)
             LogConsoleHandler.setFormatter(LogFormat)
             self.logger.addHandler(LogConsoleHandler)
-            self.logger.addHandler(LogFileHandler)
 
         ## Put initial lines in log
-        self.logger.info('')
         self.logger.info("###### Processing Image {} ######".format(self.raw_file_name))
         self.logger.info('IQMon version = {}'.format(__version__))
-        self.logger.info('')
 
         ## Print Configuration to Log
         if 'name' in self.tel.config.keys():
