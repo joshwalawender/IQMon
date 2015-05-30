@@ -20,8 +20,6 @@ import logging
 import yaml
 import math
 import numpy as np
-import matplotlib as mpl
-import matplotlib.pyplot as pyplot
 import pymongo
 from pymongo import MongoClient
 
@@ -447,7 +445,7 @@ class Image(object):
                       'ellipticity': False,\
                       'pointing error': False,\
                       'zero point': False,\
-                      'other': False,\
+                      'blank': False,\
                      }
 
     def __del__(self):
@@ -1600,6 +1598,7 @@ class Image(object):
         Make various plots for analysis of image quality.
         '''
         start_time = datetime.datetime.now()
+        import matplotlib.pyplot as pyplot
 
         if not self.FWHM:
             self.logger.warning('No FWHM statistics found.  Skipping PSF plot creation.')
@@ -1870,11 +1869,11 @@ class Image(object):
         if len(stars) < nstars_threshold:
             self.logger.warning('  Only {} bright stars detected. Image appears blank'.format(\
                                 len(filtered_stars)))
-            self.flags['other'] = True
+            self.flags['blank'] = True
             return True
         else:
             self.logger.info('  Found {} bright stars.'.format(len(stars)))
-            self.flags['other'] = False
+            self.flags['blank'] = False
             return False
 
 
@@ -2313,6 +2312,8 @@ class Image(object):
     def make_zero_point_plot(self):
         start_time = datetime.datetime.now()
         self.logger.info('Making ZeroPoint Plot')
+        import matplotlib.pyplot as pyplot
+
         self.zero_point_plotfilename = self.raw_file_basename+'_ZeroPoint.png'
         self.zero_point_plotfile = os.path.join(self.tel.plot_file_path,\
                                                 self.zero_point_plotfilename)
@@ -2473,6 +2474,8 @@ class Image(object):
         '''
         start_time = datetime.datetime.now()
         self.logger.info('Making jpeg: {}'.format(jpeg_file_name))
+        import matplotlib.pyplot as pyplot
+
         jpeg_file = os.path.join(self.tel.plot_file_path, jpeg_file_name)
 
         from PIL import Image, ImageDraw
