@@ -20,8 +20,6 @@ import logging
 import yaml
 import math
 import numpy as np
-import matplotlib as mpl
-import matplotlib.pyplot as pyplot
 import pymongo
 from pymongo import MongoClient
 
@@ -393,7 +391,8 @@ class Image(object):
             raise IOError("File {0} does not exist".format(file))
         ## Confirm that input tel is an IQMon.Telescope object
         assert isinstance(tel, Telescope)
-        self.tel = tel
+        import copy
+        self.tel = copy.deepcopy(tel)
         ## Initialize values to None
         self.logger = None
         self.working_file = None
@@ -447,7 +446,7 @@ class Image(object):
                       'ellipticity': False,\
                       'pointing error': False,\
                       'zero point': False,\
-                      'other': False,\
+                      'blank': False,\
                      }
 
     def __del__(self):
@@ -489,7 +488,7 @@ class Image(object):
             self.logger.debug('  {} = {}'.format(entry, self.tel.config[entry]))
 
 
-    def make_logger(self, logfile=None, clobber=False, verbose=False):
+    def make_logger(self, logfile=None, clobber=False, verbose=False, nofile=False):
         '''Create a logger object to use with this image.  The logger object
         will be available as self.logger.
         
@@ -503,33 +502,34 @@ class Image(object):
         verbose : Defaults to False.  If verbose is true, it sets the logging
             level to DEBUG (otherwise level is INFO).
         '''
-        if not logfile:
-            logfile = os.path.join(self.tel.logs_file_path, '{}_IQMon.log'.format(self.raw_file_basename))
-        self.logfile = logfile
-        self.logfilename = os.path.split(self.logfile)[1]
-        if clobber:
-            if os.path.exists(logfile): os.remove(logfile)
-        self.logger = logging.getLogger(self.raw_file_basename)
+        self.logger = logging.getLogger(self.raw_file_basename.replace('.', '_'))
         if len(self.logger.handlers) == 0:
             self.logger.setLevel(logging.DEBUG)
-            LogFileHandler = logging.FileHandler(logfile)
-            LogFileHandler.setLevel(logging.DEBUG)
-            LogConsoleHandler = logging.StreamHandler()
+            LogFormat = logging.Formatter('%(asctime)23s %(levelname)8s: %(message)s')
+            ## Log to a file
+            if not nofile:
+                if not logfile:
+                    logfile = os.path.join(self.tel.logs_file_path, '{}_IQMon.log'.format(self.raw_file_basename))
+                self.logfile = logfile
+                self.logfilename = os.path.split(self.logfile)[1]
+                if clobber:
+                    if os.path.exists(logfile): os.remove(logfile)
+                LogFileHandler = logging.FileHandler(logfile)
+                LogFileHandler.setLevel(logging.DEBUG)
+                LogFileHandler.setFormatter(LogFormat)
+                self.logger.addHandler(LogFileHandler)
+            ## Log to console
+            LogConsoleHandler = logging.StreamHandler(stream=sys.stdout)
             if verbose:
                 LogConsoleHandler.setLevel(logging.DEBUG)
             else:
                 LogConsoleHandler.setLevel(logging.INFO)
-            LogFormat = logging.Formatter('%(asctime)23s %(levelname)8s: %(message)s')
-            LogFileHandler.setFormatter(LogFormat)
             LogConsoleHandler.setFormatter(LogFormat)
             self.logger.addHandler(LogConsoleHandler)
-            self.logger.addHandler(LogFileHandler)
 
         ## Put initial lines in log
-        self.logger.info('')
         self.logger.info("###### Processing Image {} ######".format(self.raw_file_name))
         self.logger.info('IQMon version = {}'.format(__version__))
-        self.logger.info('')
 
         ## Print Configuration to Log
         if 'name' in self.tel.config.keys():
@@ -1026,6 +1026,10 @@ class Image(object):
                 with fits.open(self.working_file, mode="update") as hdulist:
                     hdulist[0].data = hdulist[0].data[crop_y1:crop_y2,\
                                                       crop_x1:crop_x2]
+                    if ('CRPIX1' in hdulist[0].header) and\
+                       ('CRPIX2' in hdulist[0].header):
+                        hdulist[0].header['CRPIX1'] -= crop_x1
+                        hdulist[0].header['CRPIX2'] -= crop_y1
                     hdulist.flush()
                 self.cropped = True
                 self.original_nXPix = self.nXPix
@@ -1038,6 +1042,7 @@ class Image(object):
         else:
             self.logger.warning('Can not crop image. No region of interest defined.')
             return False
+        self.read_header()
 
 
     ##-------------------------------------------------------------------------
@@ -1327,6 +1332,7 @@ class Image(object):
                              'CHECKIMAGE_TYPE': 'NONE',
                             }
 
+
         ## Use optional sextractor params
         if not self.tel.SExtractor_params:
             SExtractor_params = SExtractor_default
@@ -1441,49 +1447,49 @@ class Image(object):
             if not os.path.exists(self.SExtractor_catalogfile):
                 self.logger.warning("SExtractor failed to create catalog.")
                 self.SExtractor_catalogfile = None
+            else:
+                ## Read FITS_LDAC SExtractor Catalog
+                self.logger.debug("  Reading SExtractor output catalog.")
+                with fits.open(self.SExtractor_catalogfile) as hdu:
+                    results = table.Table(hdu[2].data)
 
-            ## Read FITS_LDAC SExtractor Catalog
-            self.logger.debug("  Reading SExtractor output catalog.")
-            with fits.open(self.SExtractor_catalogfile) as hdu:
-                results = table.Table(hdu[2].data)
+                rows_to_remove = []
+                for i in range(0,len(results)):
+                    if results['FLAGS'][i] != 0:
+                        rows_to_remove.append(i)
+                if len(rows_to_remove) > 0:
+                    results.remove_rows(rows_to_remove)
 
-            rows_to_remove = []
-            for i in range(0,len(results)):
-                if results['FLAGS'][i] != 0:
-                    rows_to_remove.append(i)
-            if len(rows_to_remove) > 0:
-                results.remove_rows(rows_to_remove)
-
-            self.SExtractor_results = results
-            SExImageRadius = []
-            SExAngleInImage = []
-            assoc_x = []
-            assoc_y = []
-            assoc_catmag = []
-            for star in self.SExtractor_results:
-                SExImageRadius.append(math.sqrt((self.nXPix/2-star['XWIN_IMAGE'])**2 +\
-                                                (self.nYPix/2-star['YWIN_IMAGE'])**2))
-                SExAngleInImage.append(math.atan((star['XWIN_IMAGE']-self.nXPix/2) /\
-                                                 (self.nYPix/2-star['YWIN_IMAGE']))*180.0/math.pi)
+                self.SExtractor_results = results
+                SExImageRadius = []
+                SExAngleInImage = []
+                assoc_x = []
+                assoc_y = []
+                assoc_catmag = []
+                for star in self.SExtractor_results:
+                    SExImageRadius.append(math.sqrt((self.nXPix/2-star['XWIN_IMAGE'])**2 +\
+                                                    (self.nYPix/2-star['YWIN_IMAGE'])**2))
+                    SExAngleInImage.append(math.atan((star['XWIN_IMAGE']-self.nXPix/2) /\
+                                                     (self.nYPix/2-star['YWIN_IMAGE']))*180.0/math.pi)
+                    if assoc:
+                        assoc_x.append(star['VECTOR_ASSOC'][0])
+                        assoc_y.append(star['VECTOR_ASSOC'][1])
+                        assoc_catmag.append(star['VECTOR_ASSOC'][2])
+                self.SExtractor_results.add_column(table.Column(\
+                                        data=SExImageRadius, name='ImageRadius'))
+                self.SExtractor_results.add_column(table.Column(\
+                                        data=SExAngleInImage, name='AngleInImage'))
+                self.n_stars_SExtracted = len(self.SExtractor_results)
+                self.logger.info("  Read in {0} stars from SExtractor catalog (after filtering).".format(\
+                                                          self.n_stars_SExtracted))
                 if assoc:
-                    assoc_x.append(star['VECTOR_ASSOC'][0])
-                    assoc_y.append(star['VECTOR_ASSOC'][1])
-                    assoc_catmag.append(star['VECTOR_ASSOC'][2])
-            self.SExtractor_results.add_column(table.Column(\
-                                    data=SExImageRadius, name='ImageRadius'))
-            self.SExtractor_results.add_column(table.Column(\
-                                    data=SExAngleInImage, name='AngleInImage'))
-            self.n_stars_SExtracted = len(self.SExtractor_results)
-            self.logger.info("  Read in {0} stars from SExtractor catalog (after filtering).".format(\
-                                                      self.n_stars_SExtracted))
-            if assoc:
-                self.SExtractor_results.add_column(table.Column(\
-                                                   data=assoc_x, name='assoc_x'))
-                self.SExtractor_results.add_column(table.Column(\
-                                                   data=assoc_y, name='assoc_y'))
-                self.SExtractor_results.add_column(table.Column(\
-                                                   data=assoc_catmag, name='assoc_catmag'))
-                self.tel.SExtractor_params = original_params
+                    self.SExtractor_results.add_column(table.Column(\
+                                                       data=assoc_x, name='assoc_x'))
+                    self.SExtractor_results.add_column(table.Column(\
+                                                       data=assoc_y, name='assoc_y'))
+                    self.SExtractor_results.add_column(table.Column(\
+                                                       data=assoc_catmag, name='assoc_catmag'))
+                    self.tel.SExtractor_params = original_params
 
         end_time = datetime.datetime.now()
         elapsed_time = end_time - start_time
@@ -1599,6 +1605,7 @@ class Image(object):
         Make various plots for analysis of image quality.
         '''
         start_time = datetime.datetime.now()
+        import matplotlib.pyplot as pyplot
 
         if not self.FWHM:
             self.logger.warning('No FWHM statistics found.  Skipping PSF plot creation.')
@@ -1869,11 +1876,11 @@ class Image(object):
         if len(stars) < nstars_threshold:
             self.logger.warning('  Only {} bright stars detected. Image appears blank'.format(\
                                 len(filtered_stars)))
-            self.flags['other'] = True
+            self.flags['blank'] = True
             return True
         else:
             self.logger.info('  Found {} bright stars.'.format(len(stars)))
-            self.flags['other'] = False
+            self.flags['blank'] = False
             return False
 
 
@@ -1892,8 +1899,13 @@ class Image(object):
         ## Change to tmp directory
         origWD = os.getcwd()
         os.chdir(self.tel.temp_file_path)
-        ## Parameters for SCAMP
 
+        head_filename = '{}.head'.format(self.raw_file_basename)
+        head_file = os.path.join(self.tel.temp_file_path, head_filename)
+        if os.path.exists(head_file):
+            os.remove(head_file)
+
+        ## Parameters for SCAMP
         SCAMP_default = {
                         'SAVE_REFCATALOG': 'N',
                         'REFOUT_CATPATH': self.tel.temp_file_path,
@@ -1956,8 +1968,6 @@ class Image(object):
                     self.logger.debug("  SCAMP Output: "+line)
 
         ## Populate FITS header with SCAMP derived header values in .head file
-        head_filename = '{}.head'.format(self.raw_file_basename)
-        head_file = os.path.join(self.tel.temp_file_path, head_filename)
         if os.path.exists(head_file):
             self.temp_files.append(head_file)
             try:
@@ -2312,6 +2322,8 @@ class Image(object):
     def make_zero_point_plot(self):
         start_time = datetime.datetime.now()
         self.logger.info('Making ZeroPoint Plot')
+        import matplotlib.pyplot as pyplot
+
         self.zero_point_plotfilename = self.raw_file_basename+'_ZeroPoint.png'
         self.zero_point_plotfile = os.path.join(self.tel.plot_file_path,\
                                                 self.zero_point_plotfilename)
@@ -2472,6 +2484,8 @@ class Image(object):
         '''
         start_time = datetime.datetime.now()
         self.logger.info('Making jpeg: {}'.format(jpeg_file_name))
+        import matplotlib.pyplot as pyplot
+
         jpeg_file = os.path.join(self.tel.plot_file_path, jpeg_file_name)
 
         from PIL import Image, ImageDraw
