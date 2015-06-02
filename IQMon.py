@@ -297,7 +297,7 @@ class Telescope(object):
             self.threshold_ellipticity = None
 
         if 'threshold_zeropoint' in config.keys():
-            self.threshold_zeropoint = config['threshold_zeropoint']
+            self.threshold_zeropoint = config['threshold_zeropoint'] * u.mag
         else:
             self.threshold_zeropoint = None
 
@@ -2295,7 +2295,7 @@ class Image(object):
                 self.logger.info('  Weighted Average Zero Point = {:.2f} +/- {:.2f}'.format(\
                                     self.zero_point_average,\
                                     self.zero_point_average_uncertainty))
-                self.zero_point = self.zero_point_average
+                self.zero_point = self.zero_point_average * u.mag
 
                 ## Check zero point
                 if self.tel.threshold_zeropoint and self.zero_point:
@@ -2353,7 +2353,7 @@ class Image(object):
                 if (entry['FLAGS'] == 0)\
                 and not np.isnan(entry['assoc_catmag'])
                 and not (float(entry['assoc_catmag']) == 0.0)]
-        residuals = [entry['assoc_catmag'] - entry['MAG_AUTO'] - self.zero_point\
+        residuals = [entry['assoc_catmag'] - entry['MAG_AUTO'] - self.zero_point.value\
                      for entry in self.SExtractor_results
                      if (entry['FLAGS'] == 0)\
                      and not np.isnan(entry['assoc_catmag'])
@@ -2393,7 +2393,7 @@ class Image(object):
         pyplot.xlim(xmin,xmax)
         ## Overplot Line of Zero Point
         catmag = [-5,30]
-        fitmag = [(val-self.zero_point) for val in catmag]
+        fitmag = [(val-self.zero_point.value) for val in catmag]
         pyplot.plot(catmag, fitmag, 'k-')
 
 
@@ -2831,7 +2831,7 @@ class Image(object):
 
         if self.zero_point:
             try:
-                new_result['zero point'] = float(self.zero_point)
+                new_result['zero point'] = float(self.zero_point.value)
                 self.logger.debug('  Result: zero point = {}'.format(new_result['zero point']))
             except: self.logger.warning('  Could not write zero point to result')
 
@@ -2983,7 +2983,7 @@ class Image(object):
                       'background': str(self.SExtractor_background),\
                       'background_rms': str(self.SExtractor_background_RMS),\
                       'pointing_error_arcmin': str(pointing_error_arcmin),\
-                      'zero_point': str(self.zero_point),\
+                      'zero_point': str(self.zero_point.value),\
                       'alt': str(alt),\
                       'az': str(az),\
                       'airmass': str(self.airmass),\
@@ -3085,7 +3085,7 @@ class Image(object):
             pointing_error = 0.
             tableMask[7] = True
         ## Zero Point
-        if self.zero_point: zeroPoint = self.zero_point
+        if self.zero_point: zeroPoint = self.zero_point.value
         else:
             zeroPoint = 0.
             tableMask[8] = True
