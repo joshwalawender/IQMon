@@ -1042,7 +1042,6 @@ class Image(object):
         else:
             self.logger.warning('Can not crop image. No region of interest defined.')
             return False
-        self.read_header()
 
 
     ##-------------------------------------------------------------------------
