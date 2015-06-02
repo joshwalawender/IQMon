@@ -391,7 +391,8 @@ class Image(object):
             raise IOError("File {0} does not exist".format(file))
         ## Confirm that input tel is an IQMon.Telescope object
         assert isinstance(tel, Telescope)
-        self.tel = tel
+        import copy
+        self.tel = copy.deepcopy(tel)
         ## Initialize values to None
         self.logger = None
         self.working_file = None
@@ -1326,6 +1327,7 @@ class Image(object):
                              'CHECKIMAGE_TYPE': 'NONE',
                             }
 
+
         ## Use optional sextractor params
         if not self.tel.SExtractor_params:
             SExtractor_params = SExtractor_default
@@ -1440,49 +1442,49 @@ class Image(object):
             if not os.path.exists(self.SExtractor_catalogfile):
                 self.logger.warning("SExtractor failed to create catalog.")
                 self.SExtractor_catalogfile = None
+            else:
+                ## Read FITS_LDAC SExtractor Catalog
+                self.logger.debug("  Reading SExtractor output catalog.")
+                with fits.open(self.SExtractor_catalogfile) as hdu:
+                    results = table.Table(hdu[2].data)
 
-            ## Read FITS_LDAC SExtractor Catalog
-            self.logger.debug("  Reading SExtractor output catalog.")
-            with fits.open(self.SExtractor_catalogfile) as hdu:
-                results = table.Table(hdu[2].data)
+                rows_to_remove = []
+                for i in range(0,len(results)):
+                    if results['FLAGS'][i] != 0:
+                        rows_to_remove.append(i)
+                if len(rows_to_remove) > 0:
+                    results.remove_rows(rows_to_remove)
 
-            rows_to_remove = []
-            for i in range(0,len(results)):
-                if results['FLAGS'][i] != 0:
-                    rows_to_remove.append(i)
-            if len(rows_to_remove) > 0:
-                results.remove_rows(rows_to_remove)
-
-            self.SExtractor_results = results
-            SExImageRadius = []
-            SExAngleInImage = []
-            assoc_x = []
-            assoc_y = []
-            assoc_catmag = []
-            for star in self.SExtractor_results:
-                SExImageRadius.append(math.sqrt((self.nXPix/2-star['XWIN_IMAGE'])**2 +\
-                                                (self.nYPix/2-star['YWIN_IMAGE'])**2))
-                SExAngleInImage.append(math.atan((star['XWIN_IMAGE']-self.nXPix/2) /\
-                                                 (self.nYPix/2-star['YWIN_IMAGE']))*180.0/math.pi)
+                self.SExtractor_results = results
+                SExImageRadius = []
+                SExAngleInImage = []
+                assoc_x = []
+                assoc_y = []
+                assoc_catmag = []
+                for star in self.SExtractor_results:
+                    SExImageRadius.append(math.sqrt((self.nXPix/2-star['XWIN_IMAGE'])**2 +\
+                                                    (self.nYPix/2-star['YWIN_IMAGE'])**2))
+                    SExAngleInImage.append(math.atan((star['XWIN_IMAGE']-self.nXPix/2) /\
+                                                     (self.nYPix/2-star['YWIN_IMAGE']))*180.0/math.pi)
+                    if assoc:
+                        assoc_x.append(star['VECTOR_ASSOC'][0])
+                        assoc_y.append(star['VECTOR_ASSOC'][1])
+                        assoc_catmag.append(star['VECTOR_ASSOC'][2])
+                self.SExtractor_results.add_column(table.Column(\
+                                        data=SExImageRadius, name='ImageRadius'))
+                self.SExtractor_results.add_column(table.Column(\
+                                        data=SExAngleInImage, name='AngleInImage'))
+                self.n_stars_SExtracted = len(self.SExtractor_results)
+                self.logger.info("  Read in {0} stars from SExtractor catalog (after filtering).".format(\
+                                                          self.n_stars_SExtracted))
                 if assoc:
-                    assoc_x.append(star['VECTOR_ASSOC'][0])
-                    assoc_y.append(star['VECTOR_ASSOC'][1])
-                    assoc_catmag.append(star['VECTOR_ASSOC'][2])
-            self.SExtractor_results.add_column(table.Column(\
-                                    data=SExImageRadius, name='ImageRadius'))
-            self.SExtractor_results.add_column(table.Column(\
-                                    data=SExAngleInImage, name='AngleInImage'))
-            self.n_stars_SExtracted = len(self.SExtractor_results)
-            self.logger.info("  Read in {0} stars from SExtractor catalog (after filtering).".format(\
-                                                      self.n_stars_SExtracted))
-            if assoc:
-                self.SExtractor_results.add_column(table.Column(\
-                                                   data=assoc_x, name='assoc_x'))
-                self.SExtractor_results.add_column(table.Column(\
-                                                   data=assoc_y, name='assoc_y'))
-                self.SExtractor_results.add_column(table.Column(\
-                                                   data=assoc_catmag, name='assoc_catmag'))
-                self.tel.SExtractor_params = original_params
+                    self.SExtractor_results.add_column(table.Column(\
+                                                       data=assoc_x, name='assoc_x'))
+                    self.SExtractor_results.add_column(table.Column(\
+                                                       data=assoc_y, name='assoc_y'))
+                    self.SExtractor_results.add_column(table.Column(\
+                                                       data=assoc_catmag, name='assoc_catmag'))
+                    self.tel.SExtractor_params = original_params
 
         end_time = datetime.datetime.now()
         elapsed_time = end_time - start_time
@@ -1892,8 +1894,13 @@ class Image(object):
         ## Change to tmp directory
         origWD = os.getcwd()
         os.chdir(self.tel.temp_file_path)
-        ## Parameters for SCAMP
 
+        head_filename = '{}.head'.format(self.raw_file_basename)
+        head_file = os.path.join(self.tel.temp_file_path, head_filename)
+        if os.path.exists(head_file):
+            os.remove(head_file)
+
+        ## Parameters for SCAMP
         SCAMP_default = {
                         'SAVE_REFCATALOG': 'N',
                         'REFOUT_CATPATH': self.tel.temp_file_path,
@@ -1956,8 +1963,6 @@ class Image(object):
                     self.logger.debug("  SCAMP Output: "+line)
 
         ## Populate FITS header with SCAMP derived header values in .head file
-        head_filename = '{}.head'.format(self.raw_file_basename)
-        head_file = os.path.join(self.tel.temp_file_path, head_filename)
         if os.path.exists(head_file):
             self.temp_files.append(head_file)
             try:
