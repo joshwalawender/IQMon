@@ -1026,6 +1026,10 @@ class Image(object):
                 with fits.open(self.working_file, mode="update") as hdulist:
                     hdulist[0].data = hdulist[0].data[crop_y1:crop_y2,\
                                                       crop_x1:crop_x2]
+                    if ('CRPIX1' in hdulist[0].header) and\
+                       ('CRPIX2' in hdulist[0].header):
+                        hdulist[0].header['CRPIX1'] -= crop_x1
+                        hdulist[0].header['CRPIX2'] -= crop_y1
                     hdulist.flush()
                 self.cropped = True
                 self.original_nXPix = self.nXPix
