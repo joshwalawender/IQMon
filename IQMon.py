@@ -1535,7 +1535,7 @@ class Image(object):
                 self.ellipticity_mode = mode(CentralEllipticities, 0.05) 
                 self.ellipticity_median = np.median(CentralEllipticities)
                 self.ellipticity_average = np.average(CentralEllipticities, weights=weights)
-                self.ellipticity = self.ellipticity_average
+                self.ellipticity = self.ellipticity_median
                 self.logger.debug("  Using {0} stars in central {1} to determine PSF quality.".format(\
                                                                 len(CentralFWHMs),\
                                                                 self.tel.PSF_measurement_radius))
@@ -1695,10 +1695,10 @@ class Image(object):
                 pyplot.bar(fwhm_centers, fwhm_hist, align='center', width=0.7*fwhm_binsize)
                 pyplot.plot([self.FWHM_mode.to(u.pix).value, self.FWHM_mode.to(u.pix).value],\
                             [0, 1.1*max(fwhm_hist)],\
-                            'ro-', linewidth=2, label='Mode FWHM', alpha=0.4)
+                            'ro-', linewidth=2, label='Mode FWHM', alpha=0.3)
                 pyplot.plot([self.FWHM_median.to(u.pix).value, self.FWHM_median.to(u.pix).value],\
                             [0, 1.1*max(fwhm_hist)],\
-                            'go-', linewidth=2, label='Median FWHM', alpha=0.4)
+                            'go-', linewidth=2, label='Median FWHM', alpha=0.3)
                 pyplot.plot([self.FWHM_average.to(u.pix).value, self.FWHM_average.to(u.pix).value],\
                             [0, 1.1*max(fwhm_hist)],\
                             'bo-', linewidth=2, label='Mode FWHM', alpha=1.0)
@@ -1712,11 +1712,11 @@ class Image(object):
                 pyplot.title('Histogram of Elliptiticty Values for {}'.format(self.raw_file_name), size=10)
                 pyplot.bar(ellip_centers, ellip_hist, align='center', width=0.7*ellip_binsize)
                 pyplot.plot([self.ellipticity_mode, self.ellipticity_mode], [0, 1.1*max(ellip_hist)],\
-                            'ro-', linewidth=2, label='Mode Ellipticity', alpha=0.4)
+                            'ro-', linewidth=2, label='Mode Ellipticity', alpha=0.3)
                 pyplot.plot([self.ellipticity_median, self.ellipticity_median], [0, 1.1*max(ellip_hist)],\
-                            'go-', linewidth=2, label='Median Ellipticity', alpha=0.4)
+                            'go-', linewidth=2, label='Median Ellipticity', alpha=1.0)
                 pyplot.plot([self.ellipticity_average, self.ellipticity_average], [0, 1.1*max(ellip_hist)],\
-                            'bo-', linewidth=2, label='Mode Ellipticity', alpha=1.0)
+                            'bo-', linewidth=2, label='Mode Ellipticity', alpha=0.3)
                 pyplot.xlabel('Ellipticity', size=10)
                 pyplot.ylabel('N Stars', size=10)
                 pyplot.xlim(0,1)
