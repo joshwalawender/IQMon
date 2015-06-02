@@ -1108,6 +1108,7 @@ class Image(object):
                 os.rename(NewFile, NewFitsFile)
                 self.astrometry_solved = True
                 self.working_file = NewFitsFile
+                self.read_header()
             else:
                 self.logger.warning("No new file created by astrometry.net")
                 self.astrometry_solved = False
