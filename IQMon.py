@@ -1260,7 +1260,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Run SExtractor
     ##-------------------------------------------------------------------------
-    def run_SExtractor(self, assoc=False, timeout=60):
+    def run_SExtractor(self, assoc=False, params=None, timeout=60):
         '''
         Run SExtractor on image.
         '''
@@ -1308,7 +1308,7 @@ class Image(object):
         if os.path.exists(sextractor_output_param_file):
             os.remove(sextractor_output_param_file)
         with open(sextractor_output_param_file, 'w') as defaultparamsFO:
-            params = [
+            output_params = [
                       'XWIN_IMAGE', 'YWIN_IMAGE', 
                       'AWIN_IMAGE', 'BWIN_IMAGE', 'FWHM_IMAGE', 'THETAWIN_IMAGE',
                       'ERRAWIN_IMAGE', 'ERRBWIN_IMAGE', 'ERRTHETAWIN_IMAGE',
@@ -1316,9 +1316,9 @@ class Image(object):
                       'FLUX_AUTO', 'FLUXERR_AUTO', 'MAG_AUTO', 'MAGERR_AUTO',
                       'FLAGS', 'FLAGS_WEIGHT', 'FLUX_RADIUS'
                      ]
-            if assoc: params.append('VECTOR_ASSOC(3)')
-            for param in params:
-                defaultparamsFO.write(param+'\n')
+            if assoc: output_params.append('VECTOR_ASSOC(3)')
+            for output_param in output_params:
+                defaultparamsFO.write(output_param+'\n')
         self.temp_files.append(sextractor_output_param_file)
 
         ## Compare input parameters dict to default
@@ -1332,19 +1332,27 @@ class Image(object):
                              'CHECKIMAGE_TYPE': 'NONE',
                             }
 
-
-        ## Use optional sextractor params
-        if not self.tel.SExtractor_params:
-            SExtractor_params = SExtractor_default
-        else:
-            SExtractor_params = self.tel.SExtractor_params
-            for key in SExtractor_default.keys():
-                if not key in self.tel.SExtractor_params.keys():
-                    SExtractor_params[key] = SExtractor_default[key]
+        SExtractor_params = SExtractor_default
+        if self.tel.SExtractor_params:
+            for key in self.tel.SExtractor_params.keys():
+                SExtractor_params[key] = self.tel.SExtractor_params[key]
+        if params:
+            for key in params.keys():
+                SExtractor_params[key] = params[key]
 
         if assoc:
             ## Create Assoc file with pixel coordinates of catalog stars
             assoc_file = os.path.join(self.tel.temp_file_path, self.raw_file_basename+'_assoc.txt')
+            SExtractor_params['ASSOC_NAME'] = assoc_file
+            SExtractor_params['ASSOC_DATA'] = '1,2,3'
+            SExtractor_params['ASSOC_PARAMS'] = '1,2,3'
+            SExtractor_params['ASSOCCOORD_TYPE'] = 'PIXEL'
+            if not 'ASSOC_RADIUS' in SExtractor_params.keys():
+                SExtractor_params['ASSOC_RADIUS'] = '2.0'
+            if not 'ASSOC_TYPE' in SExtractor_params.keys():
+                SExtractor_params['ASSOC_TYPE'] = 'NEAREST'
+            if not 'ASSOCSELEC_TYPE' in SExtractor_params.keys():
+                SExtractor_params['ASSOCSELEC_TYPE'] = 'MATCHED'
             self.temp_files.append(assoc_file)
             if os.path.exists(assoc_file): os.remove(assoc_file)
 
