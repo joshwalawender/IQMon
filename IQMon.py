@@ -2586,7 +2586,7 @@ class Image(object):
                 x = int(xy[0])
                 y = int(xy[1])
                 thickness = 2
-                radii = np.linspace(ms, ms+thickness, thickness)
+                radii = np.linspace(ms, ms+thickness, 1)
                 for r in radii:
                     draw.ellipse((x-r, y-r, x+r, y+r), outline=circle_color)
 
@@ -2602,7 +2602,7 @@ class Image(object):
                 x = star['XWIN_IMAGE']
                 y = star['YWIN_IMAGE']
                 thickness = 2
-                radii = np.linspace(ms, ms+thickness, thickness)
+                radii = np.linspace(ms, ms+thickness, 1)
                 for r in radii:
                     draw.ellipse((x-r, y-r, x+r, y+r), outline=circle_color)
 
