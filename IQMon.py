@@ -1551,9 +1551,11 @@ class Image(object):
                                                         self.FWHM_mode.to(u.pix).value))
                 self.logger.debug("  Median FWHM in inner region is {0:.2f} pixels".format(\
                                                         self.FWHM_median.to(u.pix).value))
-                self.logger.info("  Average FWHM in inner region is {0:.2f} +/- {1:.2f} pixels".format(\
-                                    self.FWHM_average.to(u.pix).value,\
-                                    self.FWHM_average_uncertainty.to(u.pix).value))
+                self.logger.info("  Average FWHM in inner region is {0:.2f}".format(\
+                                    self.FWHM_average.to(u.pix).value))
+#                 self.logger.info("  Average FWHM in inner region is {0:.2f} +/- {1:.2f} pixels".format(\
+#                                     self.FWHM_average.to(u.pix).value,\
+#                                     self.FWHM_average_uncertainty.to(u.pix).value))
 
                 self.logger.debug("  Mode Ellipticity in inner region is {0:.2f}".format(\
                                                                  self.ellipticity_mode))
@@ -2057,6 +2059,7 @@ class Image(object):
             if os.path.exists(self.working_file): os.remove(self.working_file)
             os.rename(swarp_file, self.working_file)
             assert os.path.exists(self.working_file)
+            self.read_header()
 
         end_time = datetime.datetime.now()
         elapsed_time = end_time - start_time
@@ -2300,9 +2303,12 @@ class Image(object):
                 self.zero_point_average_uncertainty = (np.sum(weights))**-0.5
                 self.logger.debug('  Mode Zero Point = {:.2f}'.format(self.zero_point_mode))
                 self.logger.debug('  Median Zero Point = {:.2f}'.format(self.zero_point_median))
-                self.logger.info('  Weighted Average Zero Point = {:.2f} +/- {:.2f}'.format(\
-                                    self.zero_point_average,\
-                                    self.zero_point_average_uncertainty))
+                self.logger.info('  Weighted Average Zero Point = {:.2f}'.format(\
+                                    self.zero_point_average))
+#                                     self.zero_point_average_uncertainty))
+#                 self.logger.info('  Weighted Average Zero Point = {:.2f} +/- {:.2f}'.format(\
+#                                     self.zero_point_average,\
+#                                     self.zero_point_average_uncertainty))
                 self.zero_point = self.zero_point_average * u.mag
 
                 ## Check zero point
