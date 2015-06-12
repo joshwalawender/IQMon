@@ -151,7 +151,7 @@ class Status(RequestHandler):
 #         nowut = dt.utcnow()
 #         tlog.app_log.info('  v5data retrieved')
 
-        v20data = v20status.find_one( {'current': True} )
+        v5data = v20status.find_one( {'current': True} )
 
         try:
             try:
