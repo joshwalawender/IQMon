@@ -93,16 +93,18 @@ class Status(RequestHandler):
         ## Get Latest V20 Data
         ##---------------------------------------------------------------------
         v20status = client.vysos['V20.status']
-        v20entries = []
-        while (len(v20entries) < 1) and (nowut > dt(2015,1,1)):
-            v20entries = [entry for entry\
-                          in v20status.find(\
-                          {"UT date" : nowut.strftime('%Y%m%dUT')}\
-                          ).sort([('UT time', pymongo.ASCENDING)])]
-            if len(v20entries) > 0: v20data = v20entries[-1]
-            else: nowut = nowut - tdelta(1, 0)
-        nowut = dt.utcnow()
-        tlog.app_log.info('  v20data retrieved')
+#         v20entries = []
+#         while (len(v20entries) < 1) and (nowut > dt(2015,1,1)):
+#             v20entries = [entry for entry\
+#                           in v20status.find(\
+#                           {"UT date" : nowut.strftime('%Y%m%dUT')}\
+#                           ).sort([('UT time', pymongo.ASCENDING)])]
+#             if len(v20entries) > 0: v20data = v20entries[-1]
+#             else: nowut = nowut - tdelta(1, 0)
+#         nowut = dt.utcnow()
+#         tlog.app_log.info('  v20data retrieved')
+
+        v20data = v20status.find_one( {'current': True} )
 
         try:
             try:
@@ -140,14 +142,16 @@ class Status(RequestHandler):
         ## Get Latest V5 Data
         ##---------------------------------------------------------------------
         v5status = client.vysos['V5.status']
-        v5entries = []
-        while (len(v5entries) < 1) and (nowut > dt(2015,1,1)):
-            v5entries = [entry for entry\
-                          in v5status.find( {"UT date" : nowut.strftime('%Y%m%dUT')} ).sort([('UT time', pymongo.ASCENDING)])]
-            if len(v5entries) > 0: v5data = v5entries[-1]
-            else: nowut = nowut - tdelta(1, 0)
-        nowut = dt.utcnow()
-        tlog.app_log.info('  v5data retrieved')
+#         v5entries = []
+#         while (len(v5entries) < 1) and (nowut > dt(2015,1,1)):
+#             v5entries = [entry for entry\
+#                           in v5status.find( {"UT date" : nowut.strftime('%Y%m%dUT')} ).sort([('UT time', pymongo.ASCENDING)])]
+#             if len(v5entries) > 0: v5data = v5entries[-1]
+#             else: nowut = nowut - tdelta(1, 0)
+#         nowut = dt.utcnow()
+#         tlog.app_log.info('  v5data retrieved')
+
+        v20data = v20status.find_one( {'current': True} )
 
         try:
             try:
