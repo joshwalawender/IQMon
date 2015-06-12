@@ -1047,16 +1047,19 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Solve Astrometry Using astrometry.net
     ##-------------------------------------------------------------------------
-    def solve_astrometry(self, downsample=4, timeout=60):
+    def solve_astrometry(self, downsample=None, timeout=60):
         '''
         Solve astrometry in the working image using the astrometry.net solver.
         '''
         start_time = datetime.datetime.now()
         self.logger.info("Attempting to solve WCS using Astrometry.net solver.")
-        AstrometryCommand = ["solve-field", "-l", "5", "-O", "-p", "-T",
+        AstrometryCommand = ["solve-field", "-O", "-p", "-T",
                              "-L", str(self.tel.pixel_scale.value*0.75),
                              "-H", str(self.tel.pixel_scale.value*1.25),
-                             "-u", "arcsecperpix", "-z", str(downsample), self.working_file]
+                             "-u", "arcsecperpix"]
+        if downsample:
+            AstrometryCommand.extend(["-z", str(downsample)])
+        AstrometryCommand.append(self.working_file)
         with open(os.path.join(self.tel.temp_file_path, 'astrometry_output.txt'), 'w') as AstrometrySTDOUT:
             self.temp_files.append(os.path.join(self.tel.temp_file_path,\
                                    'astrometry_output.txt'))
@@ -1081,7 +1084,7 @@ class Image(object):
         if rtncode != 0:
             self.logger.warning("Astrometry.net failed.")
             for line in output:
-                self.logger.warning('  astrometry.net output: {}'.format(line.strip('\n')))
+                self.logger.debug('  astrometry.net output: {}'.format(line.strip('\n')))
         else:
             for line in output:
                 self.logger.debug('  Astrometry.net Output: {}'.format(line.strip('\n')))
@@ -1097,7 +1100,7 @@ class Image(object):
             else:
                 self.logger.warning("Could not parse field center from astrometry.net output.")
                 for line in output:
-                    self.logger.warning('  astrometry.net output: {}'.format(line.strip('\n')))
+                    self.logger.debug('  astrometry.net output: {}'.format(line.strip('\n')))
 
             NewFile = self.working_file.replace(self.file_ext, ".new")
             NewFitsFile = self.working_file.replace(self.file_ext, ".new.fits")
@@ -2092,6 +2095,8 @@ class Image(object):
 
             if self.filter in self.tel.catalog_info.keys():
                 catfilt = str(self.tel.catalog_info[self.filter])
+            else:
+                catfilt = 'R'
             if 'magmax' in self.tel.catalog_info:
                 upperlimit = '<{:.1f}'.format(self.tel.catalog_info['magmax'])
                 column_filters = {catfilt:upperlimit}
