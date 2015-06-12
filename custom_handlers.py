@@ -102,9 +102,9 @@ class Status(RequestHandler):
 #             if len(v20entries) > 0: v20data = v20entries[-1]
 #             else: nowut = nowut - tdelta(1, 0)
 #         nowut = dt.utcnow()
-#         tlog.app_log.info('  v20data retrieved')
 
         v20data = v20status.find_one( {'current': True} )
+        tlog.app_log.info('  v20data retrieved')
 
         try:
             try:
@@ -149,9 +149,9 @@ class Status(RequestHandler):
 #             if len(v5entries) > 0: v5data = v5entries[-1]
 #             else: nowut = nowut - tdelta(1, 0)
 #         nowut = dt.utcnow()
-#         tlog.app_log.info('  v5data retrieved')
 
         v5data = v20status.find_one( {'current': True} )
+        tlog.app_log.info('  v5data retrieved')
 
         try:
             try:
