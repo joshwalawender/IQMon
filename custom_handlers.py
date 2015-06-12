@@ -150,7 +150,7 @@ class Status(RequestHandler):
 #             else: nowut = nowut - tdelta(1, 0)
 #         nowut = dt.utcnow()
 
-        v5data = v20status.find_one( {'current': True} )
+        v5data = v5status.find_one( {'current': True} )
         tlog.app_log.info('  v5data retrieved')
 
         try:
