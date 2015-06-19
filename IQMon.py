@@ -1051,16 +1051,24 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Solve Astrometry Using astrometry.net
     ##-------------------------------------------------------------------------
-    def solve_astrometry(self, downsample=None, timeout=60):
+    def solve_astrometry(self, downsample=None, SIP=None,  timeout=60):
         '''
         Solve astrometry in the working image using the astrometry.net solver.
         '''
         start_time = datetime.datetime.now()
         self.logger.info("Attempting to solve WCS using Astrometry.net solver.")
-        AstrometryCommand = ["solve-field", "-O", "-p", "-T",
+        AstrometryCommand = ["solve-field", "-O", "-p",
                              "-L", str(self.tel.pixel_scale.value*0.75),
                              "-H", str(self.tel.pixel_scale.value*1.25),
                              "-u", "arcsecperpix"]
+        if not SIP:
+            AstrometryCommand.extend(['-T'])
+        else:
+            try:
+                SIP_order = int(SIP)
+                AstrometryCommand.extend(['-t', str(SIP_order)])
+            except:
+                AstrometryCommand.extend(['-T'])
         if downsample:
             AstrometryCommand.extend(["-z", str(downsample)])
         AstrometryCommand.append(self.working_file)
