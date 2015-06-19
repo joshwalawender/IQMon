@@ -343,11 +343,15 @@ class Telescope(object):
         if self.plot_file_path: paths_to_check.append(self.plot_file_path)
         if self.logs_file_path: paths_to_check.append(self.logs_file_path)
         for path in paths_to_check:
+#             print('Checking: {}'.format(path))
             while not os.path.exists(path):
+#                 print('Need to create: {}'.format(path))
                 paths_to_create.append(path)
                 path = os.path.split(path)[0]
         while len(paths_to_create) > 0:
-            os.mkdir(paths_to_create.pop())
+            new_path = paths_to_create.pop()
+#             print('Creating: {}'.format(new_path))
+            os.mkdir(new_path)
 
 
     def __del__(self):
@@ -2120,7 +2124,6 @@ class Image(object):
             dRA = (max(RAs) - min(RAs))
             if dRA > 180:
                 dRA = (min(RAs)+360. - max(RAs))
-            dRA = dRA*math.cos(center_from_WCS[0][1]*u.deg.to(u.radian))
             dDEC = (max(DECs) - min(DECs))
             self.logger.debug("  Center Coordinate: {}".format(\
                               self.coordinate_of_center_pixel.to_string(\
