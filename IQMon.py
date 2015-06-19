@@ -271,6 +271,21 @@ class Telescope(object):
             self.pixel_size = None
             self.pixel_scale = config['pixel_scale'] * u.arcsec/u.pix
 
+        if 'latitude' in config.keys():
+            self.latitude = float(config['latitude']) * u.deg
+        else:
+            self.latitude = None
+
+        if 'longitude' in config.keys():
+            self.longitude = float(config['longitude']) * u.deg
+        else:
+            self.longitude = None
+
+        if 'altitude' in config.keys():
+            self.altitude = float(config['altitude']) * u.meter
+        else:
+            self.altitude = None
+
         if 'gain' in config.keys():
             self.gain = config['gain'] / u.adu
         else:
@@ -604,33 +619,45 @@ class Image(object):
             self.logger.debug("  No date value found in header")
         else:
             self.logger.debug("  Header date = {0}".format(self.observation_date))
-        ## Get Site Latitude from header (assumes decimal degrees)
-        try:
-            self.latitude = self.header["LAT-OBS"] * u.deg
-        except:
-            self.latitude = None
-            self.logger.debug("  No latitude value found in header")
+
+        if not self.tel.latitude:
+            ## Get Site Latitude from header (assumes decimal degrees)
+            try:
+                self.latitude = self.header["LAT-OBS"] * u.deg
+            except:
+                self.latitude = None
+                self.logger.debug("  No latitude value found in header")
+            else:
+                self.logger.debug("  Header latitude = {0:.4f} deg".format(\
+                                                     self.latitude.to(u.deg).value))
         else:
-            self.logger.debug("  Header latitude = {0:.4f} deg".format(\
-                                                 self.latitude.to(u.deg).value))
-        ## Get Site Longitude from header (assumes decimal degrees)
-        try:
-            self.longitude = self.header["LONG-OBS"] * u.deg
-        except:
-            self.longitude = None
-            self.logger.debug("  No longitiude value found in header")
+            self.latitude = self.tel.latitude
+
+        if not self.tel.longitude:
+            ## Get Site Longitude from header (assumes decimal degrees)
+            try:
+                self.longitude = self.header["LONG-OBS"] * u.deg
+            except:
+                self.longitude = None
+                self.logger.debug("  No longitiude value found in header")
+            else:
+                self.logger.debug("  Header longitiude = {0:.4f} deg".format(\
+                                                   self.longitude.to(u.deg).value))
         else:
-            self.logger.debug("  Header longitiude = {0:.4f} deg".format(\
-                                               self.longitude.to(u.deg).value))
-        ## Get Site Altitude from header (assumes meters)
-        try:
-            self.altitude = self.header["ALT-OBS"] * u.meter
-        except:
-            self.altitude = None
-            self.logger.debug("  No altitude value found in header")
+            self.longitude = self.tel.longitude
+
+        if not self.tel.altitude:
+            ## Get Site Altitude from header (assumes meters)
+            try:
+                self.altitude = self.header["ALT-OBS"] * u.meter
+            except:
+                self.altitude = None
+                self.logger.debug("  No altitude value found in header")
+            else:
+                self.logger.debug("  Header altitude = {0:.0f} meters".format(\
+                                                  self.altitude.to(u.meter).value))
         else:
-            self.logger.debug("  Header altitude = {0:.0f} meters".format(\
-                                              self.altitude.to(u.meter).value))
+            self.altitude = self.tel.altitude
 
         ## Read Header Coordinates in to astropy coordinates object
         self.coordinate_from_header = None
@@ -1097,6 +1124,7 @@ class Image(object):
             self.logger.warning("Astrometry.net failed.")
             for line in output:
                 self.logger.debug('  astrometry.net output: {}'.format(line.strip('\n')))
+            self.astrometry_solved = False
         else:
             for line in output:
                 self.logger.debug('  Astrometry.net Output: {}'.format(line.strip('\n')))
@@ -1149,6 +1177,7 @@ class Image(object):
         elapsed_time = end_time - start_time
         self.logger.info('  Done with astrometry.net in {:.1f} s'.format(\
                             elapsed_time.total_seconds()))
+        return self.astrometry_solved
 
 
     ##-----------------------------------------------------------------------------
