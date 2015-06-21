@@ -1344,6 +1344,11 @@ class Image(object):
                 SExtractor_params[key] = params[key]
 
         if assoc:
+            if not self.catalog_data:
+                self.SExtractor_results = None
+                self.SExtractor_background = None
+                self.SExtractor_background_RMS = None
+                return False
             ## Create Assoc file with pixel coordinates of catalog stars
             assoc_file = os.path.join(self.tel.temp_file_path, self.raw_file_basename+'_assoc.txt')
             SExtractor_params['ASSOC_NAME'] = assoc_file
@@ -1515,11 +1520,13 @@ class Image(object):
         '''
         Determine typical FWHM of image from SExtractor results.
         '''
-        if self.n_stars_SExtracted > 1:
+        if self.SExtractor_results and self.n_stars_SExtracted > 1:
             self.logger.info('Analyzing SExtractor results to determine typical image quality.')
             if not self.tel.PSF_measurement_radius:
                 DiagonalRadius = math.sqrt((self.nXPix/2)**2+(self.nYPix/2)**2)
                 self.tel.PSF_measurement_radius = DiagonalRadius * u.pix
+                self.logger.info('  Using all stars in image.')
+            elif self.tel.PSF_measurement_radius > math.sqrt((self.nXPix/2)**2+(self.nYPix/2)**2)*u.pix:
                 self.logger.info('  Using all stars in image.')
             else:
                 self.logger.info('  Using stars within {:d} pix for IQ measurement'.format(\
@@ -1578,15 +1585,6 @@ class Image(object):
                 self.ellipticity_median = None
                 self.ellipticity_average = None
                 self.ellipticity = None
-        else:
-            self.FWHM_mode = None
-            self.FWHM_median = None
-            self.FWHM_average = None
-            self.FWHM = None
-            self.ellipticity_mode = None
-            self.ellipticity_median = None
-            self.ellipticity_average = None
-            self.ellipticity = None
         ## Flag FWHM
         try:
             if self.FWHM > self.tel.threshold_FWHM.to(u.pix,\
@@ -2129,6 +2127,11 @@ class Image(object):
             vizier_data = viz.query_region(coordinates=self.coordinate_of_center_pixel,\
                                            width=dRA*u.deg, height=dDEC*u.deg,\
                                            catalog=catalog)
+            if len(vizier_data) == 0:
+                self.logger.warning("  Failed to retrieve {} catalog.".format(catalog))
+                self.catalog_name = None
+                self.catalog_data = None
+                return False
             n_stars = len(vizier_data[0])
             self.logger.info("  Retrieved {} lines from {} catalog.".format(n_stars, catalog))
             self.catalog_name = catalog
