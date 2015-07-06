@@ -1315,6 +1315,24 @@ class Image(object):
         '''
         start_time = datetime.datetime.now()
 
+        sextractor_executable = None
+        try:
+            result = subprocess.check_output(['sex', '-d'])
+        except OSError as e:
+            self.logger.debug('  Did not find source extractor executable as sex')
+            try:
+                result = subprocess.check_output(['sextractor', '-d'])
+            except OSError as e:
+                self.logger.debug('  Did not find source extractor executable as sextractor')
+            else:
+                sextractor_executable = 'sextractor'
+        else:
+            sextractor_executable = 'sex'
+
+        if not sextractor_executable:
+            logger.error('Could not find source extractor executable')
+            return False
+
         if assoc and self.catalog_data:
             self.catalog_filter = None
             if self.header['FILTER']:
@@ -1431,7 +1449,7 @@ class Image(object):
             self.tel.SExtractor_params['ASSOCSELEC_TYPE'] = 'MATCHED'
 
         ## Run SExtractor
-        SExtractorCommand = ["sex", self.working_file]
+        SExtractorCommand = [sextractor_executable, self.working_file]
         for key in SExtractor_params.keys():
             SExtractorCommand.append('-{}'.format(key))
             SExtractorCommand.append('{}'.format(SExtractor_params[key]))
