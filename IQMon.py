@@ -15,7 +15,10 @@ import re
 import stat
 import shutil
 import datetime
-import subprocess32 as subprocess
+if sys.version_info.major == 2:
+    import subprocess32 as subprocess
+elif sys.version_info.major == 3:
+    import subprocess
 import logging
 import yaml
 import math
@@ -804,8 +807,10 @@ class Image(object):
             result = subprocess.check_output(['fpack', '-L', self.working_file], timeout=timeout)
         except subprocess.TimeoutExpired as e:
             self.logger.warning('fpack timed out')
+            return False
         except:
             self.logger.warning('Could not run fpack to check compression status')
+            return False
 
         found_compression_info = False
         for line in result.split('\n'):
