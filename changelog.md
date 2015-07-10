@@ -1,5 +1,8 @@
 ## Version History
 
+* __v1.5.2__
+    * Fix python3 compatibility with subprocess vs. subprocess32
+    * Bugfixes
 * __v1.5.1__
     * Add support for SIP polynomial solving in ``solve_astrometry()``
     * Add ability to configure observatory location in telescope config file.

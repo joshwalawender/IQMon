@@ -18,7 +18,7 @@ In addition, the software can use SCAMP and SWarp to determine a plate solution 
 
 Python Modules:
 
-* python2.7.X
+* python2.7 or python3
 * astropy (<http://www.astropy.org>)
 * pyephem (<http://rhodesmill.org/pyephem/>)
 * astroquery
