@@ -116,6 +116,7 @@ class Status(RequestHandler):
                                   '%Y-%m-%d %H:%M:%S')        
             v20clarity_age = (now - v20clarity_time).total_seconds()
             if v20clarity_age > 60: v20clarity_color = 'red'
+            else: v20clarity_color = 'black'
         except:
             v20clarity_age = float('nan')
             v20clarity_color = 'red'
@@ -162,6 +163,7 @@ class Status(RequestHandler):
                                   '%Y-%m-%d %H:%M:%S')        
             v5clarity_age = (now - v5clarity_time).total_seconds()
             if v5clarity_age > 60: v5clarity_color = 'red'
+            else: v5clarity_color = 'black'
         except:
             v5clarity_age = float('nan')
             v5clarity_color = 'red'
