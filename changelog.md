@@ -1,5 +1,14 @@
 ## Version History
 
+* __v1.5.2__
+    * Fix python3 compatibility with subprocess vs. subprocess32
+    * Bugfixes
+* __v1.5.1__
+    * Add support for SIP polynomial solving in ``solve_astrometry()``
+    * Add ability to configure observatory location in telescope config file.
+    * Removed ``example_MeasureImage.py``, refer instead to VYSOS repo at ``https://github.com/joshwalawender/VYSOStools``
+    * Updated example config file.
+    * Bugfixes
 * __v1.5__
     * Add tornado web application for serving results stored in mongo
     * Additional doc strings

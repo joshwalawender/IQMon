@@ -15,7 +15,10 @@ import re
 import stat
 import shutil
 import datetime
-import subprocess32 as subprocess
+if sys.version_info.major == 2:
+    import subprocess32 as subprocess
+elif sys.version_info.major == 3:
+    import subprocess
 import logging
 import yaml
 import math
@@ -34,7 +37,7 @@ import astropy.wcs as wcs
 import astropy.io.ascii as ascii
 
 
-__version__ = '1.5'
+__version__ = '1.5.2'
 
 
 ##-----------------------------------------------------------------------------
@@ -271,6 +274,21 @@ class Telescope(object):
             self.pixel_size = None
             self.pixel_scale = config['pixel_scale'] * u.arcsec/u.pix
 
+        if 'latitude' in config.keys():
+            self.latitude = float(config['latitude']) * u.deg
+        else:
+            self.latitude = None
+
+        if 'longitude' in config.keys():
+            self.longitude = float(config['longitude']) * u.deg
+        else:
+            self.longitude = None
+
+        if 'altitude' in config.keys():
+            self.altitude = float(config['altitude']) * u.meter
+        else:
+            self.altitude = None
+
         if 'gain' in config.keys():
             self.gain = config['gain'] / u.adu
         else:
@@ -343,11 +361,15 @@ class Telescope(object):
         if self.plot_file_path: paths_to_check.append(self.plot_file_path)
         if self.logs_file_path: paths_to_check.append(self.logs_file_path)
         for path in paths_to_check:
+#             print('Checking: {}'.format(path))
             while not os.path.exists(path):
+#                 print('Need to create: {}'.format(path))
                 paths_to_create.append(path)
                 path = os.path.split(path)[0]
         while len(paths_to_create) > 0:
-            os.mkdir(paths_to_create.pop())
+            new_path = paths_to_create.pop()
+#             print('Creating: {}'.format(new_path))
+            os.mkdir(new_path)
 
 
     def __del__(self):
@@ -600,33 +622,45 @@ class Image(object):
             self.logger.debug("  No date value found in header")
         else:
             self.logger.debug("  Header date = {0}".format(self.observation_date))
-        ## Get Site Latitude from header (assumes decimal degrees)
-        try:
-            self.latitude = self.header["LAT-OBS"] * u.deg
-        except:
-            self.latitude = None
-            self.logger.debug("  No latitude value found in header")
+
+        if not self.tel.latitude:
+            ## Get Site Latitude from header (assumes decimal degrees)
+            try:
+                self.latitude = self.header["LAT-OBS"] * u.deg
+            except:
+                self.latitude = None
+                self.logger.debug("  No latitude value found in header")
+            else:
+                self.logger.debug("  Header latitude = {0:.4f} deg".format(\
+                                                     self.latitude.to(u.deg).value))
         else:
-            self.logger.debug("  Header latitude = {0:.4f} deg".format(\
-                                                 self.latitude.to(u.deg).value))
-        ## Get Site Longitude from header (assumes decimal degrees)
-        try:
-            self.longitude = self.header["LONG-OBS"] * u.deg
-        except:
-            self.longitude = None
-            self.logger.debug("  No longitiude value found in header")
+            self.latitude = self.tel.latitude
+
+        if not self.tel.longitude:
+            ## Get Site Longitude from header (assumes decimal degrees)
+            try:
+                self.longitude = self.header["LONG-OBS"] * u.deg
+            except:
+                self.longitude = None
+                self.logger.debug("  No longitiude value found in header")
+            else:
+                self.logger.debug("  Header longitiude = {0:.4f} deg".format(\
+                                                   self.longitude.to(u.deg).value))
         else:
-            self.logger.debug("  Header longitiude = {0:.4f} deg".format(\
-                                               self.longitude.to(u.deg).value))
-        ## Get Site Altitude from header (assumes meters)
-        try:
-            self.altitude = self.header["ALT-OBS"] * u.meter
-        except:
-            self.altitude = None
-            self.logger.debug("  No altitude value found in header")
+            self.longitude = self.tel.longitude
+
+        if not self.tel.altitude:
+            ## Get Site Altitude from header (assumes meters)
+            try:
+                self.altitude = self.header["ALT-OBS"] * u.meter
+            except:
+                self.altitude = None
+                self.logger.debug("  No altitude value found in header")
+            else:
+                self.logger.debug("  Header altitude = {0:.0f} meters".format(\
+                                                  self.altitude.to(u.meter).value))
         else:
-            self.logger.debug("  Header altitude = {0:.0f} meters".format(\
-                                              self.altitude.to(u.meter).value))
+            self.altitude = self.tel.altitude
 
         ## Read Header Coordinates in to astropy coordinates object
         self.coordinate_from_header = None
@@ -773,8 +807,10 @@ class Image(object):
             result = subprocess.check_output(['fpack', '-L', self.working_file], timeout=timeout)
         except subprocess.TimeoutExpired as e:
             self.logger.warning('fpack timed out')
+            return False
         except:
             self.logger.warning('Could not run fpack to check compression status')
+            return False
 
         found_compression_info = False
         for line in result.split('\n'):
@@ -1047,16 +1083,24 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Solve Astrometry Using astrometry.net
     ##-------------------------------------------------------------------------
-    def solve_astrometry(self, downsample=None, timeout=60):
+    def solve_astrometry(self, downsample=None, SIP=None,  timeout=60):
         '''
         Solve astrometry in the working image using the astrometry.net solver.
         '''
         start_time = datetime.datetime.now()
         self.logger.info("Attempting to solve WCS using Astrometry.net solver.")
-        AstrometryCommand = ["solve-field", "-O", "-p", "-T",
+        AstrometryCommand = ["solve-field", "-O", "-p",
                              "-L", str(self.tel.pixel_scale.value*0.75),
                              "-H", str(self.tel.pixel_scale.value*1.25),
                              "-u", "arcsecperpix"]
+        if not SIP:
+            AstrometryCommand.extend(['-T'])
+        else:
+            try:
+                SIP_order = int(SIP)
+                AstrometryCommand.extend(['-t', str(SIP_order)])
+            except:
+                AstrometryCommand.extend(['-T'])
         if downsample:
             AstrometryCommand.extend(["-z", str(downsample)])
         AstrometryCommand.append(self.working_file)
@@ -1085,6 +1129,7 @@ class Image(object):
             self.logger.warning("Astrometry.net failed.")
             for line in output:
                 self.logger.debug('  astrometry.net output: {}'.format(line.strip('\n')))
+            self.astrometry_solved = False
         else:
             for line in output:
                 self.logger.debug('  Astrometry.net Output: {}'.format(line.strip('\n')))
@@ -1137,6 +1182,7 @@ class Image(object):
         elapsed_time = end_time - start_time
         self.logger.info('  Done with astrometry.net in {:.1f} s'.format(\
                             elapsed_time.total_seconds()))
+        return self.astrometry_solved
 
 
     ##-----------------------------------------------------------------------------
@@ -1269,6 +1315,24 @@ class Image(object):
         '''
         start_time = datetime.datetime.now()
 
+        sextractor_executable = None
+        try:
+            result = subprocess.check_output(['sex', '-d'])
+        except OSError as e:
+            self.logger.debug('  Did not find source extractor executable as sex')
+            try:
+                result = subprocess.check_output(['sextractor', '-d'])
+            except OSError as e:
+                self.logger.debug('  Did not find source extractor executable as sextractor')
+            else:
+                sextractor_executable = 'sextractor'
+        else:
+            sextractor_executable = 'sex'
+
+        if not sextractor_executable:
+            logger.error('Could not find source extractor executable')
+            return False
+
         if assoc and self.catalog_data:
             self.catalog_filter = None
             if self.header['FILTER']:
@@ -1390,7 +1454,7 @@ class Image(object):
             self.tel.SExtractor_params['ASSOCSELEC_TYPE'] = 'MATCHED'
 
         ## Run SExtractor
-        SExtractorCommand = ["sex", self.working_file]
+        SExtractorCommand = [sextractor_executable, self.working_file]
         for key in SExtractor_params.keys():
             SExtractorCommand.append('-{}'.format(key))
             SExtractorCommand.append('{}'.format(SExtractor_params[key]))
@@ -2118,7 +2182,6 @@ class Image(object):
             dRA = (max(RAs) - min(RAs))
             if dRA > 180:
                 dRA = (min(RAs)+360. - max(RAs))
-            dRA = dRA*math.cos(center_from_WCS[0][1]*u.deg.to(u.radian))
             dDEC = (max(DECs) - min(DECs))
             self.logger.debug("  Center Coordinate: {}".format(\
                               self.coordinate_of_center_pixel.to_string(\

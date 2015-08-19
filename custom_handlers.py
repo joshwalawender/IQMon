@@ -116,6 +116,18 @@ class Status(RequestHandler):
                                   '%Y-%m-%d %H:%M:%S')        
             v20clarity_age = (now - v20clarity_time).total_seconds()
             if v20clarity_age > 60: v20clarity_color = 'red'
+            if v20clarity_age > 600:
+                del v20data['boltwood ambient temp']
+                del v20data['boltwood sky temp']
+                del v20data['boltwood wind speed']
+                del v20data['boltwood humidity']
+                del v20data['boltwood rain status string']
+                del v20data['boltwood wet status string']
+                del v20data['boltwood cloud condition string']
+                del v20data['boltwood wind condition string']
+                del v20data['boltwood rain condition string']
+                del v20data['boltwood day condition string']
+                del v20data['boltwood roof close string']
             else: v20clarity_color = 'black'
         except:
             v20clarity_age = float('nan')
@@ -163,6 +175,18 @@ class Status(RequestHandler):
                                   '%Y-%m-%d %H:%M:%S')        
             v5clarity_age = (now - v5clarity_time).total_seconds()
             if v5clarity_age > 60: v5clarity_color = 'red'
+            if v5clarity_age > 600:
+                del v5data['boltwood ambient temp']
+                del v5data['boltwood sky temp']
+                del v5data['boltwood wind speed']
+                del v5data['boltwood humidity']
+                del v5data['boltwood rain status string']
+                del v5data['boltwood wet status string']
+                del v5data['boltwood cloud condition string']
+                del v5data['boltwood wind condition string']
+                del v5data['boltwood rain condition string']
+                del v5data['boltwood day condition string']
+                del v5data['boltwood roof close string']
             else: v5clarity_color = 'black'
         except:
             v5clarity_age = float('nan')
