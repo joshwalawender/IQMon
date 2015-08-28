@@ -309,31 +309,53 @@ class Status(RequestHandler):
         tlog.app_log.info('  colors determined')
 
         if v20clarity_age > 600:
-            del v20data['boltwood ambient temp']
-            del v20data['boltwood sky temp']
-            del v20data['boltwood wind speed']
-            del v20data['boltwood humidity']
-            del v20data['boltwood rain status string']
-            del v20data['boltwood wet status string']
-            del v20data['boltwood cloud condition string']
-            del v20data['boltwood wind condition string']
-            del v20data['boltwood rain condition string']
-            del v20data['boltwood day condition string']
-            del v20data['boltwood roof close string']
+            if 'boltwood ambient temp' in v20data.keys():
+                del v20data['boltwood ambient temp']
+            if 'boltwood sky temp' in v20data.keys():
+                del v20data['boltwood sky temp']
+            if 'boltwood wind speed' in v20data.keys():
+                del v20data['boltwood wind speed']
+            if 'boltwood humidity' in v20data.keys():
+                del v20data['boltwood humidity']
+            if 'boltwood rain status string' in v20data.keys():
+                del v20data['boltwood rain status string']
+            if 'boltwood wet status string' in v20data.keys():
+                del v20data['boltwood wet status string']
+            if 'boltwood cloud condition string' in v20data.keys():
+                del v20data['boltwood cloud condition string']
+            if 'boltwood wind condition string' in v20data.keys():
+                del v20data['boltwood wind condition string']
+            if 'boltwood rain condition string' in v20data.keys():
+                del v20data['boltwood rain condition string']
+            if 'boltwood day condition string' in v20data.keys():
+                del v20data['boltwood day condition string']
+            if 'boltwood roof close string' in v20data.keys():
+                del v20data['boltwood roof close string']
             tlog.app_log.info('  V20 Clarity data is old and has been removed.')
 
         if v5clarity_age > 600:
-            del v5data['boltwood ambient temp']
-            del v5data['boltwood sky temp']
-            del v5data['boltwood wind speed']
-            del v5data['boltwood humidity']
-            del v5data['boltwood rain status string']
-            del v5data['boltwood wet status string']
-            del v5data['boltwood cloud condition string']
-            del v5data['boltwood wind condition string']
-            del v5data['boltwood rain condition string']
-            del v5data['boltwood day condition string']
-            del v5data['boltwood roof close string']
+            if 'boltwood ambient temp' in v5data.keys():
+                del v5data['boltwood ambient temp']
+            if 'boltwood sky temp' in v5data.keys():
+                del v5data['boltwood sky temp']
+            if 'boltwood wind speed' in v5data.keys():
+                del v5data['boltwood wind speed']
+            if 'boltwood humidity' in v5data.keys():
+                del v5data['boltwood humidity']
+            if 'boltwood rain status string' in v5data.keys():
+                del v5data['boltwood rain status string']
+            if 'boltwood wet status string' in v5data.keys():
+                del v5data['boltwood wet status string']
+            if 'boltwood cloud condition string' in v5data.keys():
+                del v5data['boltwood cloud condition string']
+            if 'boltwood wind condition string' in v5data.keys():
+                del v5data['boltwood wind condition string']
+            if 'boltwood rain condition string' in v5data.keys():
+                del v5data['boltwood rain condition string']
+            if 'boltwood day condition string' in v5data.keys():
+                del v5data['boltwood day condition string']
+            if 'boltwood roof close string' in v5data.keys():
+                del v5data['boltwood roof close string']
             tlog.app_log.info('  V5 Clarity data is old and has been removed.')
 
 
