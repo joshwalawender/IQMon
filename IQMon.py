@@ -915,13 +915,14 @@ class Image(object):
             if os.path.exists(fits_file): os.remove(fits_file)
             conversion_tools = ['pamtofits', 'pnmtofits']
             for conversion_tool in conversion_tools:
-                if not os.path.exists(fits_file):
-                    command = '{} {} > {}'.format(conversion_tool, self.working_file, fits_file)
-                    self.logger.debug('Trying {}: {}'.format(conversion_tool, command))
-                    try:
-                        subprocess.call(command, shell=True, timeout=timeout)
-                    except:
-                        pass
+                if not subprocess.call(['which', conversion_tool]):
+                    if not os.path.exists(fits_file):
+                        command = '{} {} > {}'.format(conversion_tool, self.working_file, fits_file)
+                        self.logger.debug('Trying {}: {}'.format(conversion_tool, command))
+                        try:
+                            subprocess.call(command, shell=True, timeout=timeout)
+                        except:
+                            pass
             if os.path.exists(fits_file):
                 self.working_file = fits_file
                 self.file_ext = self.file_ext = os.path.splitext(self.working_file)[1]
