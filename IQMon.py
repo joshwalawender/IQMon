@@ -901,7 +901,7 @@ class Image(object):
             os.chmod(self.working_file, chmod_code)
             self.temp_files.append(self.working_file)
             ## Use dcraw to convert to ppm file
-            command = ['dcraw', '-t', '2', '-4', self.working_file]
+            command = ['dcraw', '-t', '2', '-4', '-D', self.working_file]
             self.logger.debug('Executing dcraw: {}'.format(repr(command)))
             subprocess.call(command, timeout=timeout)
             ppm_file = os.path.join(self.tel.temp_file_path, self.raw_file_basename+'.ppm')
@@ -915,13 +915,14 @@ class Image(object):
             if os.path.exists(fits_file): os.remove(fits_file)
             conversion_tools = ['pamtofits', 'pnmtofits']
             for conversion_tool in conversion_tools:
-                if not os.path.exists(fits_file):
-                    command = '{} {} > {}'.format(conversion_tool, self.working_file, fits_file)
-                    self.logger.debug('Trying {}: {}'.format(conversion_tool, command))
-                    try:
-                        subprocess.call(command, shell=True, timeout=timeout)
-                    except:
-                        pass
+                if not subprocess.call(['which', conversion_tool]):
+                    if not os.path.exists(fits_file):
+                        command = '{} {} > {}'.format(conversion_tool, self.working_file, fits_file)
+                        self.logger.debug('Trying {}: {}'.format(conversion_tool, command))
+                        try:
+                            subprocess.call(command, shell=True, timeout=timeout)
+                        except:
+                            pass
             if os.path.exists(fits_file):
                 self.working_file = fits_file
                 self.file_ext = self.file_ext = os.path.splitext(self.working_file)[1]
@@ -1309,7 +1310,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Run SExtractor
     ##-------------------------------------------------------------------------
-    def run_SExtractor(self, assoc=False, params=None, timeout=60):
+    def run_SExtractor(self, assoc=False, params=None, filter=True, timeout=60):
         '''
         Run SExtractor on image.
         '''
@@ -1534,11 +1535,12 @@ class Image(object):
                     results = table.Table(hdu[2].data)
 
                 rows_to_remove = []
-                for i in range(0,len(results)):
-                    if results['FLAGS'][i] != 0:
-                        rows_to_remove.append(i)
-                if len(rows_to_remove) > 0:
-                    results.remove_rows(rows_to_remove)
+                if filter:
+                    for i in range(0,len(results)):
+                        if results['FLAGS'][i] != 0:
+                            rows_to_remove.append(i)
+                    if len(rows_to_remove) > 0:
+                        results.remove_rows(rows_to_remove)
 
                 self.SExtractor_results = results
                 SExImageRadius = []
@@ -1675,7 +1677,7 @@ class Image(object):
     ##-------------------------------------------------------------------------
     ## Make PSF Statistics Plots
     ##-------------------------------------------------------------------------
-    def make_PSF_plot(self, filename=None):
+    def make_PSF_plot(self, filename=None, gridsize=None):
         '''
         Make various plots for analysis of image quality.
         '''
@@ -1803,10 +1805,11 @@ class Image(object):
                 pyplot.title('Average FWHM scaled from {:.1f} pix to {:.1f} pix'.format(\
                              0.8*self.FWHM.to(u.pix).value,\
                              2.0*self.FWHM.to(u.pix).value), size=10)
-                if self.n_stars_SExtracted > 20000:
-                    gridsize = 20
-                else:
-                    gridsize = 10
+                if not gridsize:
+                    if self.n_stars_SExtracted > 20000:
+                        gridsize = 20
+                    else:
+                        gridsize = 10
                 pyplot.hexbin(self.SExtractor_results['XWIN_IMAGE'].data,\
                               self.SExtractor_results['YWIN_IMAGE'].data,\
                               self.SExtractor_results['FWHM_IMAGE'].data,\
