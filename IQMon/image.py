@@ -597,7 +597,7 @@ class Image(object):
             if os.path.exists(ppm_file):
                 self.working_file = ppm_file
                 self.temp_files.append(self.working_file)
-            elif os.path.exists(ppm_file):
+            elif os.path.exists(pgm_file):
                 self.working_file = pgm_file
                 self.temp_files.append(self.working_file)
             else:
