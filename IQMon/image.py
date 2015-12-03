@@ -36,9 +36,8 @@ import astropy.table as table
 import astropy.wcs as wcs
 import astropy.io.ascii as ascii
 
-
-__version__ = '1.5.2'
-
+from . import telescope
+from . import __version__
 
 ##-----------------------------------------------------------------------------
 ## Mode Function
@@ -101,7 +100,7 @@ class Image(object):
             self.raw_file_directory = None
             raise IOError("File {0} does not exist".format(file))
         ## Confirm that input tel is an IQMon.Telescope object
-        assert isinstance(tel, Telescope)
+        assert isinstance(tel, telescope.Telescope)
         import copy
         self.tel = copy.deepcopy(tel)
         ## Initialize values to None
@@ -594,11 +593,15 @@ class Image(object):
             self.logger.debug('Executing dcraw: {}'.format(repr(command)))
             subprocess.call(command, timeout=timeout)
             ppm_file = os.path.join(self.tel.temp_file_path, self.raw_file_basename+'.ppm')
+            pgm_file = os.path.join(self.tel.temp_file_path, self.raw_file_basename+'.pgm')
             if os.path.exists(ppm_file):
                 self.working_file = ppm_file
                 self.temp_files.append(self.working_file)
+            elif os.path.exists(ppm_file):
+                self.working_file = pgm_file
+                self.temp_files.append(self.working_file)
             else:
-                self.logger.critical('dcraw failed.  Could not find ppm file.')
+                self.logger.critical('dcraw failed.  Could not find ppm/pgm file.')
             ## Use pamtofits to convert to fits file
             fits_file = os.path.join(self.tel.temp_file_path, self.raw_file_basename+'.fits')
             if os.path.exists(fits_file): os.remove(fits_file)
