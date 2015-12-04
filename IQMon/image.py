@@ -510,6 +510,7 @@ class Image(object):
                    not re.search('no_pixels', IsMatch.group(3)):
                     self.logger.debug('  Image is not compressed')
                     found_compression_info = True
+                    return False
                 elif re.search('tiled_rice', IsMatch.group(4)):
                     self.logger.debug('  Image is rice compressed.  Running funpack.')
                     found_compression_info = True
