@@ -566,7 +566,7 @@ class Image(object):
             os.chmod(self.working_file, chmod_code)
             self.temp_files.append(self.working_file)
             self.file_ext = '.fits'
-            self.uncompress()
+#             self.uncompress()
         ## fits extension:  make working copy
         elif self.file_ext == '.fits':
             self.logger.info('Making working copy of raw image: {}'.format(\
@@ -577,7 +577,7 @@ class Image(object):
             os.chmod(self.working_file, chmod_code)
             self.temp_files.append(self.working_file)
             self.file_ext = '.fits'
-            self.uncompress()
+#             self.uncompress()
         ## DSLR file:  convert to fits
         elif self.file_ext.lower() in ['.dng', '.cr2']:
             self.logger.info('Converting {} to fits format'.format(\
