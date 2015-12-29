@@ -26,6 +26,8 @@ from astropy.coordinates import SkyCoord
 import ephem
 
 import IQMon
+from IQMon.image import Image
+from IQMon.telescope import Telescope
 
 class MyStaticFileHandler(StaticFileHandler):
     def set_extra_headers(self, path):
@@ -43,7 +45,7 @@ class ListOfImages(RequestHandler):
         ## Create Telescope Object
         tlog.app_log.info('  Creating telescope object')
         config_file = os.path.join(os.path.expanduser('~'), '.{}.yaml'.format(telescope))
-        tel = IQMon.Telescope(config_file)
+        tel = Telescope(config_file)
         telescopename = tel.name
         tlog.app_log.info('  Done.')
 
