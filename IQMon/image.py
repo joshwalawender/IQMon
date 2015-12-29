@@ -510,6 +510,7 @@ class Image(object):
                    not re.search('no_pixels', IsMatch.group(3)):
                     self.logger.debug('  Image is not compressed')
                     found_compression_info = True
+                    return False
                 elif re.search('tiled_rice', IsMatch.group(4)):
                     self.logger.debug('  Image is rice compressed.  Running funpack.')
                     found_compression_info = True
@@ -565,7 +566,7 @@ class Image(object):
             os.chmod(self.working_file, chmod_code)
             self.temp_files.append(self.working_file)
             self.file_ext = '.fits'
-            self.uncompress()
+#             self.uncompress()
         ## fits extension:  make working copy
         elif self.file_ext == '.fits':
             self.logger.info('Making working copy of raw image: {}'.format(\
@@ -576,7 +577,7 @@ class Image(object):
             os.chmod(self.working_file, chmod_code)
             self.temp_files.append(self.working_file)
             self.file_ext = '.fits'
-            self.uncompress()
+#             self.uncompress()
         ## DSLR file:  convert to fits
         elif self.file_ext.lower() in ['.dng', '.cr2']:
             self.logger.info('Converting {} to fits format'.format(\
@@ -603,18 +604,40 @@ class Image(object):
             else:
                 self.logger.critical('dcraw failed.  Could not find ppm/pgm file.')
             ## Use pamtofits to convert to fits file
+#             fits_file = os.path.join(self.tel.temp_file_path, self.raw_file_basename+'.fits')
+#             if os.path.exists(fits_file): os.remove(fits_file)
+#             conversion_tools = ['pamtofits', 'pnmtofits']
+#             for conversion_tool in conversion_tools:
+#                 if not subprocess.call(['which', conversion_tool]):
+#                     if not os.path.exists(fits_file):
+#                         command = '{} {} > {}'.format(conversion_tool, self.working_file, fits_file)
+#                         self.logger.debug('Trying {}: {}'.format(conversion_tool, command))
+#                         try:
+#                             subprocess.call(command, shell=True, timeout=timeout)
+#                         except:
+#                             pass
+
+            ## read the ppm file and output fits
             fits_file = os.path.join(self.tel.temp_file_path, self.raw_file_basename+'.fits')
-            if os.path.exists(fits_file): os.remove(fits_file)
-            conversion_tools = ['pamtofits', 'pnmtofits']
-            for conversion_tool in conversion_tools:
-                if not subprocess.call(['which', conversion_tool]):
-                    if not os.path.exists(fits_file):
-                        command = '{} {} > {}'.format(conversion_tool, self.working_file, fits_file)
-                        self.logger.debug('Trying {}: {}'.format(conversion_tool, command))
-                        try:
-                            subprocess.call(command, shell=True, timeout=timeout)
-                        except:
-                            pass
+            byteorder='>'
+            with open(self.working_file, 'rb') as f:
+                buffer = f.read()
+            try:
+                header, width, height, maxval = re.search(
+                    b"(^P5\s(?:\s*#.*[\r\n])*"
+                    b"(\d+)\s(?:\s*#.*[\r\n])*"
+                    b"(\d+)\s(?:\s*#.*[\r\n])*"
+                    b"(\d+)\s(?:\s*#.*[\r\n]\s)*)", buffer).groups()
+            except AttributeError:
+                raise ValueError("Not a raw PGM file: '{}'".format(self.working_file))
+            data = np.frombuffer(buffer,
+                                 dtype='u1' if int(maxval) < 256 else byteorder + 'u2',
+                                 count=int(width) * int(height),
+                                 offset=len(header)
+                                 ).reshape((int(height), int(width)))
+            phdu = fits.PrimaryHDU(data)
+            hdulist = fits.HDUList([phdu])
+            hdulist.writeto(fits_file,clobber=True)
             if os.path.exists(fits_file):
                 self.working_file = fits_file
                 self.file_ext = self.file_ext = os.path.splitext(self.working_file)[1]
@@ -622,13 +645,13 @@ class Image(object):
             else:
                 self.logger.critical('PPM to fits conversion failed.  Could not find fits file.')
             ## Write new fits file with only green image
-            self.logger.debug('Only keeping green channel for analysis')
-            with fits.open(self.working_file, 'update') as hdulist:
-                if len(hdulist) == 1:
-                    data = hdulist[0].data
-                    green_data = data[1]
-                    hdulist[0].data = green_data
-                    hdulist.flush()
+#             self.logger.debug('Only keeping green channel for analysis')
+#             with fits.open(self.working_file, 'update') as hdulist:
+#                 if len(hdulist) == 1:
+#                     data = hdulist[0].data
+#                     green_data = data[1]
+#                     hdulist[0].data = green_data
+#                     hdulist.flush()
         else:
             self.logger.warning('Unrecognixed file extension: {}'.format(\
                                                                 self.file_ext))
