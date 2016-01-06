@@ -128,7 +128,7 @@ class ListOfNights(RequestHandler):
 
         ## Create Telescope Object
         config_file = os.path.join(os.path.expanduser('~'), '.{}.yaml'.format(telescope))
-        tel = IQMon.Telescope(config_file)
+        tel = Telescope(config_file)
         telescopename = tel.name
 
         client = MongoClient(tel.mongo_address, tel.mongo_port)
