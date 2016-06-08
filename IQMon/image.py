@@ -1046,7 +1046,7 @@ class Image(object):
             sextractor_executable = 'sex'
 
         if not sextractor_executable:
-            logger.error('Could not find source extractor executable')
+            self.logger.error('Could not find source extractor executable')
             return False
 
         if assoc and self.catalog_data:
