@@ -259,7 +259,7 @@
         {% end %}<br>
 
         <font color="{{ '{}'.format(v5clarity_color) }}">
-        {{ '{:.0f} sec'.format(v5clarity_age) }}<br>
+        {{ '{:.1f} min'.format(v5clarity_age) }}<br>
         </font>
 
     </td>
@@ -339,7 +339,7 @@
         {% if len(v5coord.split(' ')) == 2 %} {{ v5coord.split(' ')[0] }} {% end %}<br>
         {% if len(v5coord.split(' ')) == 2 %} {{ v5coord.split(' ')[1] }} {% end %}<br>
         <font color="{{ '{}'.format(v5data_color) }}">
-        {{ '{:.0f} sec'.format(v5data_age) }}<br>
+        {{ '{:.1f} min'.format(v5data_age) }}<br>
         </font>
         {{ '{:d}'.format(v5_nimages) }}<br>
     </td>
@@ -400,7 +400,7 @@
         {% if len(v20coord.split(' ')) == 2 %} {{ v20coord.split(' ')[0] }} {% end %}<br>
         {% if len(v20coord.split(' ')) == 2 %} {{ v20coord.split(' ')[1] }} {% end %}<br>
         <font color="{{ '{}'.format(v20data_color) }}">
-        {{ '{:.0f} sec'.format(v20data_age) }}<br>
+        {{ '{:.1f} min'.format(v20data_age) }}<br>
         </font>
         {{ '{:d}'.format(v20_nimages) }}<br>
     </td>

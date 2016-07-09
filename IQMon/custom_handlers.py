@@ -121,9 +121,9 @@ class Status(RequestHandler):
                 v20clarity_time = dt.strptime('{} {}'.format(\
                                   v20data['boltwood date'],\
                                   v20data['boltwood time'][:-3]),\
-                                  '%Y-%m-%d %H:%M:%S')        
-            v20clarity_age = (now - v20clarity_time).total_seconds()
-            if v20clarity_age > 60: v20clarity_color = 'red'
+                                  '%Y-%m-%d %H:%M:%S')
+            v20clarity_age = (now - v20clarity_time).total_seconds()/60.
+            if v20clarity_age > 1: v20clarity_color = 'red'
             else: v20clarity_color = 'black'
         except:
             v20clarity_age = float('nan')
@@ -138,8 +138,8 @@ class Status(RequestHandler):
                                v20data['UT date'],\
                                v20data['UT time']),\
                                '%Y%m%dUT %H:%M:%S')
-            v20data_age = (nowut - v20data_time).total_seconds()
-            if v20data_age > 60: v20data_color = 'red'
+            v20data_age = (nowut - v20data_time).total_seconds()/60.
+            if v20data_age > 1: v20data_color = 'red'
             else: v20data_color = 'black'
         except:
             v20data_age = float('nan')
@@ -169,8 +169,8 @@ class Status(RequestHandler):
                                   v5data['boltwood date'],\
                                   v5data['boltwood time'][:-3]),\
                                   '%Y-%m-%d %H:%M:%S')        
-            v5clarity_age = (now - v5clarity_time).total_seconds()
-            if v5clarity_age > 60: v5clarity_color = 'red'
+            v5clarity_age = (now - v5clarity_time).total_seconds()/60.
+            if v5clarity_age > 1.: v5clarity_color = 'red'
             else: v5clarity_color = 'black'
         except:
             v5clarity_age = float('nan')
@@ -185,8 +185,8 @@ class Status(RequestHandler):
                                v5data['UT date'],\
                                v5data['UT time']),\
                                '%Y%m%dUT %H:%M:%S')
-            v5data_age = (nowut - v5data_time).total_seconds()
-            if v5data_age > 60: v5data_color = 'red'
+            v5data_age = (nowut - v5data_time).total_seconds()/60.
+            if v5data_age > 1: v5data_color = 'red'
             else: v5data_color = 'black'
         except:
             v5data_age = float('nan')
