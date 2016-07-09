@@ -206,13 +206,16 @@ def main():
 
     if args.status:
         tlog.app_log.info('Importing status handler')
-        try:
-            from custom_handlers import Status
-            list_of_handlers.append(url(r"/", Status))
-            tlog.app_log.info('  Done')
-        except:
-            tlog.app_log.warning('  Failed')
-            pass
+        from custom_handlers import Status
+        list_of_handlers.append(url(r"/", Status))
+        tlog.app_log.info('  Done')
+#         try:
+#             from custom_handlers import Status
+#             list_of_handlers.append(url(r"/", Status))
+#             tlog.app_log.info('  Done')
+#         except:
+#             tlog.app_log.warning('  Failed')
+#             pass
 
 
     app = Application(list_of_handlers)
