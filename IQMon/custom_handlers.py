@@ -24,6 +24,14 @@ import IQMon
 
 
 ##-------------------------------------------------------------------------
+## Check for Images
+##-------------------------------------------------------------------------
+def get_nimages(telescope, date):
+    path = os.path.join('/Volumes/Data_{}/Images/{}'.format(telescope, date))
+    image_list = glob.glob(os.path.join(path, '{}*fts'.format(telescope)))
+    return len(image_list)
+
+##-------------------------------------------------------------------------
 ## Check Free Space on Drive
 ##-------------------------------------------------------------------------
 def free_space(path):
@@ -474,8 +482,8 @@ class Status(RequestHandler):
             if os.path.exists(paths[disk]):
                 size_GB, avail_GB, pcnt_used = free_space(paths[disk])
                 if disk == 'Drobo':
-                    size_GB -= 12750
-                    avail_GB -= 12750
+                    size_GB -= 12226.56
+                    avail_GB -= 12226.56
                     pcnt_used = float(size_GB - avail_GB)/float(size_GB) * 100
                 disks[disk] = [size_GB, avail_GB, pcnt_used]
 
@@ -488,9 +496,6 @@ class Status(RequestHandler):
             link_date_string = nowut.strftime('%Y%m%dUT')
         else:
             link_date_string = (nowut - tdelta(1,0)).strftime('%Y%m%dUT')
-
-        print(v20coord)
-        print(v20data_color)
 
         tlog.app_log.info('  Rendering Status')
         self.render("status.html", title="VYSOS Status",\
@@ -514,5 +519,7 @@ class Status(RequestHandler):
                     moon = moon,\
                     sun = sun,\
                     disks = disks,\
+                    v5_nimages = get_nimages('V5', link_date_string),\
+                    v20_nimages = get_nimages('V20', link_date_string),\
                     )
         tlog.app_log.info('  Done')

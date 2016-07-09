@@ -133,9 +133,11 @@
     <th colspan=6><br><br>Weather</th>
 </tr>
 <tr>
-    <td><u>Boltwood Data</u></td>
+    <td colspan=3><u>Boltwood Data</u></td>
+<!-- 
     <td><u>VYSOS-20</u></td>
     <td><u>VYSOS-5</u></td>
+ -->
     <td><u>Weather Plot</u></td>
     <td colspan=2><u>Atlas All Sky Image (Color)</u></td>
 </tr>
@@ -154,6 +156,7 @@
         Roof Close<br>
         Clarity Data Age<br>
     </td>
+<!-- 
     <td style="text-align: left;">
         {% if 'boltwood ambient temp' in v20data.keys() %}           {{ '{:.1f} {}'.format(v20data['boltwood ambient temp'], v20data['boltwood temp units']) }} {% end %}<br>
         {% if 'boltwood sky temp' in v20data.keys() %}               {{ '{:.1f} {}'.format(v20data['boltwood sky temp'], v20data['boltwood temp units']) }} {% end %}<br>
@@ -206,7 +209,8 @@
         {{ '{:.0f} sec'.format(v20clarity_age) }}<br>
         </font>
     </td>
-    <td style="text-align: left;">
+ -->
+    <td style="text-align: left;" colspan=2>
         {% if 'boltwood ambient temp' in v5data.keys() %}           {{ '{:.1f} {}'.format(v5data['boltwood ambient temp'], v5data['boltwood temp units']) }} {% end %}<br>
         {% if 'boltwood sky temp' in v5data.keys() %}               {{ '{:.1f} {}'.format(v5data['boltwood sky temp'], v5data['boltwood temp units']) }} {% end %}<br>
         {% if 'boltwood wind speed' in v5data.keys() %}             {{ '{:.1f} {}'.format(v5data['boltwood wind speed'], v5data['boltwood wind units']) }} {% end %}<br>
@@ -260,8 +264,8 @@
 
     </td>
     <td style="vertical-align: middle;">
-        <a href="../static/nights/recent_V20.png">
-            <img width=400 src="../static/nights/recent_V20.png">
+        <a href="../static/nights/recent_V5.png">
+            <img width=400 src="../static/nights/recent_V5.png">
         </a><br>
 <!-- 
         <a href="../static/nights/recent_V5.png">
@@ -286,6 +290,66 @@
         </table>
     </td>
 <tr>
+<!-- ###################################### -->
+<!-- VYSOS-5 -->
+<!-- ###################################### -->
+<tr>
+    <th colspan=6>
+        <br><br>
+        VYSOS-5<br>
+        <a href="V5/">List of Nights</a> | 
+        <a href="V5/targets">List of Targets</a> | 
+        <a href="{{ '/V5/{}'.format(link_date_string) }}">
+            Images from {{ link_date_string }}</a> | 
+        <a href="{{ '/static/nights/{}_V5.png'.format(link_date_string) }}">
+            Night Summary Plot for {{ link_date_string }}</a>
+    </th>
+</tr>
+<tr>
+    <td colspan=3><u>VYSOS-5 Status</u></td>
+    <td>VYSOS-5 External</td>
+    <td colspan=2>VYSOS-5 Internal</td>
+</tr>
+<tr>
+    <td style="text-align: right;">
+        ACP Connected<br>
+        Status<br>
+        Alt<br>
+        Az<br>
+        Target RA<br>
+        Target Dec<br>
+        ACP Data Age<br>
+        N Images<br>
+    </td>
+    <td style="text-align: left;" colspan=2>
+        {% if 'ACP connected' in v5data.keys() %}
+            <font color="{{ '{}'.format(v5data['ACP connected color']) }}">
+            {{ '{}'.format(v5data['ACP connected string']) }}
+            </font>
+        {% end %}<br>
+
+        {% if 'ACP status string' in v5data.keys() %}
+            <font color="{{ '{}'.format(v5data['ACP status color']) }}">
+            {{ '{}'.format(v5data['ACP status string']) }}
+            </font>
+        {% end %}<br>
+        
+        {% if 'ACP alt' in v5data.keys() %} {{ '{:.1f}'.format(v5data['ACP alt']) }} {% end %}<br>
+        {% if 'ACP az' in v5data.keys() %}  {{ '{:.1f}'.format(v5data['ACP az']) }} {% end %}<br>
+        {% if len(v5coord.split(' ')) == 2 %} {{ v5coord.split(' ')[0] }} {% end %}<br>
+        {% if len(v5coord.split(' ')) == 2 %} {{ v5coord.split(' ')[1] }} {% end %}<br>
+        <font color="{{ '{}'.format(v5data_color) }}">
+        {{ '{:.0f} sec'.format(v5data_age) }}<br>
+        </font>
+        {{ '{:d}'.format(v5_nimages) }}<br>
+    </td>
+    <td>
+        <a href="http://166.122.71.162:8083/4.jpg"><img width=400 height=267 src="http://166.122.71.162:8083/4.jpg"></a><br>
+    </td>
+    <td colspan=2>
+        <a href="http://166.122.71.162:8083/6.jpg"><img width=400 height=267 src="http://166.122.71.162:8083/6.jpg"></a><br>
+    </td>
+</tr>
 <!-- ###################################### -->
 <!-- VYSOS-20 -->
 <!-- ###################################### -->
@@ -316,6 +380,7 @@
         Target RA<br>
         Target Dec<br>
         ACP Data Age<br>
+        N Images<br>
     </td>
     <td style="text-align: left;" colspan=2>
         {% if 'ACP connected' in v20data.keys() %}
@@ -337,70 +402,13 @@
         <font color="{{ '{}'.format(v20data_color) }}">
         {{ '{:.0f} sec'.format(v20data_age) }}<br>
         </font>
+        {{ '{:d}'.format(v20_nimages) }}<br>
     </td>
     <td>
         <a href="http://166.122.71.162:8083/0.jpg"><img width=400 height=267 src="http://166.122.71.162:8083/0.jpg"><br>
     </td>
     <td colspan=2>
         <a href="http://166.122.71.162:8083/2.jpg"><img width=400 height=267 src="http://166.122.71.162:8083/2.jpg"></a><br>
-    </td>
-</tr>
-<!-- ###################################### -->
-<!-- VYSOS-5 -->
-<!-- ###################################### -->
-<tr>
-    <th colspan=6>
-        <br><br>
-        VYSOS-5<br>
-        <a href="V5/">List of Nights</a> | 
-        <a href="V5/targets">List of Targets</a> | 
-        <a href="{{ '/V5/{}'.format(link_date_string) }}">
-            Images from {{ link_date_string }}</a> | 
-        <a href="{{ '/static/nights/{}_V5.png'.format(link_date_string) }}">
-            Night Summary Plot for {{ link_date_string }}</a>
-    </th>
-</tr>
-<tr>
-    <td colspan=3><u>VYSOS-5 Status</u></td>
-    <td>VYSOS-5 External</td>
-    <td colspan=2>VYSOS-5 Internal</td>
-</tr>
-<tr>
-    <td style="text-align: right;">
-        ACP Connected<br>
-        Status<br>
-        Alt<br>
-        Az<br>
-        Target RA<br>
-        Target Dec<br>
-        ACP Data Age<br>
-    </td>
-    <td style="text-align: left;" colspan=2>
-        {% if 'ACP connected' in v5data.keys() %}
-            <font color="{{ '{}'.format(v5data['ACP connected color']) }}">
-            {{ '{}'.format(v5data['ACP connected string']) }}
-            </font>
-        {% end %}<br>
-
-        {% if 'ACP status string' in v5data.keys() %}
-            <font color="{{ '{}'.format(v5data['ACP status color']) }}">
-            {{ '{}'.format(v5data['ACP status string']) }}
-            </font>
-        {% end %}<br>
-        
-        {% if 'ACP alt' in v5data.keys() %} {{ '{:.1f}'.format(v5data['ACP alt']) }} {% end %}<br>
-        {% if 'ACP az' in v5data.keys() %}  {{ '{:.1f}'.format(v5data['ACP az']) }} {% end %}<br>
-        {% if len(v5coord.split(' ')) == 2 %} {{ v5coord.split(' ')[0] }} {% end %}<br>
-        {% if len(v5coord.split(' ')) == 2 %} {{ v5coord.split(' ')[1] }} {% end %}<br>
-        <font color="{{ '{}'.format(v5data_color) }}">
-        {{ '{:.0f} sec'.format(v5data_age) }}<br>
-        </font>
-    </td>
-    <td>
-        <a href="http://166.122.71.162:8083/4.jpg"><img width=400 height=267 src="http://166.122.71.162:8083/4.jpg"></a><br>
-    </td>
-    <td colspan=2>
-        <a href="http://166.122.71.162:8083/6.jpg"><img width=400 height=267 src="http://166.122.71.162:8083/6.jpg"></a><br>
     </td>
 </tr>
 </table>
