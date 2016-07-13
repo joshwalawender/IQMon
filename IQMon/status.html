@@ -238,7 +238,13 @@
             <td style="border:0px; border-style:none; text-align: right;">Clarity Data Age</td>
             <td style="border:0px; border-style:none; text-align: left;" colspan=2>
                 <font color="{{ '{}'.format(v5clarity_color) }}">
-                {{ '{:.1f} min'.format(v5clarity_age) }}
+                {% if v5clarity_age < 2*60 %}
+                    {{ '{:.1f} min'.format(v5clarity_age) }}
+                {% elif v5clarity_age < 2*24*60 %}
+                    {{ '{:.1f} hr'.format(v5clarity_age/60.) }}
+                {% else %}
+                    {{ '{:.1f} days'.format(v5clarity_age/60./24.) }}
+                {% end %}
                 </font>
             </td>
         </tr>
