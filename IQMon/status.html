@@ -134,144 +134,120 @@
 </tr>
 <tr>
     <td colspan=3><u>Boltwood Data</u></td>
-<!-- 
-    <td><u>VYSOS-20</u></td>
-    <td><u>VYSOS-5</u></td>
- -->
     <td><u>Weather Plot</u></td>
     <td colspan=2><u>Atlas All Sky Image (Color)</u></td>
 </tr>
 <tr>
-    <td style="text-align: right;">
-        Ambient Temp<br>
-        Sky Temp<br>
-        Wind Speed<br>
-        Humidity<br>
-        Rain Status<br>
-        Wet Status<br>
-        Cloud Condition<br>
-        Wind Condition<br>
-        Rain Condition<br>
-        Day Condition<br>
-        Roof Close<br>
-        Clarity Data Age<br>
-    </td>
-<!-- 
-    <td style="text-align: left;">
-        {% if 'boltwood ambient temp' in v20data.keys() %}           {{ '{:.1f} {}'.format(v20data['boltwood ambient temp'], v20data['boltwood temp units']) }} {% end %}<br>
-        {% if 'boltwood sky temp' in v20data.keys() %}               {{ '{:.1f} {}'.format(v20data['boltwood sky temp'], v20data['boltwood temp units']) }} {% end %}<br>
-        {% if 'boltwood wind speed' in v20data.keys() %}             {{ '{:.1f} {}'.format(v20data['boltwood wind speed'], v20data['boltwood wind units']) }} {% end %}<br>
-        {% if 'boltwood humidity' in v20data.keys() %}               {{ '{:.1f} %'.format(v20data['boltwood humidity']) }} {% end %}<br>
-
-        {% if 'boltwood rain status string' in v20data.keys() %}
-            <font color="{{ '{}'.format(v20data['boltwood rain status color']) }}">
-            {{ '{}'.format(v20data['boltwood rain status string']) }}
-            </font>
-        {% end %}<br>
-
-        {% if 'boltwood wet status string' in v20data.keys() %}
-            <font color="{{ '{}'.format(v20data['boltwood wet status color']) }}">
-            {{ '{}'.format(v20data['boltwood wet status string']) }}
-            </font>
-        {% end %}<br>
-
-        {% if 'boltwood cloud condition string' in v20data.keys() %}
-            <font color="{{ '{}'.format(v20data['boltwood cloud color']) }}">
-            {{ '{}'.format(v20data['boltwood cloud condition string']) }}
-            </font>
-        {% end %}<br>
-
-        {% if 'boltwood wind condition string' in v20data.keys() %}
-            <font color="{{ '{}'.format(v20data['boltwood wind color']) }}">
-            {{ '{}'.format(v20data['boltwood wind condition string']) }}
-            </font>
-        {% end %}<br>
-
-        {% if 'boltwood rain condition string' in v20data.keys() %}
-            <font color="{{ '{}'.format(v20data['boltwood rain color']) }}">
-            {{ '{}'.format(v20data['boltwood rain condition string']) }}
-            </font>
-        {% end %}<br>
-
-        {% if 'boltwood day condition string' in v20data.keys() %}
-            <font color="{{ '{}'.format(v20data['boltwood day color']) }}">
-            {{ '{}'.format(v20data['boltwood day condition string']) }}
-            </font>
-        {% end %}<br>
-
-        {% if 'boltwood roof close string' in v20data.keys() %}
-            <font color="{{ '{}'.format(v20data['boltwood roof close color']) }}">
-            {{ '{}'.format(v20data['boltwood roof close string']) }}
-            </font>
-        {% end %}<br>
-
-        <font color="{{ '{}'.format(v20clarity_color) }}">
-        {{ '{:.0f} sec'.format(v20clarity_age) }}<br>
-        </font>
-    </td>
- -->
-    <td style="text-align: left;" colspan=2>
-        {% if 'boltwood ambient temp' in v5data.keys() %}           {{ '{:.1f} {}'.format(v5data['boltwood ambient temp'], v5data['boltwood temp units']) }} {% end %}<br>
-        {% if 'boltwood sky temp' in v5data.keys() %}               {{ '{:.1f} {}'.format(v5data['boltwood sky temp'], v5data['boltwood temp units']) }} {% end %}<br>
-        {% if 'boltwood wind speed' in v5data.keys() %}             {{ '{:.1f} {}'.format(v5data['boltwood wind speed'], v5data['boltwood wind units']) }} {% end %}<br>
-        {% if 'boltwood humidity' in v5data.keys() %}               {{ '{:.1f} %'.format(v5data['boltwood humidity']) }} {% end %}<br>
-
-        {% if 'boltwood rain status string' in v5data.keys() %}
-            <font color="{{ '{}'.format(v5data['boltwood rain status color']) }}">
-            {{ '{}'.format(v5data['boltwood rain status string']) }}
-            </font>
-        {% end %}<br>
-
-        {% if 'boltwood wet status string' in v5data.keys() %}
-            <font color="{{ '{}'.format(v5data['boltwood wet status color']) }}">
-            {{ '{}'.format(v5data['boltwood wet status string']) }}
-            </font>
-        {% end %}<br>
-
-        {% if 'boltwood cloud condition string' in v5data.keys() %}
-            <font color="{{ '{}'.format(v5data['boltwood cloud color']) }}">
-            {{ '{}'.format(v5data['boltwood cloud condition string']) }}
-            </font>
-        {% end %}<br>
-
-        {% if 'boltwood wind condition string' in v5data.keys() %}
-            <font color="{{ '{}'.format(v5data['boltwood wind color']) }}">
-            {{ '{}'.format(v5data['boltwood wind condition string']) }}
-            </font>
-        {% end %}<br>
-
-        {% if 'boltwood rain condition string' in v5data.keys() %}
-            <font color="{{ '{}'.format(v5data['boltwood rain color']) }}">
-            {{ '{}'.format(v5data['boltwood rain condition string']) }}
-            </font>
-        {% end %}<br>
-
-        {% if 'boltwood day condition string' in v5data.keys() %}
-            <font color="{{ '{}'.format(v5data['boltwood day color']) }}">
-            {{ '{}'.format(v5data['boltwood day condition string']) }}
-            </font>
-        {% end %}<br>
-
-        {% if 'boltwood roof close string' in v5data.keys() %}
-            <font color="{{ '{}'.format(v5data['boltwood roof close color']) }}">
-            {{ '{}'.format(v5data['boltwood roof close string']) }}
-            </font>
-        {% end %}<br>
-
-        <font color="{{ '{}'.format(v5clarity_color) }}">
-        {{ '{:.1f} min'.format(v5clarity_age) }}<br>
-        </font>
-
+    <td colspan=3>
+        <table style="border:0px; border-style:none;">
+        <tr style="border:0px; border-style:none;">
+            <td style="border:0px; border-style:none; text-align: right;">Ambient Temp</td>
+            <td style="border:0px; border-style:none; text-align: left;">
+                {% if 'boltwood ambient temp' in v5data.keys() %} {{ '{:.1f} {}'.format(v5data['boltwood ambient temp'], v5data['boltwood temp units']) }} {% end %}
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td style="border:0px; border-style:none; text-align: right;">Sky Temp</td>
+            <td style="border:0px; border-style:none; text-align: left;" colspan=2>
+                {% if 'boltwood sky temp' in v5data.keys() %} {{ '{:.1f} {}'.format(v5data['boltwood sky temp'], v5data['boltwood temp units']) }} {% end %}
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td style="border:0px; border-style:none; text-align: right;">Wind Speed</td>
+            <td style="border:0px; border-style:none; text-align: left;" colspan=2>
+                {% if 'boltwood wind speed' in v5data.keys() %} {{ '{:.1f} {}'.format(v5data['boltwood wind speed'], v5data['boltwood wind units']) }} {% end %}
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td style="border:0px; border-style:none; text-align: right;">Humidity</td>
+            <td style="border:0px; border-style:none; text-align: left;" colspan=2>
+                {% if 'boltwood humidity' in v5data.keys() %} {{ '{:.1f} %'.format(v5data['boltwood humidity']) }} {% end %}
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td style="border:0px; border-style:none; text-align: right;">Rain Status</td>
+            <td style="border:0px; border-style:none; text-align: left;" colspan=2>
+                {% if 'boltwood rain status string' in v5data.keys() %}
+                    <font color="{{ '{}'.format(v5data['boltwood rain status color']) }}">
+                    {{ '{}'.format(v5data['boltwood rain status string']) }}
+                    </font>
+                {% end %}
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td style="border:0px; border-style:none; text-align: right;">Wet Status</td>
+            <td style="border:0px; border-style:none; text-align: left;" colspan=2>
+                {% if 'boltwood wet status string' in v5data.keys() %}
+                    <font color="{{ '{}'.format(v5data['boltwood wet status color']) }}">
+                    {{ '{}'.format(v5data['boltwood wet status string']) }}
+                    </font>
+                {% end %}
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td style="border:0px; border-style:none; text-align: right;">Cloud Condition</td>
+            <td style="border:0px; border-style:none; text-align: left;" colspan=2>
+                {% if 'boltwood cloud condition string' in v5data.keys() %}
+                    <font color="{{ '{}'.format(v5data['boltwood cloud color']) }}">
+                    {{ '{}'.format(v5data['boltwood cloud condition string']) }}
+                    </font>
+                {% end %}
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td style="border:0px; border-style:none; text-align: right;">Wind Condition</td>
+            <td style="border:0px; border-style:none; text-align: left;" colspan=2>
+                {% if 'boltwood wind condition string' in v5data.keys() %}
+                    <font color="{{ '{}'.format(v5data['boltwood wind color']) }}">
+                    {{ '{}'.format(v5data['boltwood wind condition string']) }}
+                    </font>
+                {% end %}
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td style="border:0px; border-style:none; text-align: right;">Rain Condition</td>
+            <td style="border:0px; border-style:none; text-align: left;" colspan=2>
+                {% if 'boltwood rain condition string' in v5data.keys() %}
+                    <font color="{{ '{}'.format(v5data['boltwood rain color']) }}">
+                    {{ '{}'.format(v5data['boltwood rain condition string']) }}
+                    </font>
+                {% end %}
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td style="border:0px; border-style:none; text-align: right;">Day Condition</td>
+            <td style="border:0px; border-style:none; text-align: left;" colspan=2>
+                {% if 'boltwood day condition string' in v5data.keys() %}
+                    <font color="{{ '{}'.format(v5data['boltwood day color']) }}">
+                    {{ '{}'.format(v5data['boltwood day condition string']) }}
+                    </font>
+                {% end %}
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td style="border:0px; border-style:none; text-align: right;">Roof Close</td>
+            <td style="border:0px; border-style:none; text-align: left;" colspan=2>
+                {% if 'boltwood roof close string' in v5data.keys() %}
+                    <font color="{{ '{}'.format(v5data['boltwood roof close color']) }}">
+                    {{ '{}'.format(v5data['boltwood roof close string']) }}
+                    </font>
+                {% end %}
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td style="border:0px; border-style:none; text-align: right;">Clarity Data Age</td>
+            <td style="border:0px; border-style:none; text-align: left;" colspan=2>
+                <font color="{{ '{}'.format(v5clarity_color) }}">
+                {{ '{:.1f} min'.format(v5clarity_age) }}
+                </font>
+            </td>
+        </tr>
+        </table>
     </td>
     <td style="vertical-align: middle;">
         <a href="../static/nights/recent_V5.png">
             <img width=400 src="../static/nights/recent_V5.png">
         </a><br>
-<!-- 
-        <a href="../static/nights/recent_V5.png">
-            <img width=400 src="../static/nights/recent_V5.png">
-        </a><br>
-        -->
         <a href="../static/Weather_VYSOS5.gif"><img width=400 src="../static/Weather_VYSOS5.gif"></a>
     </td>
     <td colspan=2 style="vertical-align: middle;">
@@ -289,7 +265,8 @@
             </tr>
         </table>
     </td>
-<tr>
+</tr>
+
 <!-- ###################################### -->
 <!-- VYSOS-5 -->
 <!-- ###################################### -->
@@ -311,37 +288,67 @@
     <td colspan=2>VYSOS-5 Internal</td>
 </tr>
 <tr>
-    <td style="text-align: right;">
-        ACP Connected<br>
-        Status<br>
-        Alt<br>
-        Az<br>
-        Target RA<br>
-        Target Dec<br>
-        ACP Data Age<br>
-        N Images<br>
-    </td>
-    <td style="text-align: left;" colspan=2>
-        {% if 'ACP connected' in v5data.keys() %}
-            <font color="{{ '{}'.format(v5data['ACP connected color']) }}">
-            {{ '{}'.format(v5data['ACP connected string']) }}
-            </font>
-        {% end %}<br>
-
-        {% if 'ACP status string' in v5data.keys() %}
-            <font color="{{ '{}'.format(v5data['ACP status color']) }}">
-            {{ '{}'.format(v5data['ACP status string']) }}
-            </font>
-        {% end %}<br>
-        
-        {% if 'ACP alt' in v5data.keys() %} {{ '{:.1f}'.format(v5data['ACP alt']) }} {% end %}<br>
-        {% if 'ACP az' in v5data.keys() %}  {{ '{:.1f}'.format(v5data['ACP az']) }} {% end %}<br>
-        {% if len(v5coord.split(' ')) == 2 %} {{ v5coord.split(' ')[0] }} {% end %}<br>
-        {% if len(v5coord.split(' ')) == 2 %} {{ v5coord.split(' ')[1] }} {% end %}<br>
-        <font color="{{ '{}'.format(v5data_color) }}">
-        {{ '{:.1f} min'.format(v5data_age) }}<br>
-        </font>
-        {{ '{:d}'.format(v5_nimages) }}<br>
+    <td colspan=3>
+        <table style="border:0px; border-style:none;">
+        <tr style="border:0px; border-style:none;">
+            <td style="border:0px; border-style:none; text-align: right;">ACP Connected</td>
+            <td style="border:0px; border-style:none; text-align: left;">
+                {% if 'ACP connected' in v5data.keys() %}
+                    <font color="{{ '{}'.format(v5data['ACP connected color']) }}">
+                    {{ '{}'.format(v5data['ACP connected string']) }}
+                    </font>
+                {% end %}
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td style="border:0px; border-style:none; text-align: right;">Status</td>
+            <td style="border:0px; border-style:none; text-align: left;">
+                {% if 'ACP status string' in v5data.keys() %}
+                    <font color="{{ '{}'.format(v5data['ACP status color']) }}">
+                    {{ '{}'.format(v5data['ACP status string']) }}
+                    </font>
+                {% end %}
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td style="border:0px; border-style:none; text-align: right;">Alt</td>
+            <td style="border:0px; border-style:none; text-align: left;">
+                {% if 'ACP alt' in v5data.keys() %} {{ '{:.1f}'.format(v5data['ACP alt']) }} {% end %}
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td style="border:0px; border-style:none; text-align: right;">Az</td>
+            <td style="border:0px; border-style:none; text-align: left;">
+                {% if 'ACP az' in v5data.keys() %}  {{ '{:.1f}'.format(v5data['ACP az']) }} {% end %}
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td style="border:0px; border-style:none; text-align: right;">Target RA</td>
+            <td style="border:0px; border-style:none; text-align: left;">
+                {% if len(v5coord.split(' ')) == 2 %} {{ v5coord.split(' ')[0] }} {% end %}
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td style="border:0px; border-style:none; text-align: right;">Target Dec</td>
+            <td style="border:0px; border-style:none; text-align: left;">
+                {% if len(v5coord.split(' ')) == 2 %} {{ v5coord.split(' ')[1] }} {% end %}
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td style="border:0px; border-style:none; text-align: right;">ACP Data Age</td>
+            <td style="border:0px; border-style:none; text-align: left;">
+                <font color="{{ '{}'.format(v5data_color) }}">
+                {{ '{:.1f} min'.format(v5data_age) }}
+                </font>
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td style="border:0px; border-style:none; text-align: right;">N Images</td>
+            <td style="border:0px; border-style:none; text-align: left;">
+                {{ '{:d}'.format(v5_nimages) }}
+            </td>
+        </tr>
+        </table>
     </td>
     <td>
         <a href="http://166.122.71.162:8083/4.jpg"><img width=400 height=267 src="http://166.122.71.162:8083/4.jpg"></a><br>
@@ -372,37 +379,67 @@
     <td colspan=2>VYSOS-20 Internal</td>
 </tr>
 <tr>
-    <td style="text-align: right;">
-        ACP Connected<br>
-        Status<br>
-        Alt<br>
-        Az<br>
-        Target RA<br>
-        Target Dec<br>
-        ACP Data Age<br>
-        N Images<br>
-    </td>
-    <td style="text-align: left;" colspan=2>
-        {% if 'ACP connected' in v20data.keys() %}
-            <font color="{{ '{}'.format(v20data['ACP connected color']) }}">
-            {{ '{}'.format(v20data['ACP connected string']) }}
-            </font>
-        {% end %}<br>
-
-        {% if 'ACP status string' in v20data.keys() %}
-            <font color="{{ '{}'.format(v20data['ACP status color']) }}">
-            {{ '{}'.format(v20data['ACP status string']) }}
-            </font>
-        {% end %}<br>
-        
-        {% if 'ACP alt' in v20data.keys() %} {{ '{:.1f}'.format(v20data['ACP alt']) }} {% end %}<br>
-        {% if 'ACP az' in v20data.keys() %}  {{ '{:.1f}'.format(v20data['ACP az']) }} {% end %}<br>
-        {% if len(v20coord.split(' ')) == 2 %} {{ v20coord.split(' ')[0] }} {% end %}<br>
-        {% if len(v20coord.split(' ')) == 2 %} {{ v20coord.split(' ')[1] }} {% end %}<br>
-        <font color="{{ '{}'.format(v20data_color) }}">
-        {{ '{:.1f} min'.format(v20data_age) }}<br>
-        </font>
-        {{ '{:d}'.format(v20_nimages) }}<br>
+    <td colspan=3>
+        <table style="border:0px; border-style:none;">
+        <tr style="border:0px; border-style:none;">
+            <td style="border:0px; border-style:none; text-align: right;">ACP Connected</td>
+            <td style="border:0px; border-style:none; text-align: left;">
+                {% if 'ACP connected' in v20data.keys() %}
+                    <font color="{{ '{}'.format(v5data['ACP connected color']) }}">
+                    {{ '{}'.format(v20data['ACP connected string']) }}
+                    </font>
+                {% end %}
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td style="border:0px; border-style:none; text-align: right;">Status</td>
+            <td style="border:0px; border-style:none; text-align: left;">
+                {% if 'ACP status string' in v20data.keys() %}
+                    <font color="{{ '{}'.format(v20data['ACP status color']) }}">
+                    {{ '{}'.format(v20data['ACP status string']) }}
+                    </font>
+                {% end %}
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td style="border:0px; border-style:none; text-align: right;">Alt</td>
+            <td style="border:0px; border-style:none; text-align: left;">
+                {% if 'ACP alt' in v20data.keys() %} {{ '{:.1f}'.format(v20data['ACP alt']) }} {% end %}
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td style="border:0px; border-style:none; text-align: right;">Az</td>
+            <td style="border:0px; border-style:none; text-align: left;">
+                {% if 'ACP az' in v20data.keys() %}  {{ '{:.1f}'.format(v20data['ACP az']) }} {% end %}
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td style="border:0px; border-style:none; text-align: right;">Target RA</td>
+            <td style="border:0px; border-style:none; text-align: left;">
+                {% if len(v5coord.split(' ')) == 2 %} {{ v5coord.split(' ')[0] }} {% end %}
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td style="border:0px; border-style:none; text-align: right;">Target Dec</td>
+            <td style="border:0px; border-style:none; text-align: left;">
+                {% if len(v5coord.split(' ')) == 2 %} {{ v5coord.split(' ')[1] }} {% end %}
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td style="border:0px; border-style:none; text-align: right;">ACP Data Age</td>
+            <td style="border:0px; border-style:none; text-align: left;">
+                <font color="{{ '{}'.format(v20data_color) }}">
+                {{ '{:.1f} min'.format(v20data_age) }}
+                </font>
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td style="border:0px; border-style:none; text-align: right;">N Images</td>
+            <td style="border:0px; border-style:none; text-align: left;">
+                {{ '{:d}'.format(v5_nimages) }}
+            </td>
+        </tr>
+        </table>
     </td>
     <td>
         <a href="http://166.122.71.162:8083/0.jpg"><img width=400 height=267 src="http://166.122.71.162:8083/0.jpg"><br>
