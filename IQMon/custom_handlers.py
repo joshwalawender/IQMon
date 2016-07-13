@@ -32,6 +32,15 @@ def get_nimages(telescope, date):
     return len(image_list)
 
 ##-------------------------------------------------------------------------
+## Check for Flats
+##-------------------------------------------------------------------------
+def get_nflats(telescope, date):
+    path = os.path.join('/Volumes/Data_{}/Images/{}/AutoFlat'.format(telescope, date))
+    image_list = glob.glob(os.path.join(path, '{}*fts'.format(telescope)))
+    return len(image_list)
+
+
+##-------------------------------------------------------------------------
 ## Check Free Space on Drive
 ##-------------------------------------------------------------------------
 def free_space(path):
@@ -521,5 +530,7 @@ class Status(RequestHandler):
                     disks = disks,\
                     v5_nimages = get_nimages('V5', link_date_string),\
                     v20_nimages = get_nimages('V20', link_date_string),\
+                    v5_nflats = get_nflats('V5', link_date_string),\
+                    v20_nflats = get_nflats('V20', link_date_string),\
                     )
         tlog.app_log.info('  Done')
