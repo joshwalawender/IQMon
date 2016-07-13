@@ -338,7 +338,13 @@
             <td style="border:0px; border-style:none; text-align: right;">ACP Data Age</td>
             <td style="border:0px; border-style:none; text-align: left;">
                 <font color="{{ '{}'.format(v5data_color) }}">
-                {{ '{:.1f} min'.format(v5data_age) }}
+                {% if v5data_age < 2*60 %}
+                    {{ '{:.1f} min'.format(v5data_age) }}
+                {% elif v5data_age < 2*24*60 %}
+                    {{ '{:.1f} hr'.format(v5data_age/60.) }}
+                {% else %}
+                    {{ '{:.1f} days'.format(v5data_age/60./24.) }}
+                {% end %}
                 </font>
             </td>
         </tr>
@@ -429,7 +435,13 @@
             <td style="border:0px; border-style:none; text-align: right;">ACP Data Age</td>
             <td style="border:0px; border-style:none; text-align: left;">
                 <font color="{{ '{}'.format(v20data_color) }}">
-                {{ '{:.1f} min'.format(v20data_age) }}
+                {% if v20data_age < 2*60 %}
+                    {{ '{:.1f} min'.format(v20data_age) }}
+                {% elif v20data_age < 2*24*60 %}
+                    {{ '{:.1f} hr'.format(v20data_age/60.) }}
+                {% else %}
+                    {{ '{:.1f} days'.format(v20data_age/60./24.) }}
+                {% end %}
                 </font>
             </td>
         </tr>
