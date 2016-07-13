@@ -316,7 +316,7 @@ class Status(RequestHandler):
         else: v5data['boltwood roof close color'] = 'red'
         tlog.app_log.info('  colors determined')
 
-        if v20clarity_age > 600:
+        if v20clarity_age > 10:
             if 'boltwood ambient temp' in v20data.keys():
                 del v20data['boltwood ambient temp']
             if 'boltwood sky temp' in v20data.keys():
@@ -341,7 +341,7 @@ class Status(RequestHandler):
                 del v20data['boltwood roof close string']
             tlog.app_log.info('  V20 Clarity data is old and has been removed.')
 
-        if v5clarity_age > 600:
+        if v5clarity_age > 10:
             if 'boltwood ambient temp' in v5data.keys():
                 del v5data['boltwood ambient temp']
             if 'boltwood sky temp' in v5data.keys():
