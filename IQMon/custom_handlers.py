@@ -36,7 +36,7 @@ def get_nimages(telescope, date):
 ##-------------------------------------------------------------------------
 def get_nflats(telescope, date):
     path = os.path.join('/Volumes/Data_{}/Images/{}/AutoFlat'.format(telescope, date))
-    image_list = glob.glob(os.path.join(path, '{}*fts'.format(telescope)))
+    image_list = glob.glob(os.path.join(path, 'AutoFlat*fts'))
     return len(image_list)
 
 
