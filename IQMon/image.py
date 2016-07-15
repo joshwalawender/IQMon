@@ -120,6 +120,7 @@ class Image(object):
         self.temp_files = []
         self.SExtractor_catalogfile = None
         self.SExtractor_results = None
+        self.SExtractor_assoc_results = None
         self.position_angle = None
         self.zero_point = None
         self.zero_point_mode = None
@@ -1257,13 +1258,12 @@ class Image(object):
                     if len(rows_to_remove) > 0:
                         results.remove_rows(rows_to_remove)
 
-                self.SExtractor_results = results
                 SExImageRadius = []
                 SExAngleInImage = []
                 assoc_x = []
                 assoc_y = []
                 assoc_catmag = []
-                for star in self.SExtractor_results:
+                for star in results:
                     SExImageRadius.append(math.sqrt((self.nXPix/2-star['XWIN_IMAGE'])**2 +\
                                                     (self.nYPix/2-star['YWIN_IMAGE'])**2))
                     SExAngleInImage.append(math.atan((star['XWIN_IMAGE']-self.nXPix/2) /\
@@ -1272,21 +1272,26 @@ class Image(object):
                         assoc_x.append(star['VECTOR_ASSOC'][0])
                         assoc_y.append(star['VECTOR_ASSOC'][1])
                         assoc_catmag.append(star['VECTOR_ASSOC'][2])
-                self.SExtractor_results.add_column(table.Column(\
+                results.add_column(table.Column(\
                                         data=SExImageRadius, name='ImageRadius'))
-                self.SExtractor_results.add_column(table.Column(\
+                results.add_column(table.Column(\
                                         data=SExAngleInImage, name='AngleInImage'))
-                self.n_stars_SExtracted = len(self.SExtractor_results)
+                self.n_stars_SExtracted = len(results)
                 self.logger.info("  Read in {0} stars from SExtractor catalog (after filtering).".format(\
                                                           self.n_stars_SExtracted))
                 if assoc:
-                    self.SExtractor_results.add_column(table.Column(\
+                    results.add_column(table.Column(\
                                                        data=assoc_x, name='assoc_x'))
-                    self.SExtractor_results.add_column(table.Column(\
+                    results.add_column(table.Column(\
                                                        data=assoc_y, name='assoc_y'))
-                    self.SExtractor_results.add_column(table.Column(\
+                    results.add_column(table.Column(\
                                                        data=assoc_catmag, name='assoc_catmag'))
                     self.tel.SExtractor_params = original_params
+
+                if assoc:
+                    self.SExtractor_assoc_results = results
+                else:
+                    self.SExtractor_results = results
 
         end_time = datetime.datetime.now()
         elapsed_time = end_time - start_time
@@ -2058,13 +2063,13 @@ class Image(object):
         start_time = datetime.datetime.now()
         self.logger.info('Analyzing SExtractor results to determine photometric zero point')
 
-        if self.SExtractor_results\
-            and ('assoc_catmag' in self.SExtractor_results.keys())\
-            and ('MAG_AUTO' in self.SExtractor_results.keys()):
+        if self.SExtractor_assoc_results\
+            and ('assoc_catmag' in self.SExtractor_assoc_results.keys())\
+            and ('MAG_AUTO' in self.SExtractor_assoc_results.keys()):
             min_stars = 10
 
             zero_points = [entry['assoc_catmag'] - entry['MAG_AUTO']\
-                           for entry in self.SExtractor_results\
+                           for entry in self.SExtractor_assoc_results\
                            if (entry['FLAGS'] == 0)\
                            and not np.isnan(entry['assoc_catmag'])\
                            and not (float(entry['assoc_catmag']) == 0.0)]
@@ -2074,7 +2079,7 @@ class Image(object):
             ##   sig_m = dm/dF * sig_F = 2.512/ln(10) sig_F/F
             ##   weight = 1/sig_m^2 = (ln(10)/2.512 * SNR)^2
             weights = [(np.log(10)/2.512*entry['FLUX_AUTO'] / entry['FLUXERR_AUTO'])**2\
-                       for entry in self.SExtractor_results\
+                       for entry in self.SExtractor_assoc_results\
                        if (entry['FLAGS'] == 0)\
                        and not np.isnan(entry['assoc_catmag'])\
                        and not (float(entry['assoc_catmag']) == 0.0)]
@@ -2132,32 +2137,32 @@ class Image(object):
                                                 self.zero_point_plotfilename)
 
         catalog_mags = [entry['assoc_catmag']\
-                        for entry in self.SExtractor_results\
+                        for entry in self.SExtractor_assoc_results\
                         if (entry['FLAGS'] == 0)\
                         and not np.isnan(entry['assoc_catmag'])
                         and not (float(entry['assoc_catmag']) == 0.0)]
         instrumental_mags = [entry['MAG_AUTO']\
-                             for entry in self.SExtractor_results\
+                             for entry in self.SExtractor_assoc_results\
                              if (entry['FLAGS'] == 0)\
                              and not np.isnan(entry['assoc_catmag'])
                              and not (float(entry['assoc_catmag']) == 0.0)]
         zero_points = [entry['assoc_catmag'] - entry['MAG_AUTO']\
-                       for entry in self.SExtractor_results\
+                       for entry in self.SExtractor_assoc_results\
                        if (entry['FLAGS'] == 0)\
                        and not np.isnan(entry['assoc_catmag'])
                        and not (float(entry['assoc_catmag']) == 0.0)]
         xpix = [entry['XWIN_IMAGE']\
-                for entry in self.SExtractor_results\
+                for entry in self.SExtractor_assoc_results\
                 if (entry['FLAGS'] == 0)\
                 and not np.isnan(entry['assoc_catmag'])
                 and not (float(entry['assoc_catmag']) == 0.0)]
         ypix = [entry['YWIN_IMAGE']\
-                for entry in self.SExtractor_results
+                for entry in self.SExtractor_assoc_results
                 if (entry['FLAGS'] == 0)\
                 and not np.isnan(entry['assoc_catmag'])
                 and not (float(entry['assoc_catmag']) == 0.0)]
         residuals = [entry['assoc_catmag'] - entry['MAG_AUTO'] - self.zero_point.value\
-                     for entry in self.SExtractor_results
+                     for entry in self.SExtractor_assoc_results
                      if (entry['FLAGS'] == 0)\
                      and not np.isnan(entry['assoc_catmag'])
                      and not (float(entry['assoc_catmag']) == 0.0)]
