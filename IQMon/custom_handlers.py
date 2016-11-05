@@ -501,7 +501,7 @@ class Status(RequestHandler):
         ##---------------------------------------------------------------------
         ## Render
         ##---------------------------------------------------------------------
-        if nowut.hour >= 4:
+        if nowut.hour >= 3:
             link_date_string = nowut.strftime('%Y%m%dUT')
         else:
             link_date_string = (nowut - tdelta(1,0)).strftime('%Y%m%dUT')
