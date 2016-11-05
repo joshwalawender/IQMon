@@ -354,13 +354,11 @@
                 </font>
             </td>
         </tr>
-        {% if nowut.strftime('%Y%m%dUT') != link_date_string %}
         <tr style="border:0px; border-style:none;">            
-            <td style="border:0px; border-style:none; text-align: center;" colspan=2><u>Last Night's Files</u></td>
+            <td style="border:0px; border-style:none; text-align: center;" colspan=2><u>
+              {{ files_string }}
+            </u></td>
         </tr>
-        {% else %}
-            <td style="border:0px; border-style:none; text-align: center;" colspan=2><u>Tonight's Files</u></td>
-        {% end %}
         <tr style="border:0px; border-style:none;">            
             <td style="border:0px; border-style:none; text-align: right;">N Images</td>
             <td style="border:0px; border-style:none; text-align: left;">
@@ -464,13 +462,11 @@
                 </font>
             </td>
         </tr>
-        {% if nowut.strftime('%Y%m%dUT') != link_date_string %}
         <tr style="border:0px; border-style:none;">            
-            <td style="border:0px; border-style:none; text-align: center;" colspan=2><u>Last Night's Files</u></td>
+            <td style="border:0px; border-style:none; text-align: center;" colspan=2><u>
+              {{ files_string }}
+            </u></td>
         </tr>
-        {% else %}
-            <td style="border:0px; border-style:none; text-align: center;" colspan=2><u>Tonight's Files</u></td>
-        {% end %}
         <tr style="border:0px; border-style:none;">
             <td style="border:0px; border-style:none; text-align: right;">N Images</td>
             <td style="border:0px; border-style:none; text-align: left;">

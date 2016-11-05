@@ -110,16 +110,6 @@ class Status(RequestHandler):
         ## Get Latest V20 Data
         ##---------------------------------------------------------------------
         v20status = client.vysos['V20.status']
-#         v20entries = []
-#         while (len(v20entries) < 1) and (nowut > dt(2015,1,1)):
-#             v20entries = [entry for entry\
-#                           in v20status.find(\
-#                           {"UT date" : nowut.strftime('%Y%m%dUT')}\
-#                           ).sort([('UT time', pymongo.ASCENDING)])]
-#             if len(v20entries) > 0: v20data = v20entries[-1]
-#             else: nowut = nowut - tdelta(1, 0)
-#         nowut = dt.utcnow()
-
         v20data = v20status.find_one( {'current': True} )
         tlog.app_log.info('  v20data retrieved')
 
@@ -159,14 +149,6 @@ class Status(RequestHandler):
         ## Get Latest V5 Data
         ##---------------------------------------------------------------------
         v5status = client.vysos['V5.status']
-#         v5entries = []
-#         while (len(v5entries) < 1) and (nowut > dt(2015,1,1)):
-#             v5entries = [entry for entry\
-#                           in v5status.find( {"UT date" : nowut.strftime('%Y%m%dUT')} ).sort([('UT time', pymongo.ASCENDING)])]
-#             if len(v5entries) > 0: v5data = v5entries[-1]
-#             else: nowut = nowut - tdelta(1, 0)
-#         nowut = dt.utcnow()
-
         v5data = v5status.find_one( {'current': True} )
         tlog.app_log.info('  v5data retrieved')
 
@@ -501,15 +483,15 @@ class Status(RequestHandler):
         ##---------------------------------------------------------------------
         ## Render
         ##---------------------------------------------------------------------
-        if sun['now'] != 'day':
-            link_date_string = nowut.strftime('%Y%m%dUT')
-            tlog.app_log.info('It is night.  Displaying UT date {}'.format(link_date_string))
-        elif sun['now'] == 'day' and (sun['set']-nowut).total_seconds() < 60.*60.:
-            link_date_string = nowut.strftime('%Y%m%dUT')
-            tlog.app_log.info('It is day, but within 1 hour of sunset.  Displaying UT date {}'.format(link_date_string))
-        elif sun['now'] == 'day' and (sun['set']-nowut).total_seconds() >= 60.*60.:
+        if nowut.hour < 6 and sun['now'] == 'day' and (sun['set']-nowut).total_seconds() >= 60.*60.:
             link_date_string = (nowut - tdelta(1,0)).strftime('%Y%m%dUT')
-            tlog.app_log.info('It is day.  Displaying UT date {}'.format(link_date_string))
+            files_string = "Last Night's Files"
+        elif sun['now'] != 'day':
+            link_date_string = nowut.strftime('%Y%m%dUT')
+            files_string = "Tonight's Files"
+        else:
+            link_date_string = nowut.strftime('%Y%m%dUT')
+            files_string = "Last Night's Files"
 
         tlog.app_log.info('  Rendering Status')
         self.render("status.html", title="VYSOS Status",\
@@ -533,6 +515,7 @@ class Status(RequestHandler):
                     moon = moon,\
                     sun = sun,\
                     disks = disks,\
+                    files_string = files_string,\
                     v5_nimages = get_nimages('V5', link_date_string),\
                     v20_nimages = get_nimages('V20', link_date_string),\
                     v5_nflats = get_nflats('V5', link_date_string),\
