@@ -501,10 +501,15 @@ class Status(RequestHandler):
         ##---------------------------------------------------------------------
         ## Render
         ##---------------------------------------------------------------------
-        if nowut.hour >= 3:
+        if sun['now'] != 'day':
             link_date_string = nowut.strftime('%Y%m%dUT')
-        else:
+            tlog.app_log.info('It is night.  Displaying UT date {}'.format(link_date_string))
+        elif sun['now'] == 'day' and (sun['set']-nowut).total_seconds() < 60.*60.:
+            link_date_string = nowut.strftime('%Y%m%dUT')
+            tlog.app_log.info('It is day, but within 1 hour of sunset.  Displaying UT date {}'.format(link_date_string))
+        elif sun['now'] == 'day' and (sun['set']-nowut).total_seconds() >= 60.*60.:
             link_date_string = (nowut - tdelta(1,0)).strftime('%Y%m%dUT')
+            tlog.app_log.info('It is day.  Displaying UT date {}'.format(link_date_string))
 
         tlog.app_log.info('  Rendering Status')
         self.render("status.html", title="VYSOS Status",\

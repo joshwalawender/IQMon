@@ -354,7 +354,14 @@
                 </font>
             </td>
         </tr>
-        <tr style="border:0px; border-style:none;">
+        {% if nowut.strftime('%Y%m%dUT') != link_date_string %}
+        <tr style="border:0px; border-style:none;">            
+            <td style="border:0px; border-style:none; text-align: center;" colspan=2><u>Last Night's Files</u></td>
+        </tr>
+        {% else %}
+            <td style="border:0px; border-style:none; text-align: center;" colspan=2><u>Tonight's Files</u></td>
+        {% end %}
+        <tr style="border:0px; border-style:none;">            
             <td style="border:0px; border-style:none; text-align: right;">N Images</td>
             <td style="border:0px; border-style:none; text-align: left;">
                 {{ '{:d}'.format(v5_nimages) }}
@@ -369,10 +376,10 @@
         </table>
     </td>
     <td>
-        <a href="http://166.122.71.162:8083/4.jpg"><img width=400 height=267 src="http://166.122.71.162:8083/4.jpg"></a><br>
+<!--         <a href="http://166.122.71.162:8083/4.jpg"><img width=400 height=267 src="http://166.122.71.162:8083/4.jpg"></a><br> -->
     </td>
     <td colspan=2>
-        <a href="http://166.122.71.162:8083/6.jpg"><img width=400 height=267 src="http://166.122.71.162:8083/6.jpg"></a><br>
+<!--         <a href="http://166.122.71.162:8083/6.jpg"><img width=400 height=267 src="http://166.122.71.162:8083/6.jpg"></a><br> -->
     </td>
 </tr>
 <!-- ###################################### -->
@@ -457,6 +464,13 @@
                 </font>
             </td>
         </tr>
+        {% if nowut.strftime('%Y%m%dUT') != link_date_string %}
+        <tr style="border:0px; border-style:none;">            
+            <td style="border:0px; border-style:none; text-align: center;" colspan=2><u>Last Night's Files</u></td>
+        </tr>
+        {% else %}
+            <td style="border:0px; border-style:none; text-align: center;" colspan=2><u>Tonight's Files</u></td>
+        {% end %}
         <tr style="border:0px; border-style:none;">
             <td style="border:0px; border-style:none; text-align: right;">N Images</td>
             <td style="border:0px; border-style:none; text-align: left;">
@@ -472,10 +486,10 @@
         </table>
     </td>
     <td>
-        <a href="http://166.122.71.162:8083/0.jpg"><img width=400 height=267 src="http://166.122.71.162:8083/0.jpg"><br>
+<!--         <a href="http://166.122.71.162:8083/0.jpg"><img width=400 height=267 src="http://166.122.71.162:8083/0.jpg"><br> -->
     </td>
     <td colspan=2>
-        <a href="http://166.122.71.162:8083/2.jpg"><img width=400 height=267 src="http://166.122.71.162:8083/2.jpg"></a><br>
+<!--         <a href="http://166.122.71.162:8083/2.jpg"><img width=400 height=267 src="http://166.122.71.162:8083/2.jpg"></a><br> -->
     </td>
 </tr>
 </table>
