@@ -1,5 +1,7 @@
 ## Version History
 
+* __v1.6.0__
+    * Update directory stucture
 * __v1.5.2__
     * Fix python3 compatibility with subprocess vs. subprocess32
     * Bugfixes
