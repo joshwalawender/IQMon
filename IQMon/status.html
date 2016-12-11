@@ -36,13 +36,15 @@
 <!-- Status Header -->
 <!-- ###################################### -->
 <tr>
-    <td colspan=3 style="text-align: left;">
+    <td width="210px" style="text-align: left;">
         {{ nowut.strftime('%Y/%m/%d %H:%M:%S UT') }}
     </td>
-    <td width="410px" style="text-align: left;">
+    <td width="210px" style="text-align: left;">
         {{ now.strftime('%Y/%m/%d %H:%M:%S HST') }}
     </td>
-    <td width="215px" style="text-align: left;">
+    <td width="210px" style="text-align: left;">
+    </td>
+    <td width="210px" style="text-align: left;">
         {% if 'Drobo' in disks.keys() %}
             {% if disks['Drobo'][1] < 300 %}
                 <font color="red"> 
@@ -52,7 +54,7 @@
             Drobo: {{ '{:.0f}GB free ({:.0f}% full)'.format(disks['Drobo'][1], disks['Drobo'][2]) }}
         {% end %}
     </td>
-    <td width="215px" style="text-align: left;">
+    <td width="210px" style="text-align: left;">
         {% if 'USB Drive B' in disks.keys() %}
             {% if disks['USB Drive B'][1] < 40 %}
                 <font color="red"> 
@@ -71,17 +73,17 @@
     </td>
 </tr>
 <tr>
-    <td colspan=3 style="text-align: left;">
+    <td style="text-align: left;">
         {{ 'It is currently {} (Sun alt = {:.0f})'.format(sun['now'], sun['alt']) }}<br>
     </td>
-    <td width="410px" style="text-align: left;">
+    <td colspan=2 style="text-align: left;">
         {% if sun['rise'] < sun['set'] %}
             {{ 'Next sunrise is at {}'.format(sun['rise'].strftime('%Y/%m/%d %H:%M:%S UT')) }}
         {% else %}
             {{ 'Next sunset is at {}'.format(sun['set'].strftime('%Y/%m/%d %H:%M:%S UT')) }}
         {% end %} 
     </td>
-    <td width="215px" style="text-align: left;">
+    <td style="text-align: left;">
         {% if 'Data' in disks.keys() %}
             {% if disks['Data'][1] < 40 %}
                 <font color="red"> 
@@ -91,21 +93,21 @@
             Data: {{ '{:.0f}GB free ({:.0f}% full)'.format(disks['Data'][1], disks['Data'][2]) }}</font>
         {% end %}
     </td>
-    <td width="215px" style="text-align: left;">
+    <td style="text-align: left;">
     </td>
 </tr>
 <tr>
-    <td colspan=3 style="text-align: left;">
+    <td style="text-align: left;">
         {{ 'A {:.0f}% illuminated moon is {}'.format(moon['phase'], moon['now']) }}
     </td>
-    <td style="text-align: left;">
+    <td colspan=2 style="text-align: left;">
         {% if sun['rise'] > sun['set'] %}
             {{ 'Next sunrise is at {}'.format(sun['rise'].strftime('%Y/%m/%d %H:%M:%S UT')) }}
         {% else %}
             {{ 'Next sunset is at {}'.format(sun['set'].strftime('%Y/%m/%d %H:%M:%S UT')) }}
         {% end %} 
     </td>
-    <td width="215px" style="text-align: left;">
+    <td style="text-align: left;">
         {% if 'Vega' in disks.keys() %}
             {% if disks['Vega'][1] < 40 %}
                 <font color="red"> 
@@ -115,7 +117,7 @@
             Vega: {{ '{:.0f}GB free ({:.0f}% full)'.format(disks['Vega'][1], disks['Vega'][2]) }}
         {% end %}
     </td>
-    <td width="215px" style="text-align: left;">
+    <td style="text-align: left;">
         {% if 'Black' in disks.keys() %}
             {% if disks['Black'][1] < 40 %}
                 <font color="red"> 
@@ -130,15 +132,15 @@
 <!-- Weather -->
 <!-- ###################################### -->
 <tr>
-    <th colspan=6><br><br>Weather</th>
+    <th colspan=5><br><br>Weather</th>
 </tr>
 <tr>
-    <td colspan=3><u>Boltwood Data</u></td>
-    <td><u>Weather Plot</u></td>
+    <td><u>Boltwood Data</u></td>
+    <td colspan=2><u>Weather Plot</u></td>
     <td colspan=2><u>Atlas All Sky Image (Color)</u></td>
 </tr>
 <tr>
-    <td colspan=3>
+    <td>
         <table style="border:0px; border-style:none;">
         <tr style="border:0px; border-style:none;">
             <td style="border:0px; border-style:none; text-align: right;">Ambient Temp</td>
@@ -250,7 +252,7 @@
         </tr>
         </table>
     </td>
-    <td style="vertical-align: middle;">
+    <td colspan=2 style="vertical-align: middle;">
         <a href="../static/nights/recent_V5.png">
             <img width=400 src="../static/nights/recent_V5.png">
         </a><br>
@@ -270,9 +272,18 @@
                 <td style="border:0px; border-style: none; vertical-align: middle;">W</td>
             </tr>
         </table>
-<!-- 
-        <img width=400 src="http://www.fallingstar.com/weather/mlo/latest_zp.jpg">
- -->
+    </td>
+</tr>
+
+
+<tr>
+    <td colspan=5><u>Live Images</u></td>
+</tr>
+<tr>
+    <td colspan=5>
+        <object data=http://166.122.71.162:8080/html/live.htm width="1100" height="520">
+        <embed   src=http://166.122.71.162:8080/html/live.htm width="1100" height="520"> </embed>
+        Error: Embedded data could not be displayed. </object>
     </td>
 </tr>
 
@@ -280,24 +291,12 @@
 <!-- VYSOS-5 -->
 <!-- ###################################### -->
 <tr>
-    <th colspan=6>
-        <br><br>
-        VYSOS-5<br>
-        <a href="V5/">List of Nights</a> | 
-        <a href="V5/targets">List of Targets</a> | 
-        <a href="{{ '/V5/{}'.format(link_date_string) }}">
-            Images from {{ link_date_string }}</a> | 
-        <a href="{{ '/static/nights/{}_V5.png'.format(link_date_string) }}">
-            Night Summary Plot for {{ link_date_string }}</a>
-    </th>
+    <td colspan=2>VYSOS-5 Status</td>
+    <td width="210px"></td>
+    <td colspan=2>VYSOS-20 Status</td>
 </tr>
 <tr>
-    <td colspan=3><u>VYSOS-5 Status</u></td>
-    <td>VYSOS-5 External</td>
-    <td colspan=2>VYSOS-5 Internal</td>
-</tr>
-<tr>
-    <td colspan=3>
+    <td colspan=2>
         <table style="border:0px; border-style:none;">
         <tr style="border:0px; border-style:none;">
             <td style="border:0px; border-style:none; text-align: right;">ACP Connected</td>
@@ -374,38 +373,41 @@
                 {{ '{:d}'.format(v5_nflats) }}
             </td>
         </tr>
+
+        <tr style="border:0px; border-style:none;">            
+            <td style="border:0px; border-style:none; text-align: center;" colspan=2><u>
+              IQMon Results
+            </u></td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td colspan=2 style="border:0px; border-style:none; text-align: center;">
+            <a href="V5/">List of Nights</a>
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td colspan=2 style="border:0px; border-style:none; text-align: center;">
+            <a href="V5/targets">List of Targets</a>
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td colspan=2 style="border:0px; border-style:none; text-align: center;">
+            <a href="{{ '/V5/{}'.format(link_date_string) }}">
+            Images from {{ link_date_string }}</a>
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td colspan=2 style="border:0px; border-style:none; text-align: center;">
+            <a href="{{ '/static/nights/{}_V5.png'.format(link_date_string) }}">
+            Night Summary Plot for {{ link_date_string }}</a>
+            </td>
+        </tr>
+
         </table>
     </td>
     <td>
-<!--         <a href="http://166.122.71.162:8083/4.jpg"><img width=400 height=267 src="http://166.122.71.162:8083/4.jpg"></a><br> -->
     </td>
     <td colspan=2>
-<!--         <a href="http://166.122.71.162:8083/6.jpg"><img width=400 height=267 src="http://166.122.71.162:8083/6.jpg"></a><br> -->
-    </td>
-</tr>
-<!-- ###################################### -->
-<!-- VYSOS-20 -->
-<!-- ###################################### -->
-<tr>
-    <th colspan=6>
-        <br><br>
-        VYSOS-20<br>
-        <a href="V20/">List of Nights</a> | 
-        <a href="V20/targets">List of Targets</a> | 
 
-        <a href="{{ '/V20/{}'.format(link_date_string) }}">
-            Images from {{ link_date_string }}</a> | 
-        <a href="{{ '/static/nights/{}_V20.png'.format(link_date_string) }}">
-            Night Summary Plot for {{ link_date_string }}</a>
-    </th>
-</tr>
-<tr>
-    <td colspan=3><u>VYSOS-20 Status</u></td>
-    <td>VYSOS-20 External</td>
-    <td colspan=2>VYSOS-20 Internal</td>
-</tr>
-<tr>
-    <td colspan=3>
         <table style="border:0px; border-style:none;">
         <tr style="border:0px; border-style:none;">
             <td style="border:0px; border-style:none; text-align: right;">ACP Connected</td>
@@ -482,15 +484,45 @@
                 {{ '{:d}'.format(v20_nflats) }}
             </td>
         </tr>
+
+        <tr style="border:0px; border-style:none;">            
+            <td style="border:0px; border-style:none; text-align: center;" colspan=2><u>
+              IQMon Results
+            </u></td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td colspan=2 style="border:0px; border-style:none; text-align: center;">
+            <a href="V20/">List of Nights</a>
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td colspan=2 style="border:0px; border-style:none; text-align: center;">
+            <a href="V20/targets">List of Targets</a>
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td colspan=2 style="border:0px; border-style:none; text-align: center;">
+            <a href="{{ '/V20/{}'.format(link_date_string) }}">
+            Images from {{ link_date_string }}</a>
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td colspan=2 style="border:0px; border-style:none; text-align: center;">
+            <a href="{{ '/static/nights/{}_V20.png'.format(link_date_string) }}">
+            Night Summary Plot for {{ link_date_string }}</a>
+            </td>
+        </tr>
         </table>
-    </td>
-    <td>
-<!--         <a href="http://166.122.71.162:8083/0.jpg"><img width=400 height=267 src="http://166.122.71.162:8083/0.jpg"><br> -->
-    </td>
-    <td colspan=2>
-<!--         <a href="http://166.122.71.162:8083/2.jpg"><img width=400 height=267 src="http://166.122.71.162:8083/2.jpg"></a><br> -->
+
+
     </td>
 </tr>
+
+
+
+
+
+
 </table>
 
 <br><br>
