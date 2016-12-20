@@ -4,7 +4,6 @@
 <html>
 <head>
     <title>VYSOS Status</title>
-    <meta HTTP-EQUIV="refresh" CONTENT="300">
     <meta http-equiv="content-type"
     content="text/html; charset=ISO-8859-1">
 
@@ -84,13 +83,13 @@
         {% end %} 
     </td>
     <td style="text-align: left;">
-        {% if 'Data' in disks.keys() %}
-            {% if disks['Data'][1] < 40 %}
+        {% if 'macOS' in disks.keys() %}
+            {% if disks['macOS'][1] < 40 %}
                 <font color="red"> 
             {% else %}
                 <font color="black"> 
             {% end %}
-            Data: {{ '{:.0f}GB free ({:.0f}% full)'.format(disks['Data'][1], disks['Data'][2]) }}</font>
+            macOS: {{ '{:.0f}GB free ({:.0f}% full)'.format(disks['macOS'][1], disks['macOS'][2]) }}</font>
         {% end %}
     </td>
     <td style="text-align: left;">
@@ -384,12 +383,8 @@
         </tr>
         <tr style="border:0px; border-style:none;">
             <td colspan=2 style="border:0px; border-style:none; text-align: left;">
-            <a href="V5/">List of Nights</a>
-            </td>
-        </tr>
-        <tr style="border:0px; border-style:none;">
-            <td colspan=2 style="border:0px; border-style:none; text-align: left;">
-            <a href="V5/targets">List of Targets</a>
+            <a href="{{ '/static/nights/{}_V5.png'.format(link_date_string) }}">
+            Night Summary Plot for {{ link_date_string }}</a>
             </td>
         </tr>
         <tr style="border:0px; border-style:none;">
@@ -400,11 +395,14 @@
         </tr>
         <tr style="border:0px; border-style:none;">
             <td colspan=2 style="border:0px; border-style:none; text-align: left;">
-            <a href="{{ '/static/nights/{}_V5.png'.format(link_date_string) }}">
-            Night Summary Plot for {{ link_date_string }}</a>
+            <a href="V5/">List of Nights</a>
             </td>
         </tr>
-
+        <tr style="border:0px; border-style:none;">
+            <td colspan=2 style="border:0px; border-style:none; text-align: left;">
+            <a href="V5/targets">List of Targets</a>
+            </td>
+        </tr>
         </table>
     </td>
     <td>
@@ -495,12 +493,8 @@
         </tr>
         <tr style="border:0px; border-style:none;">
             <td colspan=2 style="border:0px; border-style:none; text-align: left;">
-            <a href="V20/">List of Nights</a>
-            </td>
-        </tr>
-        <tr style="border:0px; border-style:none;">
-            <td colspan=2 style="border:0px; border-style:none; text-align: left;">
-            <a href="V20/targets">List of Targets</a>
+            <a href="{{ '/static/nights/{}_V20.png'.format(link_date_string) }}">
+            Night Summary Plot for {{ link_date_string }}</a>
             </td>
         </tr>
         <tr style="border:0px; border-style:none;">
@@ -511,8 +505,12 @@
         </tr>
         <tr style="border:0px; border-style:none;">
             <td colspan=2 style="border:0px; border-style:none; text-align: left;">
-            <a href="{{ '/static/nights/{}_V20.png'.format(link_date_string) }}">
-            Night Summary Plot for {{ link_date_string }}</a>
+            <a href="V20/">List of Nights</a>
+            </td>
+        </tr>
+        <tr style="border:0px; border-style:none;">
+            <td colspan=2 style="border:0px; border-style:none; text-align: left;">
+            <a href="V20/targets">List of Targets</a>
             </td>
         </tr>
         </table>

@@ -460,8 +460,8 @@ class Status(RequestHandler):
         ##---------------------------------------------------------------------
         ## Get disk use info
         ##---------------------------------------------------------------------
-        paths = {'Drobo': os.path.join('/', 'Volumes', 'Drobo'),\
-                 'Data': os.path.expanduser('~'),\
+        paths = {'Drobo': os.path.join('/', 'Volumes', 'DataCopy'),\
+                 'macOS': os.path.expanduser('~'),\
                  'USB Drive B': os.path.join('/', 'Volumes', 'WD500B'),\
                  'USB Drive C': os.path.join('/', 'Volumes', 'WD500_C'),\
                  'Vega': os.path.join('/', 'Volumes', 'Data_V5'),\
