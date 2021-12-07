@@ -15,13 +15,17 @@
 #         return np.all(checks)
 # 
 #     def _post_condition(self):
-#         """Check for conditions necessary to verify that the process run correctly"""
+#         """
+#         Check for conditions necessary to verify that the process ran
+#         correctly.
+#         """
 #         checks = []
 #         return np.all(checks)
 # 
 #     def _perform(self):
 #         """
-#         Returns an Argument() with the parameters that depends on this operation.
+#         Returns an Argument() with the parameters that depend on this
+#         operation.
 #         """
 #         self.log.info(f"Running {self.__class__.__name__} action")
 # 

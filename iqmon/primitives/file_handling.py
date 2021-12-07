@@ -1,6 +1,9 @@
 from pathlib import Path
 from datetime import datetime, timedelta
 
+from astropy import units as u
+from astropy import coordinates as c
+from astropy.io import fits
 from astropy.nddata import CCDData
 
 from keckdrpframework.primitives.base_primitive import BasePrimitive
@@ -32,8 +35,11 @@ class ReadFITS(BasePrimitive):
         self.action.args.fitsfilepath = Path(self.action.args.name).expanduser().absolute()
         self.action.args.skip = False
         self.action.args.ccddata = None
+        self.action.args.destination_dir = None
+        self.action.args.destination_file = None
         # initialize values in the args for use with science frames
         self.action.args.meta = {}
+        self.action.args.header_pointing = None
 
         # If we are reading a compressed file, use the uncompressed version of
         # the name for the database
@@ -88,7 +94,7 @@ class ReadFITS(BasePrimitive):
         self.log.info(f"  Reading: {self.action.args.meta['fitsfile']}")
         self.action.args.ccddata = CCDData.read(self.action.args.fitsfilepath,
                                                 unit="adu")
-
+        # Read header metadata
         hdr = self.action.args.ccddata.header
         for key, val in self.cfg.items('Header'):
             if (val is not 'None') and (hdr.get(val, None) is not None):
@@ -96,6 +102,14 @@ class ReadFITS(BasePrimitive):
                 self.log.debug(f"  {key} = {self.action.args.meta[val]}")
             else:
                 self.log.warning(f"  Could not read {key} from header {val} keyword")
+
+        # Set Image Type
+        self.action.args.imtype = None
+        for key, val in self.cfg.items('Header'):
+            if key[:11] == 'type_string':
+                if self.action.args.meta['imtype'] == self.cfg['Header'].get(key):
+                    self.action.args.imtype = key[12:].upper()
+        self.log.info(f"  Image type is {self.action.args.imtype}")
 
         ## VYSOS Specific Code:
         if self.cfg['telescope'].get('name') == 'V5':
@@ -128,14 +142,128 @@ class ReadFITS(BasePrimitive):
 
 
 ##-----------------------------------------------------------------------------
-## Primitive: MoveFile
+## Primitive: PopulateMetaData
 ##-----------------------------------------------------------------------------
-class MoveFile(BasePrimitive):
+class PopulateMetaData(BasePrimitive):
+    """
+    """
+    def __init__(self, action, context):
+        BasePrimitive.__init__(self, action, context)
+        self.log = context.pipeline_logger
+        self.cfg = self.context.config.instrument
+
+    def _pre_condition(self):
+        """Check for conditions necessary to run this process"""
+        checks = []
+        return np.all(checks)
+
+    def _post_condition(self):
+        """
+        Check for conditions necessary to verify that the process ran
+        correctly.
+        """
+        checks = []
+        return np.all(checks)
+
+    def _perform(self):
+        """
+        Returns an Argument() with the parameters that depend on this
+        operation.
+        """
+        self.log.info(f"Running {self.__class__.__name__} action")
+
+        if self.action.args.imtype == 'object':
+            # Build header pointing
+            try:
+                self.action.args.header_pointing = c.SkyCoord(self.action.args.meta.get('RA'),
+                                                              self.action.args.meta.get('DEC'),
+                                                              frame='icrs',
+                                                              unit=(u.hourangle, u.deg))
+            except:
+                self.action.args.header_pointing = None
+
+            # Determine Moon Info
+            if self.action.args.header_pointing is not None:
+                site_lat = c.Latitude(self.cfg['Telescope'].getfloat('site_lat'), unit=u.degree)
+                site_lon = c.Longitude(self.cfg['Telescope'].getfloat('site_lon'), unit=u.degree)
+                site_elevation = self.cfg['Telescope'].getfloat('site_elevation') * u.meter
+                loc = c.EarthLocation(site_lon, site_lat, site_elevation)
+                pressure = self.cfg['Telescope'].getfloat('pressure', 700)*u.mbar
+                obstime = Time(self.action.args.meta.get('date_obs'), location=loc)
+                altazframe = c.AltAz(location=loc, obstime=obstime, pressure=pressure)
+                moon = c.get_moon(obstime)
+                sun = c.get_sun(obstime)
+                moon_alt = ((moon.transform_to(altazframe).alt).to(u.degree)).value
+                moon_separation = (moon.separation(self.action.args.header_pointing).to(u.degree)).value\
+                            if self.action.args.header_pointing is not None else None
+                # Moon illumination formula from Meeus, “Astronomical 
+                # Algorithms". Formulae 46.1 and 46.2 in the 1991 edition, 
+                # using the approximation cos(psi) \approx -cos(i). Error 
+                # should be no more than 0.0014 (p. 316). 
+                moon_illum = 50*(1 - np.sin(sun.dec.radian)*np.sin(moon.dec.radian)\
+                             - np.cos(sun.dec.radian)*np.cos(moon.dec.radian)\
+                             * np.cos(sun.ra.radian-moon.ra.radian))
+                self.action.args.meta['moon_alt'] = moon_alt
+                self.action.args.meta['moon_separation'] = moon_separation
+                self.action.args.meta['moon_illum'] = moon_illum
+        elif self.action.args.imtype == 'bias':
+            pass
+        elif self.action.args.imtype == 'dark':
+            pass
+        elif self.action.args.imtype in ['domeflat', 'twiflat']:
+            pass
+
+        return self.action.args
+
+
+##-----------------------------------------------------------------------------
+## Primitive: RecordFile
+##-----------------------------------------------------------------------------
+class RecordFile(BasePrimitive):
+    """
+    """
+    def __init__(self, action, context):
+        BasePrimitive.__init__(self, action, context)
+        self.log = context.pipeline_logger
+        self.cfg = self.context.config.instrument
+
+    def _pre_condition(self):
+        """Check for conditions necessary to run this process"""
+        checks = [pre_condition(self, 'FITS file was read',
+                                self.action.args.ccddata is not None),]
+        return np.all(checks)
+
+    def _post_condition(self):
+        """
+        Check for conditions necessary to verify that the process ran
+        correctly.
+        """
+        checks = []
+        return np.all(checks)
+
+    def _perform(self):
+        """
+        Returns an Argument() with the parameters that depend on this
+        operation.
+        """
+        self.log.info(f"Running {self.__class__.__name__} action")
+
+        self.log.info(f"Recording the following metadata:")
+        for key in self.action.args.meta.keys():
+            self.log.info(f"  {key:15s} : {self.action.args.meta[key]}")
+
+        return self.action.args
+
+
+##-----------------------------------------------------------------------------
+## Primitive: CopyFile
+##-----------------------------------------------------------------------------
+class CopyFile(BasePrimitive):
     """
     Take the original raw image read by ReadFITS and write it out as a
     compressed FITS file to a new directory.
     
-    If the system uses ACP, look for a similarly named log file and move that
+    If the system uses ACP, look for a similarly named log file and copy that
     as well.
     """
     def __init__(self, action, context):
@@ -160,6 +288,62 @@ class MoveFile(BasePrimitive):
         Returns an Argument() with the parameters that depends on this operation.
         """
         self.log.info(f"Running {self.__class__.__name__} action")
+        self.action.args.destination_dir = Path(get_destination_dir(self.cfg))
+        destination_dir.mkdir(parents=True, exist_ok=True)
+        
+        overwrite = self.cfg['FileHandling'].getboolean('overwrite', False)
+        
+        if self.action.args.fitsfilepath.suffix in ['.fits', '.fts']:
+            self.action.args.destination_file = destination_dir / f"{self.action.args.fitsfilepath.name}.fz"
+        elif self.action.args.fitsfilepath.suffix == '.fz':
+            self.action.args.destination_file = destination_dir / self.action.args.fitsfilepath.name
+        else:
+            msg = f'File extension not handled: {self.action.args.fitsfilepath.suffix}'
+            self.log.error(msg)
+            self.action.args.skip = True
+            return self.action.args
+        if self.action.args.destination_file.exists() is True and overwrite is True:
+            self.action.args.destination_file.unlink()
+        if self.action.args.destination_file.exists() is False:
+            with fits.open(self.action.args.fitsfilepath, checksum=True) as hdul:
+                hdul[0].add_checksum()
+                hdul.writeto(self.action.args.destination_file, checksum=True)
 
+        return self.action.args
+
+
+##-----------------------------------------------------------------------------
+## Primitive: DeleteOriginal
+##-----------------------------------------------------------------------------
+class DeleteOriginal(BasePrimitive):
+    """
+    """
+    def __init__(self, action, context):
+        BasePrimitive.__init__(self, action, context)
+        self.log = context.pipeline_logger
+        self.cfg = self.context.config.instrument
+
+    def _pre_condition(self):
+        """Check for conditions necessary to run this process"""
+        checks = [pre_condition(self, 'delete_original flag is True',
+                  self.cfg['FileHandling'].getboolean('delete_original', False) is True),
+                  pre_condition(self, 'destination copy exists',
+                  self.action.args.destination_file.exists() is True),
+                  ]
+        return np.all(checks)
+
+    def _post_condition(self):
+        """Check for conditions necessary to verify that the process run correctly"""
+        checks = [post_condition(self, 'original file is gone',
+                  self.action.args.fitsfilepath.exists() is False),
+                  ]
+        return np.all(checks)
+
+    def _perform(self):
+        """
+        Returns an Argument() with the parameters that depends on this operation.
+        """
+        self.log.info(f"Running {self.__class__.__name__} action")
+        self.action.args.fitsfilepath.unlink()
         return self.action.args
 
