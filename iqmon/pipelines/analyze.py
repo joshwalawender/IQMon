@@ -14,6 +14,7 @@ from iqmon.primitives.photometry import (MakeSourceMask,
                                          CreateBackground,
                                          ExtractStars,
                                          )
+from iqmon.primitives.astrometry import SolveAstrometry
 from iqmon.primitives.database import RecordFile
 
 

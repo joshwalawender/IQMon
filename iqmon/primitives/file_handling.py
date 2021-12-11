@@ -45,6 +45,7 @@ class ReadFITS(BasePrimitive):
         self.action.args.meta = {'telescope': self.cfg['Telescope'].get('name')}
         self.action.args.imtype = None
         self.action.args.header_pointing = None
+        self.action.args.wcs = None
 
         # If we are reading a compressed file, use the uncompressed version of
         # the name for the database

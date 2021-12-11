@@ -1,8 +1,10 @@
 from pathlib import Path
 from datetime import datetime, timedelta
+import subprocess
 
 import numpy as np
 from astropy import units as u
+from astropy import coordinates as c
 from astropy import stats
 from astropy.wcs import WCS
 from astropy.time import Time
@@ -137,7 +139,7 @@ class SolveAstrometry(BasePrimitive):
         self.action.args.wcs_pointing = c.SkyCoord(r[0], d[0], frame='fk5',
                                           equinox='J2000',
                                           unit=(u.deg, u.deg),
-                                          obstime=self.action.args.kd.obstime())
+                                          obstime=self.action.args.meta.get('date'))
         self.action.args.meta['perr'] = self.action.args.wcs_pointing.separation(
                                         self.action.args.header_pointing).to(u.arcmin).value
         self.log.info(f'Pointing error = {self.action.args.meta.get("perr"):.1f}')
