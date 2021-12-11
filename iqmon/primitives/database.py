@@ -41,8 +41,9 @@ class RecordFile(BasePrimitive):
         self.log.info(f"Running {self.__class__.__name__} action")
 
         self.log.info(f"Recording the following metadata:")
-        for key in self.action.args.meta.keys():
-            self.log.info(f"  {key:15s} : {self.action.args.meta[key]}")
+        for key in self.action.args.meta:
+            val = self.action.args.meta.get(key)
+            self.log.info(f"  {key:15s} : {val} ({type(val)})")
 
         return self.action.args
 

@@ -10,10 +10,10 @@ from iqmon.primitives.image_reduction import (SubtractBias,
                                               GainCorrect,
                                               CreateDeviation,
                                               )
-from iqmon.primitives.source_extraction import (MakeSourceMask,
-                                                CreateBackground,
-                                                ExtractStars,
-                                               )
+from iqmon.primitives.photometry import (MakeSourceMask,
+                                         CreateBackground,
+                                         ExtractStars,
+                                         )
 from iqmon.primitives.database import RecordFile
 
 
@@ -36,8 +36,8 @@ class AnalysisPipeline(BasePipeline):
         "create_deviation":  ("CreateDeviation", "creating_deviation", "make_source_mask"),
         "make_source_mask":  ("MakeSourceMask", "making_source_mask", "create_background"),
         "create_background": ("CreateBackground", "creating_background", "extract"),
-        "extract":           ("ExtractStars", "extracting_stars", "record_analysis"),
-#         "solve_astrometry": ("SolveAstrometry", "solving", "get_calibrators"),
+        "extract":           ("ExtractStars", "extracting_stars", "solve_astrometry"),
+        "solve_astrometry":  ("SolveAstrometry", "solving", "record_analysis"),
 #         "get_calibrators": ("GetCalibrationStars", "getting_calibrators", "associate_calibrators"),
 #         "associate_calibrators": ("AssociateCalibratorStars", "associating_calibrators", "render_jpeg"),
 #         "render_jpeg": ("RenderJPEG", "rendering_jpeg", "record"),
