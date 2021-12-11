@@ -38,14 +38,11 @@ class AnalysisPipeline(BasePipeline):
         "make_source_mask":  ("MakeSourceMask", "making_source_mask", "create_background"),
         "create_background": ("CreateBackground", "creating_background", "extract"),
         "extract":           ("ExtractStars", "extracting_stars", "solve_astrometry"),
-        "solve_astrometry":  ("SolveAstrometry", "solving", "record_analysis"),
+        "solve_astrometry":  ("SolveAstrometry", "solving", "render_jpeg"),
 #         "get_calibrators": ("GetCalibrationStars", "getting_calibrators", "associate_calibrators"),
 #         "associate_calibrators": ("AssociateCalibratorStars", "associating_calibrators", "render_jpeg"),
-#         "render_jpeg": ("RenderJPEG", "rendering_jpeg", "record"),
-#         "record": ("Record", "recording_results_in_mongo", None),
+        "render_jpeg":       ("RenderJPEG", "rendering_jpeg", "record_analysis"),
         "record_analysis":   ("RecordFile", "recording", None),
-
-
     }
 
     def __init__(self, context: ProcessingContext):
