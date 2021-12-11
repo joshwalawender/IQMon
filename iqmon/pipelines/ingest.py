@@ -2,8 +2,11 @@ from keckdrpframework.pipelines.base_pipeline import BasePipeline
 from keckdrpframework.models.processing_context import ProcessingContext
 
 # MODIFY THIS IMPORT to reflect the name of the module created in the primitives directory
-from iqmon.primitives.file_handling import (ReadFITS, MoveFile, DeleteOriginal,
-                                            PopulateMetaData, RecordFile)
+from iqmon.primitives.file_handling import (ReadFITS,
+                                            PopulateAdditionalMetaData,
+                                            CopyFile,
+                                            DeleteOriginal)
+from iqmon.primitives.database import RecordFile
 
 
 class Ingest(BasePipeline):
@@ -18,7 +21,7 @@ class Ingest(BasePipeline):
     """
     event_table = {
         "next_file":         ("ReadFITS", "reading_file", "science_metadata"),
-        "populate_metadata": ("PopulateMetaData", "populating_metadata", "copy_file"),
+        "populate_metadata": ("PopulateAdditionalMetaData", "populating_metadata", "copy_file"),
         "copy_file":         ("CopyFile", "copying_file", "delete_original"),
         "delete_original":   ("DeleteOriginal", "deleting_original", "record_file"),
         "record_file":       ("RecordFile", "recording", None),
@@ -27,7 +30,3 @@ class Ingest(BasePipeline):
 
     def __init__(self, context: ProcessingContext):
         BasePipeline.__init__(self, context)
-    
-    def template_action(self, action, context):
-        self.logger.info("Running template_action on %s", action.args.name)
-        return action.args

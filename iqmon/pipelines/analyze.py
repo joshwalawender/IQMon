@@ -2,8 +2,8 @@ from keckdrpframework.pipelines.base_pipeline import BasePipeline
 from keckdrpframework.models.processing_context import ProcessingContext
 
 # MODIFY THIS IMPORT to reflect the name of the module created in the primitives directory
-from iqmon.primitives.file_handling import (ReadFITS, MoveFile, DeleteOriginal,
-                                            PopulateMetaData, RecordFile)
+from iqmon.primitives.file_handling import (ReadFITS,
+                                            PopulateMetaData)
 
 
 class Analyze(BasePipeline):
@@ -24,8 +24,3 @@ class Analyze(BasePipeline):
 
     def __init__(self, context: ProcessingContext):
         BasePipeline.__init__(self, context)
-    
-    def template_action(self, action, context):
-        self.logger.info("Running template_action on %s", action.args.name)
-        return action.args
-  

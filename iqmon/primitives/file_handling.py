@@ -38,7 +38,8 @@ class ReadFITS(BasePrimitive):
         self.action.args.destination_dir = None
         self.action.args.destination_file = None
         # initialize values in the args for use with science frames
-        self.action.args.meta = {}
+        self.action.args.meta = {'telescope': self.cfg['Telescope'].get('name')}
+        self.action.args.imtype = None
         self.action.args.header_pointing = None
 
         # If we are reading a compressed file, use the uncompressed version of
@@ -72,6 +73,10 @@ class ReadFITS(BasePrimitive):
         """Check for conditions necessary to verify that the process run correctly"""
         checks = [post_condition(self, 'FITS file was read',
                                  self.action.args.ccddata is not None),
+                  post_condition(self, 'FITS header was read',
+                                 len(self.action.args.meta.keys()) > 1),
+                  post_condition(self, 'Image type was set',
+                                 self.action.args.imtype is not None),
                  ]
         return np.all(checks)
 
@@ -96,12 +101,20 @@ class ReadFITS(BasePrimitive):
                                                 unit="adu")
         # Read header metadata
         hdr = self.action.args.ccddata.header
-        for key, val in self.cfg.items('Header'):
-            if (val is not 'None') and (hdr.get(val, None) is not None):
-                self.action.args.meta[key] = hdr.get(val)
-                self.log.debug(f"  {key} = {self.action.args.meta[val]}")
-            else:
-                self.log.warning(f"  Could not read {key} from header {val} keyword")
+        for key, hdr_key in self.cfg.items('Header'):
+            if hdr_key not in ['None', None]:
+                raw_read = hdr.get(hdr_key, '').split(',')
+                val = raw_read[0]
+                if len(raw_read) == 2:
+                    type_string = raw_read[1]
+                    if type_string == 'datetime':
+                        val = datetime.strptime(val, '%Y-%m-%dT%H:%M:%S')
+                    else:
+                        val = eval(type_string)(val)
+                elif len(raw_read) > 2:
+                    raise TypeError(f'Could not parse "{hdr_key}" in Header config')
+                self.action.args.meta[key] = val
+                self.log.debug(f"  {key} = {self.action.args.meta[key]} ({type(self.action.args.meta[key])})")
 
         # Set Image Type
         self.action.args.imtype = None
@@ -144,7 +157,7 @@ class ReadFITS(BasePrimitive):
 ##-----------------------------------------------------------------------------
 ## Primitive: PopulateMetaData
 ##-----------------------------------------------------------------------------
-class PopulateMetaData(BasePrimitive):
+class PopulateAdditionalMetaData(BasePrimitive):
     """
     """
     def __init__(self, action, context):
@@ -217,45 +230,6 @@ class PopulateMetaData(BasePrimitive):
 
 
 ##-----------------------------------------------------------------------------
-## Primitive: RecordFile
-##-----------------------------------------------------------------------------
-class RecordFile(BasePrimitive):
-    """
-    """
-    def __init__(self, action, context):
-        BasePrimitive.__init__(self, action, context)
-        self.log = context.pipeline_logger
-        self.cfg = self.context.config.instrument
-
-    def _pre_condition(self):
-        """Check for conditions necessary to run this process"""
-        checks = [pre_condition(self, 'FITS file was read',
-                                self.action.args.ccddata is not None),]
-        return np.all(checks)
-
-    def _post_condition(self):
-        """
-        Check for conditions necessary to verify that the process ran
-        correctly.
-        """
-        checks = []
-        return np.all(checks)
-
-    def _perform(self):
-        """
-        Returns an Argument() with the parameters that depend on this
-        operation.
-        """
-        self.log.info(f"Running {self.__class__.__name__} action")
-
-        self.log.info(f"Recording the following metadata:")
-        for key in self.action.args.meta.keys():
-            self.log.info(f"  {key:15s} : {self.action.args.meta[key]}")
-
-        return self.action.args
-
-
-##-----------------------------------------------------------------------------
 ## Primitive: CopyFile
 ##-----------------------------------------------------------------------------
 class CopyFile(BasePrimitive):
@@ -280,7 +254,9 @@ class CopyFile(BasePrimitive):
 
     def _post_condition(self):
         """Check for conditions necessary to verify that the process run correctly"""
-        checks = []
+        checks = [post_condition(self, 'File was copied',
+                                 self.action.args.destination_file.exists() is True),
+                  ]
         return np.all(checks)
 
     def _perform(self):
@@ -334,7 +310,7 @@ class DeleteOriginal(BasePrimitive):
 
     def _post_condition(self):
         """Check for conditions necessary to verify that the process run correctly"""
-        checks = [post_condition(self, 'original file is gone',
+        checks = [post_condition(self, 'Original file is gone',
                   self.action.args.fitsfilepath.exists() is False),
                   ]
         return np.all(checks)
