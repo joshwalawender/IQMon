@@ -16,11 +16,11 @@ from glob import glob
 
 # the preferred way to import the pipeline is a direct import
 
-from iqmon.pipelines.ingest import IngestPipeline
+from iqmon.pipelines.ingest import AnalysisPipeline
 
 
 def _parseArguments(in_args):
-    description = "Ingest pipeline CLI"
+    description = "Analysis pipeline CLI"
 
     # this is a simple case where we provide a frame and a configuration file
     parser = argparse.ArgumentParser(prog=f"{in_args[0]}", description=description)
@@ -62,7 +62,7 @@ def main():
     # load the logger config file from the config directory of this package
     # this part uses the pkg_resources package to find the full path location
     # of logger.cfg
-    framework_logcfg_file = 'configs/logger_ingest.cfg'
+    framework_logcfg_file = 'configs/logger_analysis.cfg'
     framework_logcfg_fullpath = pkg_resources.resource_filename(pkg, framework_logcfg_file)
 
     # add PIPELINE specific config files

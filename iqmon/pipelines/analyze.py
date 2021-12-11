@@ -12,7 +12,7 @@ from iqmon.primitives.image_reduction import (SubtractBias,
                                               )
 
 
-class Analyze(BasePipeline):
+class AnalysisPipeline(BasePipeline):
     """
     This pipeline ingests files from their raw location on disk and rewrites
     them to the destination directory with a checksum.  It then (if spcified)
