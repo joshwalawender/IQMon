@@ -5,13 +5,14 @@ import numpy as np
 from astropy import units as u
 from astropy import stats
 from astropy.time import Time
+from astropy.table import Table, Column
 import photutils
 import sep
 
 
 from keckdrpframework.primitives.base_primitive import BasePrimitive
 
-from .utils import pre_condition, post_condition
+from .utils import pre_condition, post_condition, mode
 
 
 ##-----------------------------------------------------------------------------

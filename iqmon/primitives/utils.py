@@ -2,6 +2,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 import logging
 
+import numpy as np
 import ephem
 from astropy.table import Table, Column
 from astropy import stats
