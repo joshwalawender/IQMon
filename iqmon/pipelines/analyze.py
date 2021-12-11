@@ -3,7 +3,13 @@ from keckdrpframework.models.processing_context import ProcessingContext
 
 # MODIFY THIS IMPORT to reflect the name of the module created in the primitives directory
 from iqmon.primitives.file_handling import (ReadFITS,
-                                            PopulateMetaData)
+                                            PopulateAdditionalMetaData,
+                                            )
+from iqmon.primitives.image_reduction import (SubtractBias,
+                                              SubtractDark,
+                                              GainCorrect,
+                                              CreateDeviation,
+                                              )
 
 
 class Analyze(BasePipeline):
@@ -17,9 +23,13 @@ class Analyze(BasePipeline):
     the file's existence to the database.
     """
     event_table = {
-        "next_file":         ("ReadFITS", "reading_file", "science_metadata"),
-        "populate_metadata": ("PopulateMetaData", "populating_metadata", None),
-        
+        "next_file":         ("ReadFITS", "reading_file", "populate_metadata"),
+        "populate_metadata": ("PopulateAdditionalMetaData", "populating_metadata", "subtract_bias"),
+        "subtract_bias":     ("SubtractBias", "subtracting_bias", "subtract_dark"),
+        "subtract_dark":     ("SubtractDark", "subtracting_dark", "gain_correct"),
+        "gain_correct":      ("GainCorrect", "correcting_gain", "create_deviation"),
+        "create_deviation":  ("CreateDeviation", "creating_deviation", None),
+
     }
 
     def __init__(self, context: ProcessingContext):

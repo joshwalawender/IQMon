@@ -291,3 +291,56 @@ def mode(data):
     return mode
 
 
+##-----------------------------------------------------------------------------
+## Function: find_master
+##-----------------------------------------------------------------------------
+def build_master_file_name(meta, master_type, date_string):
+    if master_type.lower() in ['bias', 'zero']:
+        master_file_name = f"MasterBias_{date_string}.fits"
+    elif master_type.lower() in ['dark']:
+        exptime = int(meta.get('exptime'))
+        master_file_name = f"MasterDark_{exptime:03d}s_{date_string}.fits"
+    elif master_type.lower() in ['flat']:
+        master_file_name = f"MasterFlat_{meta.get('filter')}_{date_string}.fits"
+    else:
+        master_file_name = None
+    return master_file_name
+
+
+def find_master(master_directory, master_type, meta):
+    # Find master bias file
+    if master_directory is not None:
+        master_directory = Path(master_directory)
+    else:
+        return None
+    if master_directory.exists() is False:
+        return None
+
+    # Build expected file name
+    date_string = meta.get('date').strftime('%Y%m%dUT')
+    master_file_name = build_master_file_name(meta, master_type, date_string)
+    master_file = master_directory.joinpath(master_file_name)
+
+    # Go hunting for the files
+    if master_file.exists() is True:
+        return master_file
+    else:
+        # Look for bias within 10 days
+        count = 0
+        while master_file.exists() is False and count <= 10:
+            count += 1
+            # Days before
+            date_string = (meta.get('date')-timedelta(count)).strftime('%Y%m%dUT')
+            master_file_name = build_master_file_name(meta, master_type, date_string)
+            master_file = master_directory.joinpath(master_file_name)
+            if master_file.exists() is True:
+                return master_file
+            # Days after
+            date_string = (meta.get('date')+timedelta(count)).strftime('%Y%m%dUT')
+            master_file_name = build_master_file_name(meta, master_type, date_string)
+            master_file = master_directory.joinpath(master_file_name)
+            if master_file.exists() is True:
+                return master_file
+        if master_file.exists() is False:
+            return None
+        return master_file

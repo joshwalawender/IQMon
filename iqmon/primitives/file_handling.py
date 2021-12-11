@@ -137,7 +137,11 @@ class ReadFITS(BasePrimitive):
         self.log.info(f"  Image type is {self.action.args.imtype}")
 
         ## VYSOS Specific Code:
-        if self.cfg['Telescope'].get('name') == 'V5':
+        if self.cfg['Telescope'].get('name') in ['V5', 'V20']:
+            # Manually set filter for V5A
+            if self.action.args.meta.get('filter', None) is None:
+                self.action.args.meta['filter'] = 'PSr'
+            # Pull focus info from status database
             try:
                 self.log.info(f'  Reading focus data from DB')
                 status_collection = self.action.args.mongodb['V5status']
@@ -233,11 +237,24 @@ class PopulateAdditionalMetaData(BasePrimitive):
                 self.action.args.meta['moon_separation'] = moon_separation
                 self.action.args.meta['moon_illum'] = moon_illum
         elif self.action.args.imtype == 'BIAS':
-            pass
+            self.log.info('Determine image stats')
+            mean, med, std = stats.sigma_clipped_stats(self.action.args.ccddata.data)
+            self.log.info(f"  mean, med, std = {mean:.0f}, {med:.0f}, {std:.0f} (adu)")
+            self.action.args.meta['mean adu'] = mean
+            self.action.args.meta['median adu'] = med
+            self.action.args.meta['std dev adu'] = std
         elif self.action.args.imtype == 'DARK':
-            pass
+            mean, med, std = stats.sigma_clipped_stats(self.action.args.ccddata.data)
+            self.log.info(f"  mean, med, std = {mean:.0f}, {med:.0f}, {std:.0f} (adu)")
+            self.action.args.meta['mean adu'] = mean
+            self.action.args.meta['median adu'] = med
+            self.action.args.meta['std dev adu'] = std
         elif self.action.args.imtype in ['DOMEFLAT', 'TWIFLAT']:
-            pass
+            mean, med, std = stats.sigma_clipped_stats(self.action.args.ccddata.data)
+            self.log.info(f"  mean, med, std = {mean:.0f}, {med:.0f}, {std:.0f} (adu)")
+            self.action.args.meta['mean adu'] = mean
+            self.action.args.meta['median adu'] = med
+            self.action.args.meta['std dev adu'] = std
 
         return self.action.args
 
