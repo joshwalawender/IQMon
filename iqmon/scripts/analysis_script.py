@@ -16,7 +16,7 @@ from glob import glob
 
 # the preferred way to import the pipeline is a direct import
 
-from iqmon.pipelines.ingest import AnalysisPipeline
+from iqmon.pipelines.analyze import AnalysisPipeline
 
 
 def _parseArguments(in_args):
@@ -78,7 +78,7 @@ def main():
     # END HANDLING OF CONFIGURATION FILES ##########
 
     try:
-        framework = Framework(IngestPipeline, framework_config_fullpath)
+        framework = Framework(AnalysisPipeline, framework_config_fullpath)
         logging.config.fileConfig(framework_logcfg_fullpath)
         framework.config.instrument = pipeline_config
     except Exception as e:
