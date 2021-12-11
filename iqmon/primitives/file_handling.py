@@ -1,10 +1,14 @@
 from pathlib import Path
 from datetime import datetime, timedelta
+import pymongo
 
+import numpy as np
 from astropy import units as u
 from astropy import coordinates as c
 from astropy.io import fits
 from astropy.nddata import CCDData
+from astropy import stats
+from astropy.time import Time
 
 from keckdrpframework.primitives.base_primitive import BasePrimitive
 
@@ -58,9 +62,12 @@ class ReadFITS(BasePrimitive):
             mongo_collection = self.cfg['mongo'].get('collection')
             mongoclient = pymongo.MongoClient(mongo_host, mongo_port)
             self.action.args.mongodb = mongoclient[mongo_db][mongo_collection]
-        except:
+            self.action.args.mongo_collection = mongoclient[mongo_db]
+        except Exception as e:
             self.log.error('Could not connect to mongo db')
+            self.log.error(e)
             self.action.args.mongodb = None
+            self.action.args.mongo_collection = None
 
     def _pre_condition(self):
         """Check for conditions necessary to run this process"""
@@ -100,35 +107,40 @@ class ReadFITS(BasePrimitive):
         self.action.args.ccddata = CCDData.read(self.action.args.fitsfilepath,
                                                 unit="adu")
         # Read header metadata
+        self.log.info('Reading FITS header')
         hdr = self.action.args.ccddata.header
-        for key, hdr_key in self.cfg.items('Header'):
-            if hdr_key not in ['None', None]:
-                raw_read = hdr.get(hdr_key, '').split(',')
-                val = raw_read[0]
-                if len(raw_read) == 2:
+        for key, raw_read in self.cfg.items('Header'):
+            raw_read = raw_read.split(',')
+            if key != 'default_section' and key[:11] != 'type_string':
+                hdr_key = raw_read[0]
+                val = hdr.get(hdr_key, None)
+                if len(raw_read) == 2 and val is not None:
                     type_string = raw_read[1]
                     if type_string == 'datetime':
                         val = datetime.strptime(val, '%Y-%m-%dT%H:%M:%S')
                     else:
                         val = eval(type_string)(val)
                 elif len(raw_read) > 2:
-                    raise TypeError(f'Could not parse "{hdr_key}" in Header config')
-                self.action.args.meta[key] = val
-                self.log.debug(f"  {key} = {self.action.args.meta[key]} ({type(self.action.args.meta[key])})")
+                    raise TypeError(f'Could not parse "{raw_read}" in Header config')
+                if val is not None:
+                    self.action.args.meta[key] = val
+                    self.log.info(f"  {key} = {self.action.args.meta[key]} ({type(self.action.args.meta[key])})")
 
         # Set Image Type
+        self.log.info('Determining image type')
+        self.log.debug(f"  header imtype = {self.action.args.meta['imtype']}")
         self.action.args.imtype = None
         for key, val in self.cfg.items('Header'):
             if key[:11] == 'type_string':
-                if self.action.args.meta['imtype'] == self.cfg['Header'].get(key):
+                if self.action.args.meta['imtype'] == val:
                     self.action.args.imtype = key[12:].upper()
         self.log.info(f"  Image type is {self.action.args.imtype}")
 
         ## VYSOS Specific Code:
-        if self.cfg['telescope'].get('name') == 'V5':
+        if self.cfg['Telescope'].get('name') == 'V5':
             try:
                 self.log.info(f'  Reading focus data from DB')
-                status_collection = mongoclient[mongo_db][f'V5status']
+                status_collection = self.action.args.mongodb['V5status']
                 date_obs = datetime.strptime(self.action.args.ccddata.header.get('DATE-OBS'), '%Y-%m-%dT%H:%M:%S')
                 querydict = {"date": {"$gt": date_obs, "$lt": date_obs+timedelta(minutes=2)},
                              "telescope": 'V5'}
@@ -185,24 +197,25 @@ class PopulateAdditionalMetaData(BasePrimitive):
         """
         self.log.info(f"Running {self.__class__.__name__} action")
 
-        if self.action.args.imtype == 'object':
-            # Build header pointing
+        if self.action.args.imtype == 'OBJECT':
+            self.log.info('Build astropy coordinate for header pointing')
             try:
-                self.action.args.header_pointing = c.SkyCoord(self.action.args.meta.get('RA'),
-                                                              self.action.args.meta.get('DEC'),
+                self.action.args.header_pointing = c.SkyCoord(self.action.args.meta.get('header_ra'),
+                                                              self.action.args.meta.get('header_dec'),
                                                               frame='icrs',
                                                               unit=(u.hourangle, u.deg))
             except:
                 self.action.args.header_pointing = None
+            self.log.info(f'  {self.action.args.header_pointing.to_string("hmsdms", precision=1)}')
 
-            # Determine Moon Info
             if self.action.args.header_pointing is not None:
+                self.log.info('Determine Moon info')
                 site_lat = c.Latitude(self.cfg['Telescope'].getfloat('site_lat'), unit=u.degree)
                 site_lon = c.Longitude(self.cfg['Telescope'].getfloat('site_lon'), unit=u.degree)
                 site_elevation = self.cfg['Telescope'].getfloat('site_elevation') * u.meter
                 loc = c.EarthLocation(site_lon, site_lat, site_elevation)
                 pressure = self.cfg['Telescope'].getfloat('pressure', 700)*u.mbar
-                obstime = Time(self.action.args.meta.get('date_obs'), location=loc)
+                obstime = Time(self.action.args.meta.get('date'), location=loc)
                 altazframe = c.AltAz(location=loc, obstime=obstime, pressure=pressure)
                 moon = c.get_moon(obstime)
                 sun = c.get_sun(obstime)
@@ -219,11 +232,11 @@ class PopulateAdditionalMetaData(BasePrimitive):
                 self.action.args.meta['moon_alt'] = moon_alt
                 self.action.args.meta['moon_separation'] = moon_separation
                 self.action.args.meta['moon_illum'] = moon_illum
-        elif self.action.args.imtype == 'bias':
+        elif self.action.args.imtype == 'BIAS':
             pass
-        elif self.action.args.imtype == 'dark':
+        elif self.action.args.imtype == 'DARK':
             pass
-        elif self.action.args.imtype in ['domeflat', 'twiflat']:
+        elif self.action.args.imtype in ['DOMEFLAT', 'TWIFLAT']:
             pass
 
         return self.action.args
@@ -265,14 +278,14 @@ class CopyFile(BasePrimitive):
         """
         self.log.info(f"Running {self.__class__.__name__} action")
         self.action.args.destination_dir = Path(get_destination_dir(self.cfg))
-        destination_dir.mkdir(parents=True, exist_ok=True)
+        self.action.args.destination_dir.mkdir(parents=True, exist_ok=True)
         
         overwrite = self.cfg['FileHandling'].getboolean('overwrite', False)
         
         if self.action.args.fitsfilepath.suffix in ['.fits', '.fts']:
-            self.action.args.destination_file = destination_dir / f"{self.action.args.fitsfilepath.name}.fz"
+            self.action.args.destination_file = self.action.args.destination_dir / f"{self.action.args.fitsfilepath.name}.fz"
         elif self.action.args.fitsfilepath.suffix == '.fz':
-            self.action.args.destination_file = destination_dir / self.action.args.fitsfilepath.name
+            self.action.args.destination_file = self.action.args.destination_dir / self.action.args.fitsfilepath.name
         else:
             msg = f'File extension not handled: {self.action.args.fitsfilepath.suffix}'
             self.log.error(msg)

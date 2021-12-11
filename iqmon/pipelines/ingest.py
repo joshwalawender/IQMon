@@ -9,7 +9,7 @@ from iqmon.primitives.file_handling import (ReadFITS,
 from iqmon.primitives.database import RecordFile
 
 
-class Ingest(BasePipeline):
+class IngestPipeline(BasePipeline):
     """
     This pipeline ingests files from their raw location on disk and rewrites
     them to the destination directory with a checksum.  It then (if spcified)
@@ -20,7 +20,7 @@ class Ingest(BasePipeline):
     the file's existence to the database.
     """
     event_table = {
-        "next_file":         ("ReadFITS", "reading_file", "science_metadata"),
+        "next_file":         ("ReadFITS", "reading_file", "populate_metadata"),
         "populate_metadata": ("PopulateAdditionalMetaData", "populating_metadata", "copy_file"),
         "copy_file":         ("CopyFile", "copying_file", "delete_original"),
         "delete_original":   ("DeleteOriginal", "deleting_original", "record_file"),

@@ -1,5 +1,6 @@
 from pathlib import Path
 from datetime import datetime, timedelta
+import logging
 
 import ephem
 from astropy.table import Table, Column

@@ -1,5 +1,6 @@
 from pathlib import Path
 from datetime import datetime, timedelta
+import numpy as np
 
 from keckdrpframework.primitives.base_primitive import BasePrimitive
 
@@ -20,7 +21,8 @@ class RecordFile(BasePrimitive):
     def _pre_condition(self):
         """Check for conditions necessary to run this process"""
         checks = [pre_condition(self, 'FITS file was read',
-                                self.action.args.ccddata is not None),]
+                                self.action.args.ccddata is not None),
+                 ]
         return np.all(checks)
 
     def _post_condition(self):

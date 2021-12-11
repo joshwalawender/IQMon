@@ -16,7 +16,7 @@ from glob import glob
 
 # the preferred way to import the pipeline is a direct import
 
-from iqmon.pipelines.ingest import Ingest
+from iqmon.pipelines.ingest import IngestPipeline
 
 
 def _parseArguments(in_args):
@@ -78,7 +78,7 @@ def main():
     # END HANDLING OF CONFIGURATION FILES ##########
 
     try:
-        framework = Framework(TemplatePipeline, framework_config_fullpath)
+        framework = Framework(IngestPipeline, framework_config_fullpath)
         logging.config.fileConfig(framework_logcfg_fullpath)
         framework.config.instrument = pipeline_config
     except Exception as e:
@@ -89,7 +89,7 @@ def main():
     # this part defines a specific logger for the pipeline, so that
     # we can separate the output of the pipeline
     # from the output of the framework
-    framework.context.pipeline_logger = getLogger(framework_logcfg_fullpath, name="IQMon")
+    framework.context.pipeline_logger = getLogger(framework_logcfg_fullpath, name="pipeline")
     framework.logger = getLogger(framework_logcfg_fullpath, name="DRPF")
 
     framework.logger.info("Framework initialized")
