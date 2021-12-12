@@ -46,6 +46,9 @@ class ReadFITS(BasePrimitive):
         self.action.args.imtype = None
         self.action.args.header_pointing = None
         self.action.args.wcs = None
+        self.action.args.objects = None
+        self.action.args.calibration_catalog = None
+        self.action.args.associated_calibrators = None
 
         # If we are reading a compressed file, use the uncompressed version of
         # the name for the database
