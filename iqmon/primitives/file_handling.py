@@ -47,6 +47,7 @@ class ReadFITS(BasePrimitive):
         self.action.args.header_pointing = None
         self.action.args.background = None
         self.action.args.wcs = None
+        self.action.args.wcs_pointing = None
         self.action.args.objects = None
         self.action.args.calibration_catalog = None
         self.action.args.associated_calibrators = None
@@ -65,14 +66,13 @@ class ReadFITS(BasePrimitive):
             mongo_port = self.cfg['mongo'].getint('port')
             mongo_db = self.cfg['mongo'].get('db')
             mongo_collection = self.cfg['mongo'].get('collection')
-            mongoclient = pymongo.MongoClient(mongo_host, mongo_port)
-            self.action.args.mongodb = mongoclient[mongo_db][mongo_collection]
-            self.action.args.mongo_collection = mongoclient[mongo_db]
+            self.mongoclient = pymongo.MongoClient(mongo_host, mongo_port)
+            self.mongo_iqmon = self.mongoclient[mongo_db][mongo_collection]
         except Exception as e:
             self.log.error('Could not connect to mongo db')
             self.log.error(e)
-            self.action.args.mongodb = None
-            self.action.args.mongo_collection = None
+            self.mongoclient = None
+            self.mongo_iqmon = None
 
     def _pre_condition(self):
         """Check for conditions necessary to run this process"""
@@ -98,14 +98,6 @@ class ReadFITS(BasePrimitive):
         """
         self.log.info(f"Running {self.__class__.__name__} action")
         self.action.args.start_time = datetime.now()
-
-        if self.action.args.mongodb is not None:
-            already_processed = [d for d in self.action.args.mongodb.find( {'filename': self.action.args.meta['fitsfile']} )]
-            if len(already_processed) != 0\
-               and self.cfg['FileHandling'].getboolean('overwrite', False) is False:
-                self.log.info(f"overwrite is {self.cfg['FileHandling'].getboolean('overwrite')}")
-                self.log.info('  File is already in the database, skipping further processing')
-                self.action.args.skip = True
 
         # Read FITS file
         self.log.info(f"  Reading: {self.action.args.meta['fitsfile']}")
@@ -141,6 +133,49 @@ class ReadFITS(BasePrimitive):
                     self.action.args.imtype = key[12:].upper()
         self.log.info(f"  Image type is {self.action.args.imtype}")
 
+        # Build header pointing coordinate
+        if self.action.args.imtype == 'OBJECT':
+            self.log.info('Build astropy coordinate for header pointing')
+            try:
+                self.action.args.header_pointing = c.SkyCoord(self.action.args.meta.get('header_ra'),
+                                                              self.action.args.meta.get('header_dec'),
+                                                              frame='icrs',
+                                                              unit=(u.hourangle, u.deg))
+            except:
+                self.action.args.header_pointing = None
+            self.log.info(f'  {self.action.args.header_pointing.to_string("hmsdms", precision=1)}')
+
+        # Should we skip a previously processed file?
+        if self.mongo_iqmon is not None:
+            self.log.info('Check for previous analysis of this file')
+            already_processed = [d for d in self.mongo_iqmon.find( {'fitsfile': self.action.args.meta['fitsfile']} )]
+            if len(already_processed) != 0\
+               and self.cfg['mongo'].getboolean('overwrite', False) is False:
+                self.log.info(f"overwrite is {self.cfg['FileHandling'].getboolean('overwrite')}")
+                self.log.info('  File is already in the database, skipping further processing')
+                self.action.args.skip = True
+                return self.action.args
+
+            # Read previously solved WCS if available
+            if len(already_processed) != 0 and self.action.args.imtype == 'OBJECT':
+                self.log.info(f'  Found {len(already_processed)} database entries for this file')
+                db_wcs = already_processed[0].get('wcs_header', None)
+                if db_wcs is None:
+                    self.log.info('  Database entry does not contain WCS')
+                else:
+                    from astropy.wcs import WCS
+                    self.log.info('  Found Previously Solved WCS')
+                    self.action.args.wcs = WCS(db_wcs)
+                    nx, ny = self.action.args.ccddata.data.shape
+                    r, d = self.action.args.wcs.all_pix2world([nx/2.], [ny/2.], 1)
+                    self.action.args.wcs_pointing = c.SkyCoord(r[0], d[0],
+                                     frame='icrs', equinox='J2000',
+                                     unit=(u.deg, u.deg),
+                                     obstime=self.action.args.meta.get('date'))
+                    self.action.args.meta['perr'] = self.action.args.wcs_pointing.separation(
+                                                    self.action.args.header_pointing).to(u.arcmin).value
+                    self.log.info(f'  Pointing error = {self.action.args.meta.get("perr"):.1f}')
+
         ## VYSOS Specific Code:
         if self.cfg['Telescope'].get('name') in ['V5', 'V20']:
             # Manually set filter for V5A
@@ -149,8 +184,8 @@ class ReadFITS(BasePrimitive):
             # Pull focus info from status database
             try:
                 self.log.info(f'  Reading focus data from DB')
-                status_collection = self.action.args.mongodb['V5status']
-                date_obs = datetime.strptime(self.action.args.ccddata.header.get('DATE-OBS'), '%Y-%m-%dT%H:%M:%S')
+                status_collection = self.mongoclient[self.cfg['mongo'].get('db')]['V5status']
+                date_obs = self.action.args.meta.get('date')
                 querydict = {"date": {"$gt": date_obs, "$lt": date_obs+timedelta(minutes=2)},
                              "telescope": 'V5'}
                 focus_pos = [entry['focuser_position'] for entry in\
@@ -172,6 +207,8 @@ class ReadFITS(BasePrimitive):
                 self.log.warning(f'  Failed to read focus data from DB')
                 self.log.warning(e)
 
+        self.mongoclient.close()
+
         return self.action.args
 
 
@@ -188,7 +225,9 @@ class PopulateAdditionalMetaData(BasePrimitive):
 
     def _pre_condition(self):
         """Check for conditions necessary to run this process"""
-        checks = []
+        checks = [pre_condition(self, 'Skip image is not set',
+                                not self.action.args.skip),
+                 ]
         return np.all(checks)
 
     def _post_condition(self):
@@ -207,16 +246,6 @@ class PopulateAdditionalMetaData(BasePrimitive):
         self.log.info(f"Running {self.__class__.__name__} action")
 
         if self.action.args.imtype == 'OBJECT':
-            self.log.info('Build astropy coordinate for header pointing')
-            try:
-                self.action.args.header_pointing = c.SkyCoord(self.action.args.meta.get('header_ra'),
-                                                              self.action.args.meta.get('header_dec'),
-                                                              frame='icrs',
-                                                              unit=(u.hourangle, u.deg))
-            except:
-                self.action.args.header_pointing = None
-            self.log.info(f'  {self.action.args.header_pointing.to_string("hmsdms", precision=1)}')
-
             if self.action.args.header_pointing is not None:
                 self.log.info('Determine Moon info')
                 site_lat = c.Latitude(self.cfg['Telescope'].getfloat('site_lat'), unit=u.degree)
@@ -231,7 +260,7 @@ class PopulateAdditionalMetaData(BasePrimitive):
                 moon_alt = ((moon.transform_to(altazframe).alt).to(u.degree)).value
                 moon_separation = (moon.separation(self.action.args.header_pointing).to(u.degree)).value\
                             if self.action.args.header_pointing is not None else None
-                # Moon illumination formula from Meeus, â€œAstronomical 
+                # Moon illumination formula from Meeus, ÒAstronomical 
                 # Algorithms". Formulae 46.1 and 46.2 in the 1991 edition, 
                 # using the approximation cos(psi) \approx -cos(i). Error 
                 # should be no more than 0.0014 (p. 316). 
