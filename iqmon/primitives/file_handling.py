@@ -131,6 +131,7 @@ class ReadFITS(BasePrimitive):
             if key[:11] == 'type_string':
                 if self.action.args.meta['imtype'] == val:
                     self.action.args.imtype = key[12:].upper()
+                    self.action.args.meta['imtype'] = key[12:].upper()
         self.log.info(f"  Image type is {self.action.args.imtype}")
 
         # Build header pointing coordinate
