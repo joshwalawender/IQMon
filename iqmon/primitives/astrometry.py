@@ -34,6 +34,8 @@ class SolveAstrometry(BasePrimitive):
                                 not self.action.args.skip),
                   pre_condition(self, 'WCS not already solved',
                                 self.action.args.wcs is None),
+                  pre_condition(self, 'Image type is OBJECT',
+                                self.action.args.imtype == 'OBJECT'),
                  ]
         force_solve = self.cfg['Astrometry'].getboolean('force_solve', False)
         return np.all(checks) if force_solve is False else True

@@ -45,6 +45,7 @@ class ReadFITS(BasePrimitive):
         self.action.args.meta = {'telescope': self.cfg['Telescope'].get('name')}
         self.action.args.imtype = None
         self.action.args.header_pointing = None
+        self.action.args.background = None
         self.action.args.wcs = None
         self.action.args.objects = None
         self.action.args.calibration_catalog = None
