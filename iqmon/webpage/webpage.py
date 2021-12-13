@@ -212,10 +212,6 @@ def weather():
                      size=markersize, color="green", alpha=0.8)
     safe_plot.circle(unsafe_dates, [0]*len(unsafe_dates),
                      size=markersize, color="red", alpha=0.8)
-#     safe_plot.vbar(x=safe_dates, width=width, bottom=0, top=1,
-#                    color="green", alpha=0.2)
-#     safe_plot.vbar(x=unsafe_dates, width=width, bottom=0, top=1,
-#                    color="red", alpha=0.2)
     safe_plot.yaxis.axis_label = 'Safe'
     safe_plot.xaxis.axis_label = 'Time (UT)'
     safe_plot.yaxis.formatter = NumeralTickFormatter(format="0,0")
@@ -249,20 +245,6 @@ def weather():
                if val < weather_limits['clear']]
     cloudiness_plot.circle(clear_x, clear_y,
                            size=markersize, color="green", alpha=0.8)
-#     cloudiness_plot.quad(top=[5],
-#                          bottom=[weather_limits['cloudy']],
-#                          left=[min(date)], right=[max(date)],
-#                          color="red", alpha=0.15)
-#     cloudiness_plot.quad(top=[weather_limits['cloudy']],
-#                          bottom=[weather_limits['clear']],
-#                          left=[min(date)], right=[max(date)],
-#                          color="yellow", alpha=0.15)
-#     cloudiness_plot.quad(top=[weather_limits['clear']],
-#                          bottom=[-45],
-#                          left=[min(date)], right=[max(date)],
-#                          color="green", alpha=0.15)
-#     cloudiness_plot.circle(date, clouds,
-#                            size=markersize, color="#53777a", alpha=0.8)
     cloudiness_plot.yaxis.axis_label = 'Cloudiness (C)'
     cloudiness_plot.yaxis.formatter = NumeralTickFormatter(format="0,0")
     cloudiness_plot.xaxis.visible = False
@@ -295,20 +277,6 @@ def weather():
                if val < weather_limits['calm']]
     wind_plot.circle(calm_x, calm_y,
                      size=markersize, color="green", alpha=0.8)
-#     wind_plot.quad(top=[80],
-#                    bottom=[weather_limits['windy']],
-#                    left=[min(date)], right=[max(date)],
-#                    color="red", alpha=0.15)
-#     wind_plot.quad(top=[weather_limits['windy']],
-#                    bottom=[weather_limits['calm']],
-#                    left=[min(date)], right=[max(date)],
-#                    color="yellow", alpha=0.15)
-#     wind_plot.quad(top=[weather_limits['calm']],
-#                    bottom=[0],
-#                    left=[min(date)], right=[max(date)],
-#                    color="green", alpha=0.15)
-#     wind_plot.circle(date, wind,
-#                      size=markersize, color="#53777a", alpha=0.8)
     wind_plot.yaxis.axis_label = 'Wind Speed (kph)'
     wind_plot.yaxis.formatter = NumeralTickFormatter(format="0,0")
     wind_plot.xaxis.visible = False
@@ -341,20 +309,6 @@ def weather():
                if val < weather_limits['wet']]
     rain_plot.circle(rain_x, rain_y,
                      size=markersize, color="red", alpha=0.8)
-#     rain_plot.quad(top=[2800],
-#                    bottom=[weather_limits['dry']],
-#                    left=[min(date)], right=[max(date)],
-#                    color="green", alpha=0.15)
-#     rain_plot.quad(top=[weather_limits['dry']],
-#                    bottom=[weather_limits['wet']],
-#                    left=[min(date)], right=[max(date)],
-#                    color="yellow", alpha=0.15)
-#     rain_plot.quad(top=[weather_limits['wet']],
-#                    bottom=[1000],
-#                    left=[min(date)], right=[max(date)],
-#                    color="red", alpha=0.15)
-#     rain_plot.circle(date, rain,
-#                      size=markersize, color="#53777a", alpha=0.8)
     rain_plot.yaxis.axis_label = 'Rain'
     rain_plot.yaxis.formatter = NumeralTickFormatter(format="0.0a")
     rain_plot.xaxis.visible = False

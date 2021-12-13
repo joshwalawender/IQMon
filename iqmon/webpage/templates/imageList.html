@@ -74,7 +74,11 @@
 
     <td style='text-align:left;'>
     {% if 'fitsfile' in image.keys() %}
-        {{ image['fitsfile'] }}
+        {% if 'jpegfile' in image.keys() %}
+            <a href="/static/plots/{{ telescope }}/{{ image['jpegfile'] }}">{{ image['fitsfile'] }}</a>
+        {% else %}
+            {{ image['fitsfile'] }}
+        {% endif %}
     {% endif %}
     </td>
 

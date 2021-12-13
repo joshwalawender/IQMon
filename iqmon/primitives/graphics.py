@@ -370,10 +370,10 @@ class RenderJPEG(BasePrimitive):
 
         self.log.debug(f'  Saving JPEG file')
         jpeg_axes.set_title(titlestr)
-        reportfilename = f'{self.action.args.meta.get("fitsfile").split(".")[0]}.jpg'
         instrument = self.cfg['Telescope'].get('name')
-        self.action.args.jpegfile = Path('/var/www/plots/') / instrument / reportfilename
-        plt.savefig(self.action.args.jpegfile, dpi=dpi)
+        self.action.args.meta['jpegfile'] = f'{self.action.args.meta.get("fitsfile").split(".")[0]}.jpg'
+        jpeg_file_path = Path('/var/www/plots/') / instrument / self.action.args.meta['jpegfile']
+        plt.savefig(jpeg_file_path, dpi=dpi)
         self.log.debug(f'  Done')
 
         return self.action.args
