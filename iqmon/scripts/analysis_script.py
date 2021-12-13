@@ -56,7 +56,7 @@ def main():
     # load the framework config file from the config directory of this package
     # this part uses the pkg_resources package to find the full path location
     # of framework.cfg
-    framework_config_file = "configs/framework.cfg"
+    framework_config_file = "configs/framework_analysis.cfg"
     framework_config_fullpath = pkg_resources.resource_filename(pkg, framework_config_file)
 
     # load the logger config file from the config directory of this package

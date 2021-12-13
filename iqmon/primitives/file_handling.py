@@ -100,7 +100,7 @@ class ReadFITS(BasePrimitive):
         self.action.args.start_time = datetime.now()
 
         # Read FITS file
-        self.log.info(f"  Reading: {self.action.args.meta['fitsfile']}")
+        self.log.info(f"  Reading: {self.action.args.fitsfilepath}")
         self.action.args.ccddata = CCDData.read(self.action.args.fitsfilepath,
                                                 unit="adu")
         # Read header metadata
@@ -126,13 +126,13 @@ class ReadFITS(BasePrimitive):
         # Set Image Type
         self.log.info('Determining image type')
         self.log.debug(f"  header imtype = {self.action.args.meta['imtype']}")
-        self.action.args.imtype = None
+        self.action.args.imtype = f"unknown ({self.action.args.meta['imtype']})"
         for key, val in self.cfg.items('Header'):
             if key[:11] == 'type_string':
                 if self.action.args.meta['imtype'] == val:
                     self.action.args.imtype = key[12:].upper()
-                    self.action.args.meta['imtype'] = key[12:].upper()
-        self.log.info(f"  Image type is {self.action.args.imtype} ({self.action.args.meta['imtype']})")
+        self.action.args.meta['imtype'] = self.action.args.imtype
+        self.log.info(f"  Image type is {self.action.args.imtype}")
 
         # Build header pointing coordinate
         if self.action.args.imtype == 'OBJECT':
