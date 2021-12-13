@@ -415,6 +415,9 @@ def imageList(telescope, date):
                   'date': {'$gt': start, '$lt': end}}
     query_result = mongo_query('iqmon', query_dict)
     image_list = [d for d in query_result]
+    flat_count = len([d for d in image_list if d['imtype'] in ['FLAT', 'TWIFLAT']])
+    cal_count = len([d for d in image_list if d['imtype'] in ['BIAS', 'DARK']])
+    object_count = len([d for d in image_list if d['imtype'] in ['OBJECT']])
     log.info(f"Got {len(image_list)} images")
 
     log.info(f"Rendering template")
@@ -422,6 +425,9 @@ def imageList(telescope, date):
                                  telescope=telescope,
                                  subject=subject,
                                  image_list=image_list,
+                                 flat_count=flat_count,
+                                 cal_count=cal_count,
+                                 object_count=object_count,
                                  )
 
 

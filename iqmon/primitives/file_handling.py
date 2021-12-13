@@ -121,7 +121,7 @@ class ReadFITS(BasePrimitive):
                     raise TypeError(f'Could not parse "{raw_read}" in Header config')
                 if val is not None:
                     self.action.args.meta[key] = val
-                    self.log.info(f"  {key} = {self.action.args.meta[key]} ({type(self.action.args.meta[key])})")
+                    self.log.debug(f"  {key} = {self.action.args.meta[key]} ({type(self.action.args.meta[key])})")
 
         # Set Image Type
         self.log.info('Determining image type')
@@ -132,7 +132,7 @@ class ReadFITS(BasePrimitive):
                 if self.action.args.meta['imtype'] == val:
                     self.action.args.imtype = key[12:].upper()
                     self.action.args.meta['imtype'] = key[12:].upper()
-        self.log.info(f"  Image type is {self.action.args.imtype}")
+        self.log.info(f"  Image type is {self.action.args.imtype} ({self.action.args.meta['imtype']})")
 
         # Build header pointing coordinate
         if self.action.args.imtype == 'OBJECT':

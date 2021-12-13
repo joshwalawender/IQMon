@@ -34,7 +34,8 @@
 
 <h2>Image List for {{ subject }} for {{ telescope }}</h2>
 
-<center><p>Found {{ image_list|length }} images in database
+<center><p>Found {{ image_list|length }} images in database 
+({{ flat_count }} flats, {{ cal_count }} cals, {{ object_count }} science images)
 </p></center>
 
 <table>
@@ -44,8 +45,8 @@
     <th style="width:420px">Image File Name</th>
     <th style="width:50px">Alt (deg)</th>
     <th style="width:50px">Az (deg)</th>
-    <th style="width:70px">Pointing Error (arcmin)</th>
     <th style="width:50px">Airmass</th>
+    <th style="width:70px">Pointing Error (arcmin)</th>
     <th style="width:50px">Moon Sep (deg)</th>
     <th style="width:50px">Moon Illum. (%)</th>
     <th style="width:50px">Sky Bkg.</th>
@@ -90,14 +91,14 @@
     </td>
 
     <td style='text-align:right;'>
-    {% if 'perr' in image.keys() %}
-        {{ "{:.1f}".format(image['perr']) }}
+    {% if 'airmass' in image.keys() %}
+        {{ "{:.2f}".format(image['airmass']) }}
     {% endif %}
     </td>
 
     <td style='text-align:right;'>
-    {% if 'airmass' in image.keys() %}
-        {{ "{:.2f}".format(image['airmass']) }}
+    {% if 'perr' in image.keys() %}
+        {{ "{:.1f}".format(image['perr']) }}
     {% endif %}
     </td>
 
@@ -162,8 +163,8 @@
     </td>
 
     <td style={{ 'text-align:right;' }}>
-    {% if 'processing time' in image.keys() %}
-        {{ "{:.0f}".format(image['processing time']) }}
+    {% if 'processing_time' in image.keys() %}
+        {{ "{:.0f}".format(image['processing_time']) }}
     {% endif %}
     </td>
 
