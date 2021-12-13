@@ -5,6 +5,10 @@ import flask
 import pymongo
 from datetime import datetime, timedelta
 
+from astroplan import Observer
+from astropy import coordinates as c
+from astropy.time import Time
+
 from bokeh.io import curdoc
 from bokeh.plotting import figure
 from bokeh.resources import CDN
@@ -52,6 +56,50 @@ def mongo_query(collection, query_dict,
     query_result = mongo_iqmon.find(query_dict, sort=sort)
     mongoclient.close()
     return query_result
+
+
+##-------------------------------------------------------------------------
+## Function: get_twilights
+##-------------------------------------------------------------------------
+def get_twilights(start, end, nsample=256):
+    """ Determine sunrise and sunset times """
+    cfg_path = Path(__file__).parent.parent / 'configs' / 'pipeline.cfg'
+    cfg = configparser.ConfigParser()
+    cfg.read(cfg_path)
+
+    location = c.EarthLocation(
+        lat=cfg['Telescope'].getfloat('site_lat'),
+        lon=cfg['Telescope'].getfloat('site_lon'),
+        height=cfg['Telescope'].getfloat('site_elevation'),
+    )
+    obs = Observer(location=location, name=cfg['Telescope'].get('name'))
+    sunset = obs.sun_set_time(Time(start), which='next').datetime
+    sunrise = obs.sun_rise_time(Time(start), which='next').datetime
+
+    # Calculate and order twilights and set plotting alpha for each
+    twilights = [(start, 'start', 0.0),
+                 (sunset, 'sunset', 0.0),
+                 (obs.twilight_evening_civil(Time(start),
+                                             which='next').datetime, 'ec', 0.1),
+                 (obs.twilight_evening_nautical(Time(start),
+                                                which='next').datetime, 'en', 0.2),
+                 (obs.twilight_evening_astronomical(Time(start),
+                                                    which='next').datetime, 'ea', 0.3),
+                 (obs.twilight_morning_astronomical(Time(start),
+                                                    which='next').datetime, 'ma', 0.5),
+                 (obs.twilight_morning_nautical(Time(start),
+                                                which='next').datetime, 'mn', 0.3),
+                 (obs.twilight_morning_civil(Time(start),
+                                             which='next').datetime, 'mc', 0.2),
+                 (sunrise, 'sunrise', 0.1),
+                 ]
+    twilights.sort(key=lambda x: x[0])
+    final = {'sunset': 0.1, 'ec': 0.2, 'en': 0.3, 'ea': 0.5,
+             'ma': 0.3, 'mn': 0.2, 'mc': 0.1, 'sunrise': 0.0}
+    twilights.append((end, 'end', final[twilights[-1][1]]))
+
+    return twilights
+
 
 
 ##-------------------------------------------------------------------------
@@ -103,7 +151,8 @@ def weather():
     log.info(f"Querying weather database")
     end = datetime.utcnow()
     oneday = timedelta(days=1)
-    start = end - timedelta(days=3)
+    plot_ndays = 2
+    start = end - timedelta(days=plot_ndays)
     query_dict = {'date': {'$gt': start, '$lt': end}}
     query_result = mongo_query('weather', query_dict)
     weather = [d for d in query_result]
@@ -218,6 +267,7 @@ def weather():
     cloudiness_plot.yaxis.formatter = NumeralTickFormatter(format="0,0")
     cloudiness_plot.xaxis.visible = False
 
+
     ##-------------------------------------------------------------------------
     ## Wind Plot
     log.info('Build wind plot')
@@ -262,6 +312,7 @@ def weather():
     wind_plot.yaxis.axis_label = 'Wind Speed (kph)'
     wind_plot.yaxis.formatter = NumeralTickFormatter(format="0,0")
     wind_plot.xaxis.visible = False
+
 
     ##-------------------------------------------------------------------------
     ## Rain Plot
@@ -308,6 +359,29 @@ def weather():
     rain_plot.yaxis.formatter = NumeralTickFormatter(format="0.0a")
     rain_plot.xaxis.visible = False
 #     rain_plot.yaxis.ticker = SingleIntervalTicker(desired_num_ticks=2)
+
+    ##-------------------------------------------------------------------------
+    ## Overplot Twilights
+    for days in range(1,plot_ndays+1):
+        twilights = get_twilights(end-timedelta(days=days), end-timedelta(days=days-1))
+        for j in range(len(twilights)-1):
+           temperature_plot.quad(top=[95], bottom=[25],
+                                  left=[twilights[j][0]], right=[twilights[j+1][0]],
+                                  color="blue", alpha=twilights[j+1][2])
+           cloudiness_plot.quad(top=[5], bottom=[-45],
+                                left=[twilights[j][0]], right=[twilights[j+1][0]],
+                                color="blue", alpha=twilights[j+1][2])
+           wind_plot.quad(top=[100], bottom=[0],
+                          left=[twilights[j][0]], right=[twilights[j+1][0]],
+                          color="blue", alpha=twilights[j+1][2])
+           rain_plot.quad(top=[2800], bottom=[1000],
+                          left=[twilights[j][0]], right=[twilights[j+1][0]],
+                          color="blue", alpha=twilights[j+1][2])
+           safe_plot.quad(top=[1.2], bottom=[-0.2],
+                          left=[twilights[j][0]], right=[twilights[j+1][0]],
+                          color="blue", alpha=twilights[j+1][2])
+
+
 
     log.info(f"Rendering template")
     script, div = components(column(safe_plot,
