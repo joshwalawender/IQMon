@@ -14,7 +14,7 @@ from astropy import stats
 
 from keckdrpframework.primitives.base_primitive import BasePrimitive
 
-from .utils import pre_condition, post_condition
+from .utils import pre_condition, post_condition, get_jpeg_dir
 
 
 
@@ -371,8 +371,12 @@ class RenderJPEG(BasePrimitive):
         self.log.debug(f'  Saving JPEG file')
         jpeg_axes.set_title(titlestr)
         instrument = self.cfg['Telescope'].get('name')
-        self.action.args.meta['jpegfile'] = f'{self.action.args.meta.get("fitsfile").split(".")[0]}.jpg'
-        jpeg_file_path = Path('/var/www/plots/') / instrument / self.action.args.meta['jpegfile']
+        jpeg_filename = f'{self.action.args.meta.get("fitsfile").split(".")[0]}.jpg'
+#         jpeg_file_path = Path('/var/www/plots/') / instrument / jpeg_filename
+        jpeg_file_dir = Path(get_jpeg_dir(self.cfg, self.action.args.meta['date']))
+        jpeg_file_dir.mkdir(parents=True, exist_ok=True)
+        jpeg_file_path = jpeg_file_dir / jpeg_filename
+        self.action.args.meta['jpegfile'] = '/'.join(jpeg_file_path.parts[-2:])
         plt.savefig(jpeg_file_path, dpi=dpi)
         self.log.debug(f'  Done')
 

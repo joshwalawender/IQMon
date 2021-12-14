@@ -23,6 +23,18 @@ def get_destination_dir(cfg):
 
 
 ##-----------------------------------------------------------------------------
+## Function: get_destination_dir
+##-----------------------------------------------------------------------------
+def get_jpeg_dir(cfg, obstime):
+    raw_string = cfg['jpeg'].get('directory')
+    y = f'{obstime.year:4d}'
+    m = f'{obstime.month:02d}'
+    d = f'{obstime.day:02d}'
+    result = raw_string.replace('YYYY', y).replace('MM', m).replace('DD', d)
+    return result
+
+
+##-----------------------------------------------------------------------------
 ## Function: get_sunrise_sunset
 ##-----------------------------------------------------------------------------
 def get_sunrise_sunset(start):
