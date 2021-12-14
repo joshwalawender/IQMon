@@ -5,6 +5,7 @@ import flask
 import pymongo
 from datetime import datetime, timedelta
 
+import numpy as np
 from astroplan import Observer
 from astropy import coordinates as c
 from astropy.time import Time
@@ -354,8 +355,18 @@ def weather():
                                  )
 
 
+
 ##-------------------------------------------------------------------------
-## status: /<string:telescope>/images/<string:date>
+## static_path: 
+##-------------------------------------------------------------------------
+@app.route("/static/plots/<string:telescope>/<string:date>/<string:filename>")
+def static_path(telescope, date, filename):
+    log.info(f"Returning static path: /Users/vysosuser/plots/{telescope} {filename}")
+    return flask.send_from_directory(f'/Users/vysosuser/plots/{telescope}/{date}', filename)
+
+
+##-------------------------------------------------------------------------
+## imageList: /<string:telescope>/images/<string:date>
 ##-------------------------------------------------------------------------
 @app.route("/<string:telescope>/images/<string:date>")
 def imageList(telescope, date):
@@ -372,7 +383,20 @@ def imageList(telescope, date):
     flat_count = len([d for d in image_list if d['imtype'] in ['FLAT', 'TWIFLAT']])
     cal_count = len([d for d in image_list if d['imtype'] in ['BIAS', 'DARK']])
     object_count = len([d for d in image_list if d['imtype'] in ['OBJECT']])
+    total_processing_time = np.sum([d['processing_time'] for d in image_list])
     log.info(f"Got {len(image_list)} images")
+
+    log.info(f"Getting IQMon limits")
+    query_result = mongo_query('V5limits', {})
+    iqmon_limits = query_result[0]
+    for key in iqmon_limits:
+        log.info(f"  {key} : {iqmon_limits[key]}")
+
+    for i,image in enumerate(image_list):
+        for key in iqmon_limits:
+            if key in image.keys():
+                if image[key] > iqmon_limits[key]:
+                    image_list[i][f"{key} flag"] = True
 
     log.info(f"Rendering template")
     return flask.render_template('imageList.html',
@@ -382,6 +406,7 @@ def imageList(telescope, date):
                                  flat_count=flat_count,
                                  cal_count=cal_count,
                                  object_count=object_count,
+                                 total_processing_time=total_processing_time,
                                  )
 
 

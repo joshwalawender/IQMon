@@ -100,7 +100,11 @@
     {% endif %}
     </td>
 
+    {% if 'perr flag' in image.keys() %}
+    <td style='text-align:right;background-color:#FF5C33;'>
+    {% else %}
     <td style='text-align:right;'>
+    {% endif %}
     {% if 'perr' in image.keys() %}
         {{ "{:.1f}".format(image['perr']) }}
     {% endif %}
@@ -142,13 +146,21 @@
     {% endif %}
     </td>
 
-    <td>
+    {% if 'ellipticity flag' in image.keys() %}
+    <td style='text-align:right;background-color:#FF5C33;'>
+    {% else %}
+    <td style='text-align:right;'>
+    {% endif %}
     {% if 'ellipticity' in image.keys() %}
         {{ "{:.2f}".format(image['ellipticity']) }}
     {% endif %}
     </td>
 
-    <td>
+    {% if 'fwhm flag' in image.keys() %}
+    <td style='text-align:right;background-color:#FF5C33;'>
+    {% else %}
+    <td style='text-align:right;'>
+    {% endif %}
     {% if 'fwhm' in image.keys() %}
         {{ "{:.2f}".format(image['fwhm']) }}
     {% endif %}
@@ -176,6 +188,10 @@
 {% endfor %}
 
 </table>
+
+<center><p>
+total processing time = {{ '{:.1f} min'.format(total_processing_time/60) }}
+</p></center>
 
 </body>
 </html>
