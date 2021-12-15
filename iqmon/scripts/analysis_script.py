@@ -43,6 +43,11 @@ def _parseArguments(in_args):
                         help="Starts queue manager only, no processing",
     )
 
+    # Catch other inputs (for change_directory
+    parser.add_argument('input', type=str,
+                        help="The input.  A directory when using cd, a file when using analyzeone")
+)
+
     args = parser.parse_args(in_args[1:])
     return args
 
@@ -227,87 +232,3 @@ def clear_queue():
 if __name__ == "__main__":
     analyze_one()
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-def main():
-    args = _parseArguments(sys.argv)
-
-    # START HANDLING OF CONFIGURATION FILES ##########
-    pkg = 'iqmon'
-
-    # load the framework config file from the config directory of this package
-    # this part uses the pkg_resources package to find the full path location
-    # of framework.cfg
-    framework_config_file = "configs/framework_analysis.cfg"
-    framework_config_fullpath = pkg_resources.resource_filename(pkg, framework_config_file)
-
-    # load the logger config file from the config directory of this package
-    # this part uses the pkg_resources package to find the full path location
-    # of logger.cfg
-    framework_logcfg_file = 'configs/logger_analysis.cfg'
-    framework_logcfg_fullpath = pkg_resources.resource_filename(pkg, framework_logcfg_file)
-
-    # add PIPELINE specific config files
-    # this part uses the pkg_resource package to find the full path location
-    # of template.cfg or uses the one defines in the command line with the option -c
-    if args.config_file is None:
-        pipeline_config_file = 'configs/pipeline.cfg'
-        pipeline_config_fullpath = pkg_resources.resource_filename(pkg, pipeline_config_file)
-        pipeline_config = ConfigClass(pipeline_config_fullpath, default_section='TEMPLATE')
-    else:
-        pipeline_config = ConfigClass(args.pipeline_config_file, default_section='TEMPLATE')
-
-    # END HANDLING OF CONFIGURATION FILES ##########
-
-    try:
-        framework = Framework(AnalysisPipeline, framework_config_fullpath)
-        logging.config.fileConfig(framework_logcfg_fullpath)
-        framework.config.instrument = pipeline_config
-    except Exception as e:
-        print("Failed to initialize framework, exiting ...", e)
-        traceback.print_exc()
-        sys.exit(1)
-
-    # this part defines a specific logger for the pipeline, so that
-    # we can separate the output of the pipeline
-    # from the output of the framework
-    framework.context.pipeline_logger = getLogger(framework_logcfg_fullpath, name="pipeline")
-    framework.logger = getLogger(framework_logcfg_fullpath, name="DRPF")
-
-    framework.logger.info("Framework initialized")
-
-    # start queue manager only (useful for RPC)
-    if args.queue_manager_only:
-        # The queue manager runs for ever.
-        framework.logger.info("Starting queue manager only, no processing")
-        framework.start_queue_manager()
-
-    # frames processing
-    elif args.frames:
-        for frame in args.frames:
-            # ingesting and triggering the default ingestion event specified in the configuration file
-            framework.ingest_data(None, args.frames, False)
-            # manually triggering an event upon ingestion, if desired.
-            #arguments = Arguments(name=frame)
-            #framework.append_event('template', arguments)
-
-    # ingest an entire directory, trigger "next_file" on each file, optionally continue to monitor if -m is specified
-    elif (len(args.infiles) > 0) or args.dirname is not None:
-        framework.ingest_data(args.dirname, args.infiles, args.monitor)
-
-    framework.start(args.queue_manager_only, args.ingest_data_only, args.wait_for_event, args.continuous)
-
-
-if __name__ == "__main__":
-    main()
