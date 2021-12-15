@@ -26,11 +26,18 @@ scripts = []
 
 entry_points = {
     'console_scripts': [
-#         "analyzeone = vysosdrp.script:analyze_one",
-#         "watchdirectory = vysosdrp.script:watch_directory",
-#         "qlcd = vysosdrp.script:change_directory",
-#         "qlclear = vysosdrp.script:clear_queue",
-#         "listqueue = vysosdrp.script:list_queue",
+        # Ingest Pipeline
+        "iqmon_ingest = iqmon.scripts.ingest_script:watch_directory",
+        "iqmon_ingestone = iqmon.scripts.ingest_script:analyze_one",
+        "iqmon_ingest_cd = iqmon.scripts.ingest_script:change_directory",
+        "iqmon_ingest_clear = iqmon.scripts.ingest_script:clear_queue",
+        "iqmon_ingest_list = iqmon.scripts.ingest_script:list_queue",
+        # Analysis Pipeline
+        "iqmon_analysis = iqmon.scripts.analysis_script:watch_directory",
+        "iqmon_analysisone = iqmon.scripts.analysis_script:analyze_one",
+        "iqmon_analysis_cd = iqmon.scripts.analysis_script:change_directory",
+        "iqmon_analysis_clear = iqmon.scripts.analysis_script:clear_queue",
+        "iqmon_analysis_list = iqmon.scripts.analysis_script:list_queue",
     ]
 }
 
