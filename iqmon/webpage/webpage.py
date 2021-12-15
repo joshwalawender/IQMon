@@ -117,7 +117,7 @@ def static_path(telescope, date, filename):
 @app.route("/")
 def hello():
     log.info(f'Building {__name__} hello')
-    return "Hello World!"
+    return status('V5')
 
 
 ##-------------------------------------------------------------------------
