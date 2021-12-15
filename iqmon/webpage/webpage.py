@@ -102,46 +102,35 @@ def get_twilights(start, end, nsample=256):
     return twilights
 
 
+##-------------------------------------------------------------------------
+## static_path: 
+##-------------------------------------------------------------------------
+@app.route("/static/plots/<string:telescope>/<string:date>/<string:filename>")
+def static_path(telescope, date, filename):
+    log.info(f"Returning static path: /Users/vysosuser/plots/{telescope} {filename}")
+    return flask.send_from_directory(f'/Users/vysosuser/plots/{telescope}/{date}', filename)
+
 
 ##-------------------------------------------------------------------------
 ## status: /
 ##-------------------------------------------------------------------------
 @app.route("/")
-def status():
+def hello():
+    log.info(f'Building {__name__} hello')
+    return "Hello World!"
+
+
+##-------------------------------------------------------------------------
+## status: /status
+##-------------------------------------------------------------------------
+@app.route("/<string:telescope>/")
+def status(telescope):
     log.info(f'Building {__name__} status')
 
-    log.info(f"Querying weather limits")
-    query_result = mongo_query('weather_limits', {})
-    weather_limits = query_result[0]
-    for key in weather_limits:
-        log.info(f"  {key} : {weather_limits[key]}")
-
-    log.info(f"Querying weather database")
-    end = datetime.now() 
-    start = end - timedelta(days=0, minutes=10)
-    query_dict = {'date': {'$gt': start, '$lt': end}}
-    query_result = mongo_query('weather', query_dict)
-    weather = [d for d in query_result]
-    log.info(f"Got {len(weather)} data points")
-    currentweather = weather[-1]
-    currentweather['age'] = (datetime.now() - currentweather['date']).total_seconds()
-    currentweather['temp F'] = currentweather['temp']*1.8 + 32
-
-    log.info(f"Rendering template")
-    return flask.render_template('status.html',
-                                 weather=weather,
-                                 currentweather=currentweather,
-                                 now=datetime.now(),
-                                 utcnow=datetime.utcnow(),
-                                 )
-
-
-##-------------------------------------------------------------------------
-## weather_plot: /weather
-##-------------------------------------------------------------------------
-@app.route("/weather")
-def weather():
-    log.info(f'Building {__name__} weather')
+    cfg_path = Path(__file__).parent.parent / 'configs' / 'pipeline.cfg'
+    log.debug(f'Reading config file {cfg_path}')
+    cfg = configparser.ConfigParser()
+    cfg.read(cfg_path)
 
     log.info(f"Querying weather limits")
     query_result = mongo_query('weather_limits', {})
@@ -149,17 +138,18 @@ def weather():
     for key in weather_limits:
         log.info(f"  {key} : {weather_limits[key]}")
 
-    log.info(f"Querying weather database")
     end = datetime.utcnow()
-    oneday = timedelta(days=1)
     plot_ndays = 2
     start = end - timedelta(days=plot_ndays)
+
+    ##-------------------------------------------------------------------------
+    ## Weather Query
+    log.info(f"Querying weather database")
     query_dict = {'date': {'$gt': start, '$lt': end}}
     query_result = mongo_query('weather', query_dict)
     weather = [d for d in query_result]
     log.info(f"Got {len(weather)} data points")
-
-    log.info(f'Examining current conditions / status')
+    ## Format currentweather
     currentweather = weather[-1]
     currentweather['age'] = (datetime.utcnow() - currentweather['date']).total_seconds()
     currentweather['temp F'] = currentweather['temp']*1.8 + 32
@@ -182,6 +172,67 @@ def weather():
     else:
         currentweather['rain status'] = 'rain'
 
+    ##-------------------------------------------------------------------------
+    ## Telescope Status Query
+    log.info(f"Querying telescope status database")
+    query_dict = {'date': {'$gt': start, '$lt': end}}
+    query_result = mongo_query(f'{telescope}status', query_dict)
+    telstatus = [d for d in query_result]
+    log.info(f"Got {len(telstatus)} data points")
+    dome_string = {0: 'Open', 1: 'Closed', 2: 'Opening', 3: 'Closing', 4: 'Unknown'}
+    dome_color = {0: 'green', 1: 'red', 2: 'orange', 3: 'orange', 4: 'black'}
+    shutter_values = {0: 0, 1: 1, 2: 0, 3: 1, 4: 4}
+    for i,d in enumerate(telstatus):
+        if d['dome_shutterstatus'] == 4 and i > 0:
+            telstatus[i]['dome_numerical_status'] = telstatus[i-1]['dome_numerical_status']
+        else:
+            telstatus[i]['dome_numerical_status'] = shutter_values[d['dome_shutterstatus']]
+    ## Format currentstatus
+    currentstatus = telstatus[-1]
+    currentstatus['age'] = (datetime.utcnow() - currentstatus['date']).total_seconds()
+    if currentstatus['dome_shutterstatus'] == 4:
+        query_dict = {'dome_shutterstatus': {'$ne': 4}}
+        query_result = mongo_query(f'{telescope}status', query_dict,
+                                   sort=[('date', pymongo.DESCENDING)])
+        last_shutter = query_result.next()
+        currentstatus['dome_string'] = dome_string[last_shutter['dome_shutterstatus']]
+        currentstatus['dome_color'] = dome_color[last_shutter['dome_shutterstatus']]
+    else:
+        currentstatus['dome_string'] = dome_string[currentstatus['dome_shutterstatus']]
+        currentstatus['dome_color'] = dome_color[currentstatus['dome_shutterstatus']]
+    if currentstatus['connected'] is True:
+        currentstatus['alt'] = f"{currentstatus['alt']:.1f}"
+        currentstatus['az'] = f"{currentstatus['az']:.1f}"
+        if currentstatus['slewing'] is True:
+            currentstatus['slew status'] = 'slewing'
+        elif currentstatus['tracking'] is True:
+            currentstatus['slew status'] = 'tracking'
+        elif currentstatus['park'] is True:
+            currentstatus['slew status'] = 'parked'
+        else:
+            currentstatus['slew status'] = 'stationary'
+    else:
+        currentstatus['slew status'] = ''
+        currentstatus['alt'] = ''
+        currentstatus['az'] = ''
+        currentstatus['RA'] = ''
+        currentstatus['DEC'] = ''
+
+    ##-------------------------------------------------------------------------
+    ## IQMon Query
+    log.info(f"Querying IQMon results database")
+    query_dict = {'telescope': telescope,
+                  'date': {'$gt': start, '$lt': end}}
+    query_result = mongo_query('iqmon', query_dict)
+    iqmon = [d for d in query_result]
+    log.info(f"Got {len(iqmon)} data points")
+    iqmon_obj_dates = [d['date'] for d in iqmon if d['imtype'] == 'OBJECT']
+    iqmon_obj_alt = [d['alt']/90 for d in iqmon if d['imtype'] == 'OBJECT']
+    iqmon_cal_dates = [d['date'] for d in iqmon if d['imtype'] in ['BIAS', 'DARK']]
+    iqmon_cal_alt = [0.5 for d in iqmon if d['imtype'] in ['BIAS', 'DARK']]
+    iqmon_flat_dates = [d['date'] for d in iqmon if d['imtype'] in ['FLAT', 'TWIFLAT', 'DOMEFLAT']]
+    iqmon_flat_alt = [0.5 for d in iqmon if d['imtype'] in ['FLAT', 'TWIFLAT', 'DOMEFLAT']]
+
     markersize = 2
 
     ##-------------------------------------------------------------------------
@@ -189,41 +240,22 @@ def weather():
     log.info('Build temperature plot')
     date = [w['date'] for w in weather]
     temp = [w['temp']*1.8+32 for w in weather]
-    temperature_plot = figure(width=800, height=100, x_axis_type="datetime",
-                              y_range=(25,95), x_range=(end - oneday, end),
+    temperature_plot = figure(width=900, height=100, x_axis_type="datetime",
+                              y_range=(25,95),
+                              x_range=(end - timedelta(hours=12), end),
                               )
     temperature_plot.circle(date, temp,
                             size=markersize, color="blue", alpha=0.8)
     temperature_plot.yaxis.axis_label = 'Temp (F)'
     temperature_plot.yaxis.formatter = NumeralTickFormatter(format="0,0")
-    temperature_plot.xaxis.formatter = DatetimeTickFormatter(hourmin=['%H:%M'])
-    temperature_plot.xaxis.ticker = DatetimeTicker(desired_num_ticks=24)
-
-    ##-------------------------------------------------------------------------
-    ## Safe Plot
-    log.info('Build safe plot')
-    safe = [w['safe'] for w in weather]
-    safe_plot = figure(width=800, height=70, x_axis_type="datetime",
-                       y_range=(-0.2,1.2), x_range=temperature_plot.x_range,
-                       )
-    width = (max(date)-min(date))/len(date)/2
-    safe_dates = [date for i,date in enumerate(date) if safe[i] == True]
-    unsafe_dates = [date for i,date in enumerate(date) if safe[i] != True]
-    safe_plot.circle(safe_dates, [1]*len(safe_dates),
-                     size=markersize, color="green", alpha=0.8)
-    safe_plot.circle(unsafe_dates, [0]*len(unsafe_dates),
-                     size=markersize, color="red", alpha=0.8)
-    safe_plot.yaxis.axis_label = 'Safe'
-    safe_plot.xaxis.axis_label = 'Time (UT)'
-    safe_plot.yaxis.formatter = NumeralTickFormatter(format="0,0")
-    safe_plot.yaxis.ticker = [0,1]
-    safe_plot.xaxis.visible = False
+    temperature_plot.yaxis.ticker = [30, 50, 70, 90]
+    temperature_plot.xaxis.visible = False
 
     ##-------------------------------------------------------------------------
     ## Cloudiness Plot
     log.info('Build cloudiness plot')
     clouds = [w['clouds'] for w in weather]
-    cloudiness_plot = figure(width=800, height=120, x_axis_type="datetime",
+    cloudiness_plot = figure(width=900, height=100, x_axis_type="datetime",
                              y_range=(-45,5), x_range=temperature_plot.x_range,
                              )
     very_cloudy_x = [date[i] for i,val in enumerate(clouds)\
@@ -255,8 +287,8 @@ def weather():
     ## Wind Plot
     log.info('Build wind plot')
     wind = [w['wind'] for w in weather]
-    wind_plot = figure(width=800, height=120, x_axis_type="datetime",
-                       y_range=(0,80), x_range=temperature_plot.x_range,
+    wind_plot = figure(width=900, height=100, x_axis_type="datetime",
+                       y_range=(0,85), x_range=temperature_plot.x_range,
                        )
     very_windy_x = [date[i] for i,val in enumerate(wind)\
                      if val >= weather_limits['windy']]
@@ -280,6 +312,7 @@ def weather():
                      size=markersize, color="green", alpha=0.8)
     wind_plot.yaxis.axis_label = 'Wind Speed (kph)'
     wind_plot.yaxis.formatter = NumeralTickFormatter(format="0,0")
+    wind_plot.yaxis.ticker = [0, 20, 40, 60, 80]
     wind_plot.xaxis.visible = False
 
 
@@ -287,7 +320,7 @@ def weather():
     ## Rain Plot
     log.info('Build rain plot')
     rain = [w['rain'] for w in weather]
-    rain_plot = figure(width=800, height=90, x_axis_type="datetime",
+    rain_plot = figure(width=900, height=60, x_axis_type="datetime",
                        y_range=(1000,2800), x_range=temperature_plot.x_range,
                        )
     dry_x = [date[i] for i,val in enumerate(rain)\
@@ -313,7 +346,52 @@ def weather():
     rain_plot.yaxis.axis_label = 'Rain'
     rain_plot.yaxis.formatter = NumeralTickFormatter(format="0.0a")
     rain_plot.xaxis.visible = False
-#     rain_plot.yaxis.ticker = SingleIntervalTicker(desired_num_ticks=2)
+
+    ##-------------------------------------------------------------------------
+    ## Safe Plot
+    log.info('Build safe plot')
+    safe = [w['safe'] for w in weather]
+    safe_date = [w['date'] for w in weather]
+    safe_plot = figure(width=900, height=50, x_axis_type="datetime",
+                       y_range=(-0.2,1.2), x_range=temperature_plot.x_range,
+                       )
+    width = (max(date)-min(date))/len(date)/2
+    safe_dates = [date for i,date in enumerate(date) if safe[i] == True]
+    unsafe_dates = [date for i,date in enumerate(date) if safe[i] != True]
+    safe_plot.circle(safe_dates, [1]*len(safe_dates),
+                     size=markersize, color="green", alpha=0.8)
+    safe_plot.circle(unsafe_dates, [0]*len(unsafe_dates),
+                     size=markersize, color="red", alpha=0.8)
+    safe_plot.yaxis.axis_label = 'Safe'
+    safe_plot.xaxis.axis_label = 'Time (UT)'
+    safe_plot.yaxis.formatter = NumeralTickFormatter(format="0,0")
+    safe_plot.yaxis.ticker = [0,1]
+    safe_plot.xaxis.visible = False
+
+    ##-------------------------------------------------------------------------
+    ## Telescope Status Plot
+    log.info('Build Telescope Status plot')
+    dome = [s['dome_numerical_status'] for s in telstatus]
+    dome_date = [s['date'] for s in telstatus]
+    dome_plot = figure(width=900, height=100, x_axis_type="datetime",
+                       y_range=(-0.2,1.2), x_range=temperature_plot.x_range,
+                       )
+    dome_plot.line(dome_date, dome, line_width=2)
+    dome_plot.circle(iqmon_obj_dates, iqmon_obj_alt,
+                     size=markersize, color="blue", alpha=0.8)
+    dome_plot.circle(iqmon_cal_dates, iqmon_cal_alt,
+                     size=markersize, color="black", alpha=0.8)
+    dome_plot.circle(iqmon_flat_dates, iqmon_flat_alt,
+                     size=markersize, color="yellow", alpha=0.8)
+    dome_plot.yaxis.axis_label = f'{cfg["Telescope"].get("name")}'
+    dome_plot.xaxis.axis_label = 'Time (UT)'
+    dome_plot.yaxis.formatter = NumeralTickFormatter(format="0,0")
+    dome_plot.yaxis.ticker = [0,1]
+    dome_plot.xaxis.visible = True
+    dome_plot.xaxis.formatter = DatetimeTickFormatter(hourmin=['%H:%M'])
+    dome_plot.xaxis.ticker = DatetimeTicker(desired_num_ticks=24)
+    dome_plot.xaxis.axis_label = 'UT Time'
+
 
     ##-------------------------------------------------------------------------
     ## Overplot Twilights
@@ -336,33 +414,31 @@ def weather():
                           left=[twilights[j][0]], right=[twilights[j+1][0]],
                           color="blue", alpha=twilights[j+1][2])
 
-
-
+    ##-------------------------------------------------------------------------
+    ## Render
     log.info(f"Rendering template")
-    script, div = components(column(safe_plot,
+    script, div = components(column(temperature_plot,
                                     cloudiness_plot,
-                                    wind_plot,
                                     rain_plot,
-                                    temperature_plot,
+                                    wind_plot,
+                                    safe_plot,
+                                    dome_plot,
                                     ))
     return flask.render_template('status.html',
+                                 telescope=telescope,
                                  weather=weather,
                                  currentweather=currentweather,
                                  now=datetime.now(),
                                  utcnow=datetime.utcnow(),
                                  script=script,
                                  div=div,
+                                 status=status,
+                                 currentstatus=currentstatus,
+                                 date_string=end.strftime('%Y%m%dUT'),
+                                 image=cfg['WebPage'].get('image', ''),
+                                 image_link=cfg['WebPage'].get('image_link', ''),
+                                 image_title=cfg['WebPage'].get('image_title', ''),
                                  )
-
-
-
-##-------------------------------------------------------------------------
-## static_path: 
-##-------------------------------------------------------------------------
-@app.route("/static/plots/<string:telescope>/<string:date>/<string:filename>")
-def static_path(telescope, date, filename):
-    log.info(f"Returning static path: /Users/vysosuser/plots/{telescope} {filename}")
-    return flask.send_from_directory(f'/Users/vysosuser/plots/{telescope}/{date}', filename)
 
 
 ##-------------------------------------------------------------------------
