@@ -237,26 +237,27 @@ def status(telescope):
 
     ##-------------------------------------------------------------------------
     ## Temperature Plot
-    log.info('Build temperature plot')
-    date = [w['date'] for w in weather]
-    temp = [w['temp']*1.8+32 for w in weather]
-    temperature_plot = figure(width=900, height=100, x_axis_type="datetime",
-                              y_range=(25,95),
-                              x_range=(end - timedelta(hours=12), end),
-                              )
-    temperature_plot.circle(date, temp,
-                            size=markersize, color="blue", alpha=0.8)
-    temperature_plot.yaxis.axis_label = 'Temp (F)'
-    temperature_plot.yaxis.formatter = NumeralTickFormatter(format="0,0")
-    temperature_plot.yaxis.ticker = [30, 50, 70, 90]
-    temperature_plot.xaxis.visible = False
+#     log.info('Build temperature plot')
+#     date = [w['date'] for w in weather]
+#     temp = [w['temp']*1.8+32 for w in weather]
+#     temperature_plot = figure(width=900, height=100, x_axis_type="datetime",
+#                               y_range=(25,95),
+#                               x_range=(end - timedelta(hours=12), end),
+#                               )
+#     temperature_plot.circle(date, temp,
+#                             size=markersize, color="blue", alpha=0.8)
+#     temperature_plot.yaxis.axis_label = 'Temp (F)'
+#     temperature_plot.yaxis.formatter = NumeralTickFormatter(format="0,0")
+#     temperature_plot.yaxis.ticker = [30, 50, 70, 90]
+#     temperature_plot.xaxis.visible = False
 
     ##-------------------------------------------------------------------------
     ## Cloudiness Plot
     log.info('Build cloudiness plot')
     clouds = [w['clouds'] for w in weather]
     cloudiness_plot = figure(width=900, height=100, x_axis_type="datetime",
-                             y_range=(-45,5), x_range=temperature_plot.x_range,
+                             y_range=(-45,5),
+                             x_range=(end - timedelta(hours=12), end),
                              )
     very_cloudy_x = [date[i] for i,val in enumerate(clouds)\
                      if val >= weather_limits['cloudy']]
@@ -288,7 +289,7 @@ def status(telescope):
     log.info('Build wind plot')
     wind = [w['wind'] for w in weather]
     wind_plot = figure(width=900, height=100, x_axis_type="datetime",
-                       y_range=(0,85), x_range=temperature_plot.x_range,
+                       y_range=(0,85), x_range=cloudiness_plot.x_range,
                        )
     very_windy_x = [date[i] for i,val in enumerate(wind)\
                      if val >= weather_limits['windy']]
@@ -310,7 +311,7 @@ def status(telescope):
                if val < weather_limits['calm']]
     wind_plot.circle(calm_x, calm_y,
                      size=markersize, color="green", alpha=0.8)
-    wind_plot.yaxis.axis_label = 'Wind Speed (kph)'
+    wind_plot.yaxis.axis_label = 'Wind (kph)'
     wind_plot.yaxis.formatter = NumeralTickFormatter(format="0,0")
     wind_plot.yaxis.ticker = [0, 20, 40, 60, 80]
     wind_plot.xaxis.visible = False
@@ -321,7 +322,7 @@ def status(telescope):
     log.info('Build rain plot')
     rain = [w['rain'] for w in weather]
     rain_plot = figure(width=900, height=60, x_axis_type="datetime",
-                       y_range=(1000,2800), x_range=temperature_plot.x_range,
+                       y_range=(1000,2800), x_range=cloudiness_plot.x_range,
                        )
     dry_x = [date[i] for i,val in enumerate(rain)\
              if val >= weather_limits['dry']]
@@ -353,7 +354,7 @@ def status(telescope):
     safe = [w['safe'] for w in weather]
     safe_date = [w['date'] for w in weather]
     safe_plot = figure(width=900, height=50, x_axis_type="datetime",
-                       y_range=(-0.2,1.2), x_range=temperature_plot.x_range,
+                       y_range=(-0.2,1.2), x_range=cloudiness_plot.x_range,
                        )
     width = (max(date)-min(date))/len(date)/2
     safe_dates = [date for i,date in enumerate(date) if safe[i] == True]
@@ -374,7 +375,7 @@ def status(telescope):
     dome = [s['dome_numerical_status'] for s in telstatus]
     dome_date = [s['date'] for s in telstatus]
     dome_plot = figure(width=900, height=100, x_axis_type="datetime",
-                       y_range=(-0.2,1.2), x_range=temperature_plot.x_range,
+                       y_range=(-0.2,1.2), x_range=cloudiness_plot.x_range,
                        )
     dome_plot.line(dome_date, dome, line_width=2)
     dome_plot.circle(iqmon_obj_dates, iqmon_obj_alt,
@@ -398,9 +399,9 @@ def status(telescope):
     for days in range(1,plot_ndays+1):
         twilights = get_twilights(end-timedelta(days=days), end-timedelta(days=days-1))
         for j in range(len(twilights)-1):
-           temperature_plot.quad(top=[95], bottom=[25],
-                                  left=[twilights[j][0]], right=[twilights[j+1][0]],
-                                  color="blue", alpha=twilights[j+1][2])
+#            temperature_plot.quad(top=[95], bottom=[25],
+#                                   left=[twilights[j][0]], right=[twilights[j+1][0]],
+#                                   color="blue", alpha=twilights[j+1][2])
            cloudiness_plot.quad(top=[5], bottom=[-45],
                                 left=[twilights[j][0]], right=[twilights[j+1][0]],
                                 color="blue", alpha=twilights[j+1][2])
@@ -417,7 +418,7 @@ def status(telescope):
     ##-------------------------------------------------------------------------
     ## Render
     log.info(f"Rendering template")
-    script, div = components(column(temperature_plot,
+    script, div = components(column(#temperature_plot,
                                     cloudiness_plot,
                                     rain_plot,
                                     wind_plot,
