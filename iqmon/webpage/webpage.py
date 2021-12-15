@@ -149,6 +149,7 @@ def status(telescope):
     query_result = mongo_query('weather', query_dict)
     weather = [d for d in query_result]
     log.info(f"Got {len(weather)} data points")
+    date = [w['date'] for w in weather]
     ## Format currentweather
     currentweather = weather[-1]
     currentweather['age'] = (datetime.utcnow() - currentweather['date']).total_seconds()
@@ -238,7 +239,6 @@ def status(telescope):
     ##-------------------------------------------------------------------------
     ## Temperature Plot
 #     log.info('Build temperature plot')
-#     date = [w['date'] for w in weather]
 #     temp = [w['temp']*1.8+32 for w in weather]
 #     temperature_plot = figure(width=900, height=100, x_axis_type="datetime",
 #                               y_range=(25,95),
