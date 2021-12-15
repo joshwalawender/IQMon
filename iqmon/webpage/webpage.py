@@ -25,8 +25,7 @@ app = flask.Flask(__name__)
 ##-------------------------------------------------------------------------
 log = logging.getLogger('FlaskLogger')
 log.setLevel(logging.DEBUG)
-LogFormat = logging.Formatter('%(asctime)s %(levelname)8s: %(message)s',
-                              datefmt='%Y-%m-%d %H:%M:%S')
+LogFormat = logging.Formatter('%(asctime)s %(levelname)8s: %(message)s')
 ## Set up console output
 ## Set up file output
 LogFileName = '/usr/local/var/log/flask.log'
@@ -42,16 +41,12 @@ log.addHandler(LogFileHandler)
 def mongo_query(collection, query_dict,
                 sort=[('date', pymongo.ASCENDING)]):
     cfg_path = Path(__file__).parent.parent / 'configs' / 'pipeline.cfg'
-    log.debug(f'Reading config file {cfg_path}')
     cfg = configparser.ConfigParser()
     cfg.read(cfg_path)
-    log.debug('Connecting to mongo db')
+    log.debug(f'Connecting to mongo db, collection {collection}')
     mongo_host = cfg['mongo'].get('host')
-    log.debug(f"  mongo_host : {mongo_host}")
     mongo_port = cfg['mongo'].getint('port')
-    log.debug(f"  mongo_port : {mongo_port}")
     mongo_db = cfg['mongo'].get('db')
-    log.debug(f"  mongo_db : {mongo_db}")
     mongoclient = pymongo.MongoClient(mongo_host, mongo_port)
     mongo_iqmon = mongoclient[mongo_db][collection]
     query_result = mongo_iqmon.find(query_dict, sort=sort)
@@ -125,18 +120,19 @@ def hello():
 ##-------------------------------------------------------------------------
 @app.route("/<string:telescope>/")
 def status(telescope):
+    log.info(f'')
     log.info(f'Building {__name__} status')
+    tick = datetime.utcnow()
 
     cfg_path = Path(__file__).parent.parent / 'configs' / 'pipeline.cfg'
-    log.debug(f'Reading config file {cfg_path}')
     cfg = configparser.ConfigParser()
     cfg.read(cfg_path)
 
     log.info(f"Querying weather limits")
     query_result = mongo_query('weather_limits', {})
     weather_limits = query_result[0]
-    for key in weather_limits:
-        log.info(f"  {key} : {weather_limits[key]}")
+#     for key in weather_limits:
+#         log.debug(f"  {key} : {weather_limits[key]}")
 
     end = datetime.utcnow()
     plot_ndays = 2
@@ -148,7 +144,7 @@ def status(telescope):
     query_dict = {'date': {'$gt': start, '$lt': end}}
     query_result = mongo_query('weather', query_dict)
     weather = [d for d in query_result]
-    log.info(f"Got {len(weather)} data points")
+    log.info(f"  Got {len(weather)} data points")
     date = [w['date'] for w in weather]
     ## Format currentweather
     currentweather = weather[-1]
@@ -179,7 +175,7 @@ def status(telescope):
     query_dict = {'date': {'$gt': start, '$lt': end}}
     query_result = mongo_query(f'{telescope}status', query_dict)
     telstatus = [d for d in query_result]
-    log.info(f"Got {len(telstatus)} data points")
+    log.info(f"  Got {len(telstatus)} data points")
     dome_string = {0: 'Open', 1: 'Closed', 2: 'Opening', 3: 'Closing', 4: 'Unknown'}
     dome_color = {0: 'green', 1: 'red', 2: 'orange', 3: 'orange', 4: 'black'}
     shutter_values = {0: 0, 1: 1, 2: 0, 3: 1, 4: 4}
@@ -226,7 +222,7 @@ def status(telescope):
                   'date': {'$gt': start, '$lt': end}}
     query_result = mongo_query('iqmon', query_dict)
     iqmon = [d for d in query_result]
-    log.info(f"Got {len(iqmon)} data points")
+    log.info(f"  Got {len(iqmon)} data points")
     iqmon_obj_dates = [d['date'] for d in iqmon if d['imtype'] == 'OBJECT']
     iqmon_obj_alt = [d['alt']/90 for d in iqmon if d['imtype'] == 'OBJECT']
     iqmon_cal_dates = [d['date'] for d in iqmon if d['imtype'] in ['BIAS', 'DARK']]
@@ -417,7 +413,7 @@ def status(telescope):
 
     ##-------------------------------------------------------------------------
     ## Render
-    log.info(f"Rendering template")
+    log.info(f"Rendering bokeh plot")
     script, div = components(column(#temperature_plot,
                                     cloudiness_plot,
                                     rain_plot,
@@ -425,22 +421,26 @@ def status(telescope):
                                     safe_plot,
                                     dome_plot,
                                     ))
-    return flask.render_template('status.html',
-                                 telescope=telescope,
-                                 weather=weather,
-                                 currentweather=currentweather,
-                                 now=datetime.now(),
-                                 utcnow=datetime.utcnow(),
-                                 script=script,
-                                 div=div,
-                                 status=status,
-                                 currentstatus=currentstatus,
-                                 date_string=end.strftime('%Y%m%dUT'),
-                                 image=cfg['WebPage'].get('image', ''),
-                                 image_link=cfg['WebPage'].get('image_link', ''),
-                                 image_title=cfg['WebPage'].get('image_title', ''),
-                                 )
-
+    log.info(f"Rendering flask template")
+    result = flask.render_template('status.html',
+                                   telescope=telescope,
+                                   weather=weather,
+                                   currentweather=currentweather,
+                                   now=datetime.now(),
+                                   utcnow=datetime.utcnow(),
+                                   script=script,
+                                   div=div,
+                                   status=status,
+                                   currentstatus=currentstatus,
+                                   date_string=end.strftime('%Y%m%dUT'),
+                                   image=cfg['WebPage'].get('image', ''),
+                                   image_link=cfg['WebPage'].get('image_link', ''),
+                                   image_title=cfg['WebPage'].get('image_title', ''),
+                                   )
+    tock = datetime.utcnow()
+    duration = (tock-tick).total_seconds()
+    log.info(f'Page built in {duration:.2f} s')
+    return result
 
 ##-------------------------------------------------------------------------
 ## imageList: /<string:telescope>/images/<string:date>
