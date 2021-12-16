@@ -126,6 +126,8 @@ class ReadFITS(BasePrimitive):
                 if val is not None:
                     self.action.args.meta[key] = val
                     self.log.debug(f"  {key} = {self.action.args.meta[key]} ({type(self.action.args.meta[key])})")
+        # Set UT date string
+        self.action.args.meta['UT date string'] = self.action.args.meta.get('date').strftime('%Y%m%dUT')
 
         # Set Image Type
         self.log.info('Determining image type')
