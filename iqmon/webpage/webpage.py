@@ -105,7 +105,7 @@ def get_twilights(start, end, nsample=256):
 ##-------------------------------------------------------------------------
 ## Function: generate_weather_plot
 ##-------------------------------------------------------------------------
-def generate_weather_plot(telescope, date=None, plot_ndays=1):
+def generate_weather_plot(telescope, date=None, plot_ndays=1, span_hours=24):
     log.info(f"Querying weather limits")
     query_result = mongo_query('weather_limits', {})
     weather_limits = query_result[0]
@@ -183,7 +183,7 @@ def generate_weather_plot(telescope, date=None, plot_ndays=1):
     clouds = [w['clouds'] for w in weather]
     cloudiness_plot = figure(width=900, height=100, x_axis_type="datetime",
                              y_range=(-45,5),
-                             x_range=(end - timedelta(hours=12), end),
+                             x_range=(end - timedelta(hours=span_hours), end),
                              )
     very_cloudy_x = [date[i] for i,val in enumerate(clouds)\
                      if val >= weather_limits['cloudy']]
@@ -386,7 +386,7 @@ def status(telescope):
     cfg = configparser.ConfigParser()
     cfg.read(cfg_path)
 
-    script, div, weather, telstatus = generate_weather_plot(telescope, plot_ndays=2)
+    script, div, weather, telstatus = generate_weather_plot(telescope, plot_ndays=2, span_hours=12)
 
     ## Format currentweather
     log.info(f"Querying weather limits")
