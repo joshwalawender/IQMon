@@ -100,9 +100,13 @@ class ReadFITS(BasePrimitive):
         self.action.args.start_time = datetime.now()
 
         # Read FITS file
-        self.log.info(f"  Reading: {self.action.args.fitsfilepath}")
-        self.action.args.ccddata = CCDData.read(self.action.args.fitsfilepath,
-                                                unit="adu")
+        self.log.info(f'Reading: {self.action.args.fitsfilepath}')
+        if self.action.args.fitsfilepath.suffix == '.fz':
+            self.action.args.ccddata = CCDData.read(self.action.args.fitsfilepath,
+                                                    unit="adu", hdu=1)
+        else:
+            self.action.args.ccddata = CCDData.read(self.action.args.fitsfilepath,
+                                                    unit="adu")
         # Read header metadata
         self.log.info('Reading FITS header')
         hdr = self.action.args.ccddata.header
