@@ -2,6 +2,8 @@ from keckdrpframework.core.framework import Framework
 from keckdrpframework.config.framework_config import ConfigClass
 from keckdrpframework.models.arguments import Arguments
 from keckdrpframework.utils.drpf_logger import getLogger
+from keckdrpframework.tools.interface import FrameworkInterface, Arguments, Event, Framework, ConfigClass
+from keckdrpframework.core import queues
 import subprocess
 import time
 import argparse
@@ -9,46 +11,31 @@ import sys
 import traceback
 import pkg_resources
 import logging.config
-
 from pathlib import Path
 from datetime import datetime
 from glob import glob
 
-# the preferred way to import the pipeline is a direct import
-
 from iqmon.pipelines.analyze import AnalysisPipeline
 
 
+##-----------------------------------------------------------------------------
+## Parse Arguments
+##-----------------------------------------------------------------------------
 def _parseArguments(in_args):
-    description = "Analysis pipeline CLI"
-
-    # this is a simple case where we provide a frame and a configuration file
-    parser = argparse.ArgumentParser(prog=f"{in_args[0]}", description=description)
-    parser.add_argument('-c', dest="config_file", type=str, help="Configuration file")
-    parser.add_argument('-frames', nargs='*', type=str, help='input image file (full path, list ok)', default=None)
-
-    # in this case, we are loading an entire directory, and ingesting all the files in that directory
-    parser.add_argument('-infiles', dest="infiles", help="Input files", nargs="*")
-    parser.add_argument('-d', '--directory', dest="dirname", type=str, help="Input directory", nargs='?', default=None)
-    # after ingesting the files, do we want to continue monitoring the directory?
-    parser.add_argument('-m', '--monitor', dest="monitor", action='store_true', default=False)
-
-    # special arguments, ignore
-    parser.add_argument("-i", "--ingest_data_only", dest="ingest_data_only", action="store_true",
-                        help="Ingest data and terminate")
-    parser.add_argument("-w", "--wait_for_event", dest="wait_for_event", action="store_true", help="Wait for events")
-    parser.add_argument("-W", "--continue", dest="continuous", action="store_true",
-                        help="Continue processing, wait for ever")
-    parser.add_argument("-s", "--start_queue_manager_only", dest="queue_manager_only", action="store_true",
-                        help="Starts queue manager only, no processing",
-    )
-
-    # Catch other inputs (for change_directory
-    parser.add_argument('input', type=str,
-                        help="The input.  A directory when using cd, a file when using analyzeone")
-)
-
+    parser = argparse.ArgumentParser(prog=f"{in_args[0]}",
+                      description='')
+    parser.add_argument("-v", "--verbose", dest="verbose",
+           default=False, action="store_true",
+           help="Be verbose.")
+    parser.add_argument('-c', dest="config_file", type=str,
+           help="Configuration file")
+    parser.add_argument("-O", "--overwrite", dest="overwrite",
+           default=False, action="store_true",
+           help="Reprocess files if they already exist in database?  Only works for analyzeone.")
+    parser.add_argument('input', type=str, nargs='?',
+           help="input image file (full path)", default='')
     args = parser.parse_args(in_args[1:])
+
     return args
 
 
@@ -72,6 +59,9 @@ def setup_framework(args, pipeline=AnalysisPipeline):
     else:
         pipeline_config = ConfigClass(args.pipeline_config_file, default_section='DEFAULT')
 
+    if args.overwrite is True:
+        pipeline_config.set('mongo', 'overwrite', value='True')
+
     # END HANDLING OF CONFIGURATION FILES ##########
 
     try:
@@ -93,58 +83,54 @@ def setup_framework(args, pipeline=AnalysisPipeline):
 
 
 ##-----------------------------------------------------------------------------
-## Analyze One File
-##-----------------------------------------------------------------------------
-def analyze_one():
-    args = _parseArguments(sys.argv)
-    p = Path(args.input).expanduser().absolute()
-    if p.exists() is False:
-        print(f'Unable to find file: {p}')
-        return
-    args.name = f"{p}"
-
-    pkg = 'iqmon'
-    framework_config_file = "configs/framework_analysis.cfg"
-    framework_config_fullpath = pkg_resources.resource_filename(pkg, framework_config_file)
-    cfg = ConfigClass(framework_config_fullpath)
-    queue = queues.get_event_queue(cfg.queue_manager_hostname,
-                                   cfg.queue_manager_portnr,
-                                   cfg.queue_manager_auth_code)
-    if queue is None:
-        print("Failed to connect to Queue Manager")
-        return
-
-    if args.overwrite is True:
-        pending = queue.get_pending()
-        event = Event("set_overwrite", args)
-        queue.put(event)
-
-    pending = queue.get_pending()
-    event = Event("next_file", args)
-    queue.put(event)
-
-
-##-----------------------------------------------------------------------------
 ## Watch Directory
 ##-----------------------------------------------------------------------------
 def watch_directory():
     args = _parseArguments(sys.argv)
     framework = setup_framework(args, pipeline=AnalysisPipeline)
 
-    now = datetime.utcnow()
-    data_path = framework.config.instrument.get('FileHandling', 'destination_dir')
-    data_path = data_path.replace('YYYY', f'{now.year:4d}')
-    data_path = data_path.replace('MM', f'{now.month:02d}')
-    data_path = data_path.replace('DD', f'{now.day:02d}')
-    framework.logger.info(f'Setting data path: {data_path}')
-    data_path = Path(data_path).expanduser()
-    if data_path.exists() is False:
-        data_path.mkdir(parents=True, exist_ok=True)
+    if args.input is not '':
+        p = Path(args.input).expanduser()
+        args.input = str(p)
+        if p.exists() is False:
+            framework.context.pipeline_logger.error(f'Could not find: {args.input}')
+        else:
+            base_path = [x for x in p.parents][-3]
+            if p.is_file() is True:
+                framework.context.pipeline_logger.info(f'Found file: {args.input}')
+            elif p.is_dir() is True:
+                framework.context.pipeline_logger.info(f'Found directory: {args.input}')
+    else:
+        path_str = framework.config.instrument.get('FileHandling', 'destination_dir')
+        now = datetime.utcnow()
+        path_str = path_str.replace('YYYY', f'{now.year:4d}')
+        path_str = path_str.replace('MM', f'{now.month:02d}')
+        path_str = path_str.replace('DD', f'{now.day:02d}')
+        p = Path(path_str).expanduser().parent
+        framework.logger.info(f'Setting data path: {p}')
+        if p.exists() is False:
+            p.mkdir(parents=True, exist_ok=True)
+        args.input = str(p)
 
-    framework.logger.info(f'Ingesting files from {data_path}')
-    infiles = data_path.glob(framework.config['DEFAULT']['file_type'])
-    framework.ingest_data(str(data_path), infiles, True)
+    framework.logger.info(f'Ingesting files from {args.input}')
+    infiles = glob(f"{args.input}/{framework.config['DEFAULT']['file_type']}")
+    framework.ingest_data(args.input, infiles, True)
     framework.start(False, False, False, True)
+
+
+##-----------------------------------------------------------------------------
+## Analyze One File
+##-----------------------------------------------------------------------------
+def analyze_one():
+    args = _parseArguments(sys.argv)
+    framework = setup_framework(args, pipeline=AnalysisPipeline)
+    p = Path(args.input).expanduser().absolute()
+    if p.exists() is False:
+        print(f'Unable to find file: {p}')
+        return
+
+    print(f"Triggering ingest of {p}")
+    framework.ingest_data(path=None, files=[str(p)], monitor=False)
 
 
 ##-----------------------------------------------------------------------------
@@ -152,36 +138,18 @@ def watch_directory():
 ##-----------------------------------------------------------------------------
 def change_directory():
     args = _parseArguments(sys.argv)
+    framework = setup_framework(args, pipeline=AnalysisPipeline)
     if args.input is not '':
         newdir = Path(args.input).expanduser().absolute()
     else:
-        now = datetime.utcnow()
-        data_path = framework.config.instrument.get('FileHandling', 'destination_dir')
-        data_path = data_path.replace('YYYY', f'{now.year:4d}')
-        data_path = data_path.replace('MM', f'{now.month:02d}')
-        data_path = data_path.replace('DD', f'{now.day:02d}')
-        newdir = Path(data_path).expanduser()
+        date_string = datetime.utcnow().strftime('%Y%m%dUT')
+        newdir = Path(f'~/V5Data/Images/{date_string}').expanduser()
 
     args.input = str(newdir)
     if newdir.exists() is False:
         newdir.mkdir(parents=True)
 
-    pkg = 'iqmon'
-    framework_config_file = "configs/framework_analysis.cfg"
-    framework_config_fullpath = pkg_resources.resource_filename(pkg, framework_config_file)
-    cfg = ConfigClass(framework_config_fullpath)
-    queue = queues.get_event_queue(cfg.queue_manager_hostname,
-                                   cfg.queue_manager_portnr,
-                                   cfg.queue_manager_auth_code)
-
-    if queue is None:
-        print("Failed to connect to Queue Manager")
-    else:
-        pending = queue.get_pending()
-        event = Event("set_file_type", args)
-        queue.put(event)
-        event = Event("update_directory", args)
-        queue.put(event)
+    framework.ingest_data(path=args.input, files=None, monitor=True)
 
 
 ##-----------------------------------------------------------------------------
@@ -210,10 +178,12 @@ def list_queue():
 ##-----------------------------------------------------------------------------
 def clear_queue():
     args = _parseArguments(sys.argv)
+
     pkg = 'iqmon'
     framework_config_file = "configs/framework_analysis.cfg"
     framework_config_fullpath = pkg_resources.resource_filename(pkg, framework_config_file)
     cfg = ConfigClass(framework_config_fullpath)
+
     drpif = FrameworkInterface(cfg)
     # Print pending Events
     if drpif.is_queue_ok():
@@ -227,7 +197,6 @@ def clear_queue():
         print ("Queue manager stopped")
     else:
         print ("Queue manager already stopped")
-
 
 if __name__ == "__main__":
     analyze_one()
