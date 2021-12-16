@@ -38,7 +38,7 @@ log.addHandler(LogFileHandler)
 ##-------------------------------------------------------------------------
 ## Function: mongo_query
 ##-------------------------------------------------------------------------
-def mongo_query(collection, query_dict,
+def mongo_query(collection, query_dict, distinct=False, count=False,
                 sort=[('date', pymongo.ASCENDING)]):
     cfg_path = Path(__file__).parent.parent / 'configs' / 'pipeline.cfg'
     cfg = configparser.ConfigParser()
@@ -49,7 +49,12 @@ def mongo_query(collection, query_dict,
     mongo_db = cfg['mongo'].get('db')
     mongoclient = pymongo.MongoClient(mongo_host, mongo_port)
     mongo_iqmon = mongoclient[mongo_db][collection]
-    query_result = mongo_iqmon.find(query_dict, sort=sort)
+    if distinct is True:
+        query_result = mongo_iqmon.distinct(query_dict)
+    elif count is True:
+        query_result = mongo_iqmon.find(query_dict).count()
+    else:
+        query_result = mongo_iqmon.find(query_dict, sort=sort)
     mongoclient.close()
     return query_result
 
@@ -98,45 +103,23 @@ def get_twilights(start, end, nsample=256):
 
 
 ##-------------------------------------------------------------------------
-## static_path: 
+## Function: generate_weather_plot
 ##-------------------------------------------------------------------------
-@app.route("/static/plots/<string:telescope>/<string:date>/<string:filename>")
-def static_path(telescope, date, filename):
-    log.info(f"Returning static path: /Users/vysosuser/plots/{telescope} {filename}")
-    return flask.send_from_directory(f'/Users/vysosuser/plots/{telescope}/{date}', filename)
-
-
-##-------------------------------------------------------------------------
-## status: /
-##-------------------------------------------------------------------------
-@app.route("/")
-def hello():
-    log.info(f'Building {__name__} hello')
-    return status('V5')
-
-
-##-------------------------------------------------------------------------
-## status: /status
-##-------------------------------------------------------------------------
-@app.route("/<string:telescope>/")
-def status(telescope):
-    log.info(f'')
-    log.info(f'Building {__name__} status')
-    tick = datetime.utcnow()
+def generate_weather_plot(telescope, date=None, plot_ndays=1):
+    log.info(f"Querying weather limits")
+    query_result = mongo_query('weather_limits', {})
+    weather_limits = query_result[0]
 
     cfg_path = Path(__file__).parent.parent / 'configs' / 'pipeline.cfg'
     cfg = configparser.ConfigParser()
     cfg.read(cfg_path)
 
-    log.info(f"Querying weather limits")
-    query_result = mongo_query('weather_limits', {})
-    weather_limits = query_result[0]
-#     for key in weather_limits:
-#         log.debug(f"  {key} : {weather_limits[key]}")
-
-    end = datetime.utcnow()
-    plot_ndays = 2
-    start = end - timedelta(days=plot_ndays)
+    if date is None:
+        end = datetime.utcnow()
+        start = end - timedelta(days=plot_ndays)
+    else:
+        start = datetime.strptime(date, '%Y%m%dUT')
+        end = start + timedelta(days=plot_ndays)
 
     ##-------------------------------------------------------------------------
     ## Weather Query
@@ -146,28 +129,6 @@ def status(telescope):
     weather = [d for d in query_result]
     log.info(f"  Got {len(weather)} data points")
     date = [w['date'] for w in weather]
-    ## Format currentweather
-    currentweather = weather[-1]
-    currentweather['age'] = (datetime.utcnow() - currentweather['date']).total_seconds()
-    currentweather['temp F'] = currentweather['temp']*1.8 + 32
-    if currentweather['clouds'] > weather_limits['cloudy']:
-        currentweather['cloud status'] = 'very cloudy'
-    elif currentweather['clouds'] > weather_limits['clear']:
-        currentweather['cloud status'] = 'cloudy'
-    else:
-        currentweather['cloud status'] = 'clear'
-    if currentweather['wind'] > weather_limits['windy']:
-        currentweather['wind status'] = 'very windy'
-    elif currentweather['wind'] > weather_limits['calm']:
-        currentweather['wind status'] = 'windy'
-    else:
-        currentweather['wind status'] = 'calm'
-    if currentweather['rain'] > weather_limits['dry']:
-        currentweather['rain status'] = 'dry'
-    elif currentweather['rain'] > weather_limits['wet']:
-        currentweather['rain status'] = 'wet'
-    else:
-        currentweather['rain status'] = 'rain'
 
     ##-------------------------------------------------------------------------
     ## Telescope Status Query
@@ -176,44 +137,12 @@ def status(telescope):
     query_result = mongo_query(f'{telescope}status', query_dict)
     telstatus = [d for d in query_result]
     log.info(f"  Got {len(telstatus)} data points")
-    dome_string = {0: 'Open', 1: 'Closed', 2: 'Opening', 3: 'Closing', 4: 'Unknown'}
-    dome_color = {0: 'green', 1: 'red', 2: 'orange', 3: 'orange', 4: 'black'}
     shutter_values = {0: 0, 1: 1, 2: 0, 3: 1, 4: 4}
     for i,d in enumerate(telstatus):
         if d['dome_shutterstatus'] == 4 and i > 0:
             telstatus[i]['dome_numerical_status'] = telstatus[i-1]['dome_numerical_status']
         else:
             telstatus[i]['dome_numerical_status'] = shutter_values[d['dome_shutterstatus']]
-    ## Format currentstatus
-    currentstatus = telstatus[-1]
-    currentstatus['age'] = (datetime.utcnow() - currentstatus['date']).total_seconds()
-    if currentstatus['dome_shutterstatus'] == 4:
-        query_dict = {'dome_shutterstatus': {'$ne': 4}}
-        query_result = mongo_query(f'{telescope}status', query_dict,
-                                   sort=[('date', pymongo.DESCENDING)])
-        last_shutter = query_result.next()
-        currentstatus['dome_string'] = dome_string[last_shutter['dome_shutterstatus']]
-        currentstatus['dome_color'] = dome_color[last_shutter['dome_shutterstatus']]
-    else:
-        currentstatus['dome_string'] = dome_string[currentstatus['dome_shutterstatus']]
-        currentstatus['dome_color'] = dome_color[currentstatus['dome_shutterstatus']]
-    if currentstatus['connected'] is True:
-        currentstatus['alt'] = f"{currentstatus['alt']:.1f}"
-        currentstatus['az'] = f"{currentstatus['az']:.1f}"
-        if currentstatus['slewing'] is True:
-            currentstatus['slew status'] = 'slewing'
-        elif currentstatus['tracking'] is True:
-            currentstatus['slew status'] = 'tracking'
-        elif currentstatus['park'] is True:
-            currentstatus['slew status'] = 'parked'
-        else:
-            currentstatus['slew status'] = 'stationary'
-    else:
-        currentstatus['slew status'] = ''
-        currentstatus['alt'] = ''
-        currentstatus['az'] = ''
-        currentstatus['RA'] = ''
-        currentstatus['DEC'] = ''
 
     ##-------------------------------------------------------------------------
     ## IQMon Query
@@ -231,6 +160,7 @@ def status(telescope):
     iqmon_flat_alt = [0.5 for d in iqmon if d['imtype'] in ['FLAT', 'TWIFLAT', 'DOMEFLAT']]
 
     markersize = 2
+
 
     ##-------------------------------------------------------------------------
     ## Temperature Plot
@@ -421,6 +351,102 @@ def status(telescope):
                                     safe_plot,
                                     dome_plot,
                                     ))
+
+    return script, div, weather, telstatus
+
+
+##-------------------------------------------------------------------------
+## static_path: 
+##-------------------------------------------------------------------------
+@app.route("/static/plots/<string:telescope>/<string:date>/<string:filename>")
+def static_path(telescope, date, filename):
+    log.info(f"Returning static path: /Users/vysosuser/plots/{telescope} {filename}")
+    return flask.send_from_directory(f'/Users/vysosuser/plots/{telescope}/{date}', filename)
+
+
+##-------------------------------------------------------------------------
+## status: /
+##-------------------------------------------------------------------------
+@app.route("/")
+def hello():
+    log.info(f'Building {__name__} hello')
+    return status('V5')
+
+
+##-------------------------------------------------------------------------
+## status: /status
+##-------------------------------------------------------------------------
+@app.route("/<string:telescope>/")
+def status(telescope):
+    log.info(f'')
+    log.info(f'Building {__name__} status')
+    tick = datetime.utcnow()
+
+    cfg_path = Path(__file__).parent.parent / 'configs' / 'pipeline.cfg'
+    cfg = configparser.ConfigParser()
+    cfg.read(cfg_path)
+
+    script, div, weather, telstatus = generate_weather_plot(telescope, plot_ndays=2)
+
+    ## Format currentweather
+    log.info(f"Querying weather limits")
+    query_result = mongo_query('weather_limits', {})
+    weather_limits = query_result[0]
+    currentweather = weather[-1]
+    currentweather['age'] = (datetime.utcnow() - currentweather['date']).total_seconds()
+    currentweather['temp F'] = currentweather['temp']*1.8 + 32
+    if currentweather['clouds'] > weather_limits['cloudy']:
+        currentweather['cloud status'] = 'very cloudy'
+    elif currentweather['clouds'] > weather_limits['clear']:
+        currentweather['cloud status'] = 'cloudy'
+    else:
+        currentweather['cloud status'] = 'clear'
+    if currentweather['wind'] > weather_limits['windy']:
+        currentweather['wind status'] = 'very windy'
+    elif currentweather['wind'] > weather_limits['calm']:
+        currentweather['wind status'] = 'windy'
+    else:
+        currentweather['wind status'] = 'calm'
+    if currentweather['rain'] > weather_limits['dry']:
+        currentweather['rain status'] = 'dry'
+    elif currentweather['rain'] > weather_limits['wet']:
+        currentweather['rain status'] = 'wet'
+    else:
+        currentweather['rain status'] = 'rain'
+
+    ## Format currentstatus
+    dome_string = {0: 'Open', 1: 'Closed', 2: 'Opening', 3: 'Closing', 4: 'Unknown'}
+    dome_color = {0: 'green', 1: 'red', 2: 'orange', 3: 'orange', 4: 'black'}
+    currentstatus = telstatus[-1]
+    currentstatus['age'] = (datetime.utcnow() - currentstatus['date']).total_seconds()
+    if currentstatus['dome_shutterstatus'] == 4:
+        query_dict = {'dome_shutterstatus': {'$ne': 4}}
+        query_result = mongo_query(f'{telescope}status', query_dict,
+                                   sort=[('date', pymongo.DESCENDING)])
+        last_shutter = query_result.next()
+        currentstatus['dome_string'] = dome_string[last_shutter['dome_shutterstatus']]
+        currentstatus['dome_color'] = dome_color[last_shutter['dome_shutterstatus']]
+    else:
+        currentstatus['dome_string'] = dome_string[currentstatus['dome_shutterstatus']]
+        currentstatus['dome_color'] = dome_color[currentstatus['dome_shutterstatus']]
+    if currentstatus['connected'] is True:
+        currentstatus['alt'] = f"{currentstatus['alt']:.1f}"
+        currentstatus['az'] = f"{currentstatus['az']:.1f}"
+        if currentstatus['slewing'] is True:
+            currentstatus['slew status'] = 'slewing'
+        elif currentstatus['tracking'] is True:
+            currentstatus['slew status'] = 'tracking'
+        elif currentstatus['park'] is True:
+            currentstatus['slew status'] = 'parked'
+        else:
+            currentstatus['slew status'] = 'stationary'
+    else:
+        currentstatus['slew status'] = ''
+        currentstatus['alt'] = ''
+        currentstatus['az'] = ''
+        currentstatus['RA'] = ''
+        currentstatus['DEC'] = ''
+
     log.info(f"Rendering flask template")
     result = flask.render_template('status.html',
                                    telescope=telescope,
@@ -432,7 +458,7 @@ def status(telescope):
                                    div=div,
                                    status=status,
                                    currentstatus=currentstatus,
-                                   date_string=end.strftime('%Y%m%dUT'),
+                                   date_string=datetime.utcnow().strftime('%Y%m%dUT'),
                                    image=cfg['WebPage'].get('image', ''),
                                    image_link=cfg['WebPage'].get('image_link', ''),
                                    image_title=cfg['WebPage'].get('image_title', ''),
@@ -484,6 +510,57 @@ def imageList(telescope, date):
                                  cal_count=cal_count,
                                  object_count=object_count,
                                  total_processing_time=total_processing_time,
+                                 )
+
+
+##-------------------------------------------------------------------------
+## nightList: /<string:telescope>/nights/
+##-------------------------------------------------------------------------
+@app.route("/<string:telescope>/nights/")
+def nightList(telescope):
+    log.info(f'Building {__name__} nightList {telescope}')
+
+    log.info(f"Querying image database")
+    query_dict = 'UT date string'
+    query_result = mongo_query('iqmon', query_dict, distinct=True)
+    night_list = sorted(query_result)
+    log.info(f"  Found {len(night_list)} nights")
+
+    nights = []
+    for datestr in night_list:
+        log.info(f"Querying image database for {datestr}")
+        night_info = {'date': datestr}
+        start = datetime.strptime(datestr, '%Y%m%dUT')
+        end = start + timedelta(days=1)
+        query_dict = {'telescope': telescope,
+                      'date': {'$gt': start, '$lt': end}}
+        query_result = mongo_query('iqmon', query_dict)
+        image_list = [d for d in query_result]
+        night_info['n images'] = len(image_list)
+        nights.append(night_info)
+
+    log.info(f"Rendering template")
+    return flask.render_template('nightList.html',
+                                 telescope=telescope,
+                                 nights=nights,
+                                 )
+
+
+##-------------------------------------------------------------------------
+## nightWeather: /<string:telescope>/nights/<string:date>
+##-------------------------------------------------------------------------
+@app.route("/<string:telescope>/nights/<string:date>")
+def nightWeather(telescope, date):
+    log.info(f'Building {__name__} nightWeather {telescope}')
+
+    script, div, weather, telstatus = generate_weather_plot(telescope, date=date)
+
+    log.info(f"Rendering template")
+    return flask.render_template('nightWeather.html',
+                                 telescope=telescope,
+                                 date=date,
+                                 script=script,
+                                 div=div,
                                  )
 
 

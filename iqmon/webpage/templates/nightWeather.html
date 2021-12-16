@@ -1,0 +1,49 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+
+<html>
+<head>
+    <title>Weather for {{ date }}</title>
+    <meta http-equiv="content-type"
+    content="text/html;">
+
+    <style>
+        p {
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        table
+        {
+            font-family: Arial, Helvetica, sans-serif;
+            border-collapse:collapse;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        table,th,td
+        {
+            font-family: Arial, Helvetica, sans-serif;
+            border:1px solid black;
+            vertical-align: top;
+            text-align: center; 
+            padding-top: 5px;
+            padding-right: 5px;
+            padding-bottom: 5px;
+            padding-left: 5px;
+        }
+    </style>
+
+    <script type="text/javascript" src="http://cdn.pydata.org/bokeh/release/bokeh-1.1.0.min.js"></script>
+    {{ script|safe }}
+
+</head>
+<body>
+<center>
+
+<h1>Weather for {{ date }}</h1>
+
+<!-- ###################################### -->
+<!-- Weather Plot -->
+<!-- ###################################### -->
+{{ div|safe }}
+
+</center>
+</body>
+</html>
