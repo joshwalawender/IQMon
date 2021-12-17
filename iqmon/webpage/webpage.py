@@ -523,7 +523,7 @@ def nightList(telescope):
     log.info(f"Querying image database")
     query_dict = 'UT date string'
     query_result = mongo_query('iqmon', query_dict, distinct=True)
-    night_list = sorted(query_result)
+    night_list = sorted(query_result, reverse=True)
     log.info(f"  Found {len(night_list)} nights")
 
     nights = []
