@@ -1,7 +1,6 @@
 from keckdrpframework.pipelines.base_pipeline import BasePipeline
 from keckdrpframework.models.processing_context import ProcessingContext
 from keckdrpframework.primitives.base_primitive import BasePrimitive
-import numpy as np
 
 # MODIFY THIS IMPORT to reflect the name of the module created in the primitives directory
 from iqmon.primitives.file_handling import (ReadFITS,
@@ -46,7 +45,7 @@ class AnalysisPipeline(BasePipeline):
 #         "associate_calibrators": ("AssociateCalibratorStars", "associating_calibrators", "render_jpeg"),
         "render_jpeg":       ("RenderJPEG", "rendering_jpeg", "record_analysis"),
         "record_analysis":   ("RecordFile", "recording", "release_memory"),
-        "release_memory":    ("ReleaseMemory", "releaseing", None),
+        "release_memory":    ("ReleaseMemory", "releasing memory", None),
     }
 
     def __init__(self, context: ProcessingContext):
@@ -66,16 +65,14 @@ class ReleaseMemory(BasePrimitive):
 
     def _pre_condition(self):
         """Check for conditions necessary to run this process"""
-        checks = []
-        return np.all(checks)
+        return True
 
     def _post_condition(self):
         """
         Check for conditions necessary to verify that the process ran
         correctly.
         """
-        checks = []
-        return np.all(checks)
+        return True
 
     def _perform(self):
         """
@@ -86,10 +83,24 @@ class ReleaseMemory(BasePrimitive):
 
         if hasattr(self.action.args, 'ccddata'):
             del(self.action.args.ccddata)
+        if hasattr(self.action.args, 'source_mask'):
+            del(self.action.args.source_mask)
         if hasattr(self.action.args, 'background'):
             del(self.action.args.background)
         if hasattr(self.action.args, 'objects'):
             del(self.action.args.objects)
+        if hasattr(self.action.args, 'meta'):
+            del(self.action.args.meta)
+        if hasattr(self.action.args, 'header_pointing'):
+            del(self.action.args.header_pointing)
+        if hasattr(self.action.args, 'wcs'):
+            del(self.action.args.wcs)
+        if hasattr(self.action.args, 'wcs_pointing'):
+            del(self.action.args.wcs_pointing)
+        if hasattr(self.action.args, 'calibration_catalog'):
+            del(self.action.args.calibration_catalog)
+        if hasattr(self.action.args, 'associated_calibrators'):
+            del(self.action.args.associated_calibrators)
 
         return self.action.args
 
