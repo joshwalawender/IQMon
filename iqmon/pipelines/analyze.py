@@ -34,7 +34,8 @@ class AnalysisPipeline(BasePipeline):
         "next_file":         ("ReadFITS", "reading_file", "populate_metadata"),
         "populate_metadata": ("PopulateAdditionalMetaData", "populating_metadata", "subtract_bias"),
         "subtract_bias":     ("SubtractBias", "subtracting_bias", "subtract_dark"),
-        "subtract_dark":     ("SubtractDark", "subtracting_dark", "gain_correct"),
+        "subtract_dark":     ("SubtractDark", "subtracting_dark", "stack_cal_frames"),
+        "stack_cal_frames":  ("MakeMasterCalFrame", "making master cal frame", "gain_correct"),
         "gain_correct":      ("GainCorrect", "correcting_gain", "create_deviation"),
         "create_deviation":  ("CreateDeviation", "creating_deviation", "make_source_mask"),
         "make_source_mask":  ("MakeSourceMask", "making_source_mask", "create_background"),
@@ -81,26 +82,26 @@ class ReleaseMemory(BasePrimitive):
         """
         self.log.info(f"Running {self.__class__.__name__} action")
 
-        if hasattr(self.action.args, 'ccddata'):
-            del(self.action.args.ccddata)
-        if hasattr(self.action.args, 'source_mask'):
-            del(self.action.args.source_mask)
-        if hasattr(self.action.args, 'background'):
-            del(self.action.args.background)
-        if hasattr(self.action.args, 'objects'):
-            del(self.action.args.objects)
-        if hasattr(self.action.args, 'meta'):
-            del(self.action.args.meta)
-        if hasattr(self.action.args, 'header_pointing'):
-            del(self.action.args.header_pointing)
-        if hasattr(self.action.args, 'wcs'):
-            del(self.action.args.wcs)
-        if hasattr(self.action.args, 'wcs_pointing'):
-            del(self.action.args.wcs_pointing)
-        if hasattr(self.action.args, 'calibration_catalog'):
-            del(self.action.args.calibration_catalog)
-        if hasattr(self.action.args, 'associated_calibrators'):
-            del(self.action.args.associated_calibrators)
+#         if hasattr(self.action.args, 'ccddata'):
+#             del(self.action.args.ccddata)
+#         if hasattr(self.action.args, 'source_mask'):
+#             del(self.action.args.source_mask)
+#         if hasattr(self.action.args, 'background'):
+#             del(self.action.args.background)
+#         if hasattr(self.action.args, 'objects'):
+#             del(self.action.args.objects)
+#         if hasattr(self.action.args, 'meta'):
+#             del(self.action.args.meta)
+#         if hasattr(self.action.args, 'header_pointing'):
+#             del(self.action.args.header_pointing)
+#         if hasattr(self.action.args, 'wcs'):
+#             del(self.action.args.wcs)
+#         if hasattr(self.action.args, 'wcs_pointing'):
+#             del(self.action.args.wcs_pointing)
+#         if hasattr(self.action.args, 'calibration_catalog'):
+#             del(self.action.args.calibration_catalog)
+#         if hasattr(self.action.args, 'associated_calibrators'):
+#             del(self.action.args.associated_calibrators)
 
-        return self.action.args
+        return None
 

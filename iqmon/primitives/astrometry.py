@@ -36,6 +36,8 @@ class SolveAstrometry(BasePrimitive):
                                 self.action.args.wcs is None),
                   pre_condition(self, 'Image type is OBJECT',
                                 self.action.args.imtype == 'OBJECT'),
+                  pre_condition(self, 'Astrometric solve requested',
+                                self.cfg['Astrometry'].getboolean('do_astrometric_solve', True) is True),
                  ]
         force_solve = self.cfg['Astrometry'].getboolean('force_solve', False)
         return np.all(checks) if force_solve is False else True

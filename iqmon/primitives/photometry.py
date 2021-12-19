@@ -31,7 +31,7 @@ class MakeSourceMask(BasePrimitive):
         checks = [pre_condition(self, 'Skip image is not set',
                                 not self.action.args.skip),
                   pre_condition(self, 'Extraction requested',
-                                self.cfg['Extract'].getboolean('do_extraction', False) is True),
+                                self.cfg['Extract'].getboolean('do_extraction', True) is True),
                   pre_condition(self, 'Image type is OBJECT',
                                 self.action.args.imtype == 'OBJECT'),
                  ]
@@ -79,7 +79,7 @@ class CreateBackground(BasePrimitive):
         checks = [pre_condition(self, 'Skip image is not set',
                                 not self.action.args.skip),
                   pre_condition(self, 'Extraction requested',
-                                self.cfg['Extract'].getboolean('do_extraction', False) is True),
+                                self.cfg['Extract'].getboolean('do_extraction', True) is True),
                   pre_condition(self, 'Image type is OBJECT',
                                 self.action.args.imtype == 'OBJECT'),
                  ]
@@ -131,7 +131,7 @@ class ExtractStars(BasePrimitive):
                   pre_condition(self, 'Background has been generated',
                                 self.action.args.background is not None),
                   pre_condition(self, 'Extraction requested',
-                                self.cfg['Extract'].getboolean('do_extraction', False) is True),
+                                self.cfg['Extract'].getboolean('do_extraction', True) is True),
                   pre_condition(self, 'Image type is OBJECT',
                                 self.action.args.imtype == 'OBJECT'),
                  ]

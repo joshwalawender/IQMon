@@ -33,6 +33,8 @@ class SubtractBias(BasePrimitive):
                                 not self.action.args.skip),
                   pre_condition(self, 'master bias is available',
                                 self.master_bias_file is not None),
+                  pre_condition(self, 'Image type is not BIAS',
+                                self.action.args.imtype != 'BIAS'),
                  ]
         return np.all(checks)
 
@@ -78,6 +80,8 @@ class SubtractDark(BasePrimitive):
                                 not self.action.args.skip),
                   pre_condition(self, 'master dark is available',
                                 self.master_dark_file is not None),
+                  pre_condition(self, 'Image type is not DARK',
+                                self.action.args.imtype != 'DARK'),
                  ]
         return np.all(checks)
 
@@ -194,4 +198,81 @@ class CreateDeviation(BasePrimitive):
                                            readnoise=read_noise*u.electron)
 
         return self.action.args
+
+
+##-----------------------------------------------------------------------------
+## Primitive: MakeMasterCalFrame
+##-----------------------------------------------------------------------------
+class MakeMasterCalFrame(BasePrimitive):
+    """
+    """
+    def __init__(self, action, context):
+        BasePrimitive.__init__(self, action, context)
+        self.log = context.pipeline_logger
+        self.cfg = self.context.config.instrument
+        self.context = context
+        date_string = self.action.args.meta['UT date string']
+        if date_string not in self.context.keys:
+            self.context[date_string] = {}
+        if self.action.args.imtype not in self.context[date_string].keys():
+            self.context[date_string][self.action.args.imtype] = []
+
+    def _pre_condition(self):
+        """Check for conditions necessary to run this process"""
+        imtype = self.action.args.imtype
+        date_string = self.action.args.meta['UT date string']
+        checks = [pre_condition(self, 'Skip image is not set',
+                                not self.action.args.skip),
+                  pre_condition(self, 'Image type is cal',
+                                imtype in ['BIAS', 'DARK']),
+                  pre_condition(self, 'Connected to mongo',
+                                self.mongo_iqmon is not None),
+                  pre_condition(self, f'do_{imtype}_subtraction is True',
+                                self.cfg['Calibrations'].getboolean(f'do_{imtype}_subtraction', True) is True),
+                  ]
+        return np.all(checks)
+
+
+    def _post_condition(self):
+        """
+        Check for conditions necessary to verify that the process ran
+        correctly.
+        """
+        checks = []
+        return np.all(checks)
+
+    def _perform(self):
+        """
+        Returns an Argument() with the parameters that depend on this
+        operation.
+        """
+        self.log.info(f"Running {self.__class__.__name__} action")
+
+        imtype = self.action.args.imtype
+        date_string = self.action.args.meta['UT date string']
+        self.context[date_string][self.action.args.imtype].append(self.action.args.ccddata)
+
+        n_cals = len(self.context[date_string][imtype])
+        self.log.info(f"Found {n_cals} {imtype} files for {date_string}")
+        if n_cals >= self.cfg['Calibrations'].getint(f"min_{imtype}_frames"):
+            self.log.info(f"Stacking {n_cals} {imtype} files")
+            combined = ccdproc.combine(self.context[date_string][imtype],
+                                       method='average',
+                                       sigma_clip=True, sigma_clip_low_thresh=5, sigma_clip_high_thresh=5,
+                                       sigma_clip_func=np.ma.median, sigma_clip_dev_func=stats.mad_std,
+                                      )
+            self.log.info(f"  Combined.")
+            combined_bias.meta['combined'] = True
+            combined_bias.meta['ncomb'] = n_cals
+
+            combined_filename = f'Master{imtype}_{date_string}.fits'
+            combined_filepath = Path(self.cfg['Calibrations'].get('directory_for_masters'))
+            combined_file = combined_filepath.joinpath(combined_filename)
+            if combined_file.exists() is True:
+                self.log.debug(f"  Deleting existing: {combined_file}")
+                combined_file.unlink()
+            self.log.info(f"  Saving: {combined_file}")
+            combined.write(combined_file)
+
+            return self.action.args
 

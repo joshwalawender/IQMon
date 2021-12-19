@@ -308,13 +308,13 @@ def mode(data):
 ## Function: find_master
 ##-----------------------------------------------------------------------------
 def build_master_file_name(meta, master_type, date_string):
-    if master_type.lower() in ['bias', 'zero']:
-        master_file_name = f"MasterBias_{date_string}.fits"
-    elif master_type.lower() in ['dark']:
+    if master_type in ['BIAS']:
+        master_file_name = f"MasterBIAS_{date_string}.fits"
+    elif master_type in ['DARK']:
         exptime = int(meta.get('exptime'))
-        master_file_name = f"MasterDark_{exptime:03d}s_{date_string}.fits"
-    elif master_type.lower() in ['flat']:
-        master_file_name = f"MasterFlat_{meta.get('filter')}_{date_string}.fits"
+        master_file_name = f"MasterDARK_{exptime:03d}s_{date_string}.fits"
+    elif master_type in ['FLAT']:
+        master_file_name = f"MasterFLAT_{meta.get('filter')}_{date_string}.fits"
     else:
         master_file_name = None
     return master_file_name
