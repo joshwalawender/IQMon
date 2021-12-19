@@ -50,13 +50,10 @@
         </td>
         <td>{{ night['n images'] }}</td>
         <td>
-            <a href="{{ night['date'] }}">Weather for {{ night['date'] }}</a>
+            <a href="{{ '/{}/weather/{}'.format(telescope, night['date']) }}">Weather for {{ night['date'] }}</a>
         </td>
         <td>
-            {% if 'night graph' in night.keys() %}
-            <a href="{{ '/static/nights/{}'.format(night['night graph']) }}">
-            {{ night['night graph'] }}</a>
-            {% endif %}
+            <a href="{{ '/{}/report/{}'.format(telescope, night['date']) }}">IQMon Report for {{ night['date'] }}</a>
         </td>
     </tr>
     {% endfor %}

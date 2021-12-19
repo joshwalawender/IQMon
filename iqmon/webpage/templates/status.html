@@ -159,12 +159,16 @@
         </td>
     </tr>
     <tr>
-        <td style="text-align: right;">Night Summary</td>
-        <td style="text-align: left;"></td>
+        <td style="text-align: right;">IQMon Plot</td>
+        <td style="text-align: left;">
+            <a href="{{ '/{}/report/{}'.format(telescope, date_string) }}">{{ date_string }}</a>
+        </td>
     </tr>
     <tr>
         <td style="text-align: right;">List of Nights</td>
-        <td style="text-align: left;"></td>
+        <td style="text-align: left;">
+            <a href="{{ '/{}/nights'.format(telescope) }}">{{ telescope }} Nights</a>
+        </td>
     </tr>
     <tr>
         <td style="text-align: right;">List of Targets</td>
