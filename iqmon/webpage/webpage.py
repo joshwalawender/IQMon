@@ -103,21 +103,17 @@ def status(telescope):
         currentstatus['slew status'] = ''
         currentstatus['alt'] = ''
         currentstatus['az'] = ''
-        currentstatus['RA'] = ''
-        currentstatus['DEC'] = ''
 
     log.info(f"Rendering flask template")
     result = flask.render_template('status.html',
+                                   date_string=datetime.utcnow().strftime('%Y%m%dUT'),
                                    telescope=telescope,
-                                   weather=weather,
                                    currentweather=currentweather,
+                                   currentstatus=currentstatus,
                                    now=datetime.now(),
                                    utcnow=datetime.utcnow(),
                                    script=script,
                                    div=div,
-                                   status=status,
-                                   currentstatus=currentstatus,
-                                   date_string=datetime.utcnow().strftime('%Y%m%dUT'),
                                    image=cfg['WebPage'].get('image', ''),
                                    image_link=cfg['WebPage'].get('image_link', ''),
                                    image_title=cfg['WebPage'].get('image_title', ''),

@@ -233,7 +233,6 @@ def generate_weather_plot(telescope, date=None, plot_ndays=1, span_hours=24):
     dome_plot.xaxis.ticker = DatetimeTicker(desired_num_ticks=24)
     dome_plot.xaxis.axis_label = 'UT Time'
 
-
     ##-------------------------------------------------------------------------
     ## Overplot Twilights
     plot_info = [(cloudiness_plot, 5, -45),

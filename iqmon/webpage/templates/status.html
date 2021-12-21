@@ -93,8 +93,8 @@
 <!-- ###################################### -->
 <table>
     <tr>
-        <th colspan=2 style="width: 150px;">{{ telescope }} Status</td>
-        <th style="width: 500px;">{{ image_title }}</td>
+        <th colspan=2 style="width: 150px;">{{ telescope }} Status</th>
+        <th style="width: 500px;">{{ image_title }}</th>
     </tr>
     <tr>
         <td style="text-align: right;">Dome Status</td>
@@ -102,7 +102,7 @@
         {% if 'dome_string' in currentstatus %}
             <font color="{{ currentstatus['dome_color'] }}">{{ currentstatus['dome_string'] }}</font>
         {% endif %}</td>
-        <td rowspan=15 style="vertical-align: middle;">
+        <td rowspan=13 style="vertical-align: middle;">
         <a href="{{ image_link }}"><img width=450 src="{{ image }}"></a>
         </td>
     </tr>
@@ -116,10 +116,11 @@
     </tr>
     <tr>
         <td style="text-align: right;">ACP Data Age</td>
+        <td style="text-align: left;">
         {% if 'age' in currentstatus %}
             {{ '{:.0f} s'.format(currentstatus['age']) }}
         {% endif %}
-        <td style="text-align: left;"></td>
+        </td>
     </tr>
     <tr>
         <td style="text-align: right;">Telescope Status</td>
@@ -138,19 +139,10 @@
         <td style="text-align: left;">{{ currentstatus['az'] }}</td>
     </tr>
     <tr>
-        <td style="text-align: right;">Target RA (Jnow)</td>
-        <td style="text-align: left;">{{ currentstatus['RA'] }}</td>
-    </tr>
-    <tr>
-        <td style="text-align: right;">Target Dec (Jnow)</td>
-        <td style="text-align: left;">{{ currentstatus['DEC'] }}</td>
-    </tr>
-    <tr>
         <td colspan=2> </td>
     </tr>
     <tr>
-        <th style="width: 150px;"></td>
-        <th style="width: 150px;">{{ telescope }} Files</td>
+        <th colspan=2>{{ telescope }} Files</td>
     </tr>
     <tr>
         <td style="text-align: right;">Analyzed Images List</td>
@@ -175,7 +167,7 @@
         <td style="text-align: left;"></td>
     </tr>
     <tr>
-        <td colspan=2> </td>
+        <td colspan=2></td>
     </tr>
 </table>
 
