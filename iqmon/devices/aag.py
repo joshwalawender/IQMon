@@ -103,7 +103,7 @@ def get_aagsolo_once():
     logging.shutdown()
 
 
-def get_aag():
+def monitor_aag():
     cfg_path = Path(__file__).parent.parent / 'configs' / 'pipeline.cfg'
     cfg = configparser.ConfigParser()
     cfg.read(cfg_path)
@@ -113,4 +113,4 @@ def get_aag():
 
 
 if __name__ == '__main__':
-    get_aag()
+    monitor_aag()

@@ -25,9 +25,9 @@ args = p.parse_args()
 
 
 ##-------------------------------------------------------------------------
-## DavisWeatherLinkLive
+## DavisWeatherLink
 ##-------------------------------------------------------------------------
-class DavisWeatherLinkLive():
+class DavisWeatherLink():
     def __init__(self, IP='192.168.4.76',
                  mongoIP='192.168.4.49', mongoport=32768,
                  dbname='weather', collectionname='DavisWeatherLink'):
@@ -44,7 +44,7 @@ class DavisWeatherLinkLive():
             self.log.addHandler(LogConsoleHandler)
 
         self.IP = IP
-        self.name = 'DavisWeatherLinkLive'
+        self.name = 'DavisWeatherLink'
         self.url = f'http://{self.IP}/v1/current_conditions'
         # Mongo Setup
         self.mongoIP = mongoIP
@@ -69,7 +69,7 @@ class DavisWeatherLinkLive():
         try:
             r = requests.get(self.url)
         except Exception as err:
-            self.log.error(f'Exception getting data from WeatherLinkLive:')
+            self.log.error(f'Exception getting data from WeatherLink:')
             self.log.error(err)
             return {}
 
@@ -80,9 +80,9 @@ class DavisWeatherLinkLive():
         if type(conditions) == list:
             conditions = conditions[0]
         if error is None:
-            self.log.info(f"Got {len(conditions.keys())} data points from Weather Link Live")
+            self.log.info(f"Got {len(conditions.keys())} data points from Weather Link")
         else:
-            self.log.error(f'Got error from WeatherLinkLive at {data["timestamp"]}')
+            self.log.error(f'Got error from WeatherLink at {data["timestamp"]}')
             self.log.error(error)
 
         mongodata = {'DWLL date': datetime.fromtimestamp(data.get('ts'))}
@@ -127,7 +127,7 @@ class DavisWeatherLinkLive():
             try:
                 data = self.get_data()
             except Exception as err:
-                self.log.error(f'Error polling WeatherLinkLive:')
+                self.log.error(f'Error polling WeatherLink:')
                 self.log.error(err)
             if self.collection is not None:
                 try:
@@ -140,7 +140,7 @@ class DavisWeatherLinkLive():
             time.sleep(sleep)
 
 
-def get_davis_weather_link():
+def monitor_davis_weather_link():
 
     # Read Config File
     cfg = configparser.ConfigParser()
@@ -160,13 +160,13 @@ def get_davis_weather_link():
     sleeptime = cfg['DavisWeatherLink'].getfloat('sleep', 60)
     IP = cfg['DavisWeatherLink'].get('address', None)
     if IP is not None:
-        d = DavisWeatherLinkLive(IP=IP,
-                                 mongoIP=cfg['mongo'].get('host'),
-                                 mongoport=cfg['mongo'].getint('port'),
-                                 dbname=cfg['mongo'].get('db'),
-                                 )
+        d = DavisWeatherLink(IP=IP,
+                             mongoIP=cfg['mongo'].get('host'),
+                             mongoport=cfg['mongo'].getint('port'),
+                             dbname=cfg['mongo'].get('db'),
+                             )
         d.poll(sleep=sleeptime)
 
 
 if __name__ == '__main__':
-    get_davis_weather_link()
+    monitor_davis_weather_link()

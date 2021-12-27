@@ -27,17 +27,20 @@ scripts = []
 entry_points = {
     'console_scripts': [
         # Ingest Pipeline
-        "iqmon_ingest = iqmon.scripts.ingest_script:watch_directory",
-        "iqmon_ingestone = iqmon.scripts.ingest_script:analyze_one",
+        "iqmon_ingest_monitor = iqmon.scripts.ingest_script:watch_directory",
+        "iqmon_ingest_one = iqmon.scripts.ingest_script:analyze_one",
         "iqmon_ingest_cd = iqmon.scripts.ingest_script:change_directory",
         "iqmon_ingest_clear = iqmon.scripts.ingest_script:clear_queue",
         "iqmon_ingest_list = iqmon.scripts.ingest_script:list_queue",
         # Analysis Pipeline
-        "iqmon_analyze = iqmon.scripts.analysis_script:watch_directory",
-        "iqmon_analyzeone = iqmon.scripts.analysis_script:analyze_one",
+        "iqmon_analyze_monitor = iqmon.scripts.analysis_script:watch_directory",
+        "iqmon_analyze_one = iqmon.scripts.analysis_script:analyze_one",
         "iqmon_analyze_cd = iqmon.scripts.analysis_script:change_directory",
         "iqmon_analyze_clear = iqmon.scripts.analysis_script:clear_queue",
         "iqmon_analyze_list = iqmon.scripts.analysis_script:list_queue",
+        # Analysis Pipeline
+        "monitor_aag = iqmon.devices.aag:monitor_aag",
+        "monitor_weatherlink = iqmon.devices.weatherlink:monitor_davis_weather_link",
     ]
 }
 
