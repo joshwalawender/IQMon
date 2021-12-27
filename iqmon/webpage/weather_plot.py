@@ -96,7 +96,7 @@ def generate_weather_plot(telescope, date=None, plot_ndays=1, span_hours=24):
     log.info('Build cloudiness plot')
     clouds = [w['clouds'] for w in weather]
     cloudiness_plot = figure(width=900, height=100, x_axis_type="datetime",
-                             y_range=(-45,5),
+                             y_range=(-50,5),
                              x_range=(end - timedelta(hours=span_hours), end),
                              )
     very_cloudy_x = [date[i] for i,val in enumerate(clouds)\
@@ -129,7 +129,7 @@ def generate_weather_plot(telescope, date=None, plot_ndays=1, span_hours=24):
     log.info('Build wind plot')
     wind = [w['wind'] for w in weather]
     wind_plot = figure(width=900, height=100, x_axis_type="datetime",
-                       y_range=(0,85), x_range=cloudiness_plot.x_range,
+                       y_range=(-3,85), x_range=cloudiness_plot.x_range,
                        )
     very_windy_x = [date[i] for i,val in enumerate(wind)\
                      if val >= weather_limits['windy']]
@@ -203,6 +203,8 @@ def generate_weather_plot(telescope, date=None, plot_ndays=1, span_hours=24):
                      size=markersize, color="green", alpha=0.8)
     safe_plot.circle(unsafe_dates, [0]*len(unsafe_dates),
                      size=markersize, color="red", alpha=0.8)
+#     safe_plot.varea(x=safe_dates, y1=[0]*len(safe_dates), y2=[1]*len(safe_dates), color="green")
+#     safe_plot.varea(x=unsafe_dates, y1=[0]*len(unsafe_dates), y2=[1]*len(unsafe_dates), color="red")
     safe_plot.yaxis.axis_label = 'Safe'
     safe_plot.xaxis.axis_label = 'Time (UT)'
     safe_plot.yaxis.formatter = NumeralTickFormatter(format="0,0")
@@ -217,7 +219,12 @@ def generate_weather_plot(telescope, date=None, plot_ndays=1, span_hours=24):
     dome_plot = figure(width=900, height=100, x_axis_type="datetime",
                        y_range=(-0.2,1.2), x_range=cloudiness_plot.x_range,
                        )
-    dome_plot.line(dome_date, dome, line_width=2)
+    open_date = [dome_date[i] for i,d in enumerate(dome) if d < 0.5]
+    open_dome = [d for i,d in enumerate(dome) if d < 0.5]
+    closed_date = [dome_date[i] for i,d in enumerate(dome) if d >= 0.5]
+    closed_dome = [d for i,d in enumerate(dome) if d >= 0.5]
+    dome_plot.line(closed_date, closed_dome, line_width=4, color="black")
+    dome_plot.line(open_date, open_dome, line_width=4, color="green")
     dome_plot.circle(iqmon_obj_dates, iqmon_obj_alt,
                      size=markersize, color="blue", alpha=0.8)
     dome_plot.circle(iqmon_cal_dates, iqmon_cal_alt,
@@ -235,8 +242,8 @@ def generate_weather_plot(telescope, date=None, plot_ndays=1, span_hours=24):
 
     ##-------------------------------------------------------------------------
     ## Overplot Twilights
-    plot_info = [(cloudiness_plot, 5, -45),
-                 (wind_plot, 100, 0),
+    plot_info = [(cloudiness_plot, 5, -50),
+                 (wind_plot, 100, -3),
                  (rain_plot, 2800, 1000),
                  (safe_plot, 1.2, -0.2),
                  ]
