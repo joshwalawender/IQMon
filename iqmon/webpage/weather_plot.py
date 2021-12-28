@@ -3,6 +3,7 @@ import configparser
 import logging
 import pymongo
 from datetime import datetime, timedelta
+import numpy as np
 
 from bokeh.io import curdoc
 from bokeh.plotting import figure
@@ -35,16 +36,186 @@ def generate_weather_plot(telescope, date=None, plot_ndays=1, span_hours=24):
         start = datetime.strptime(date, '%Y%m%dUT')
         end = start + timedelta(days=plot_ndays)
 
-    ##-------------------------------------------------------------------------
-    ## Weather Query
-    log.info(f"Querying weather database")
-    query_dict = {'date': {'$gt': start, '$lt': end}}
-    query_result = mongo_query('weather', query_dict)
-    weather = [d for d in query_result]
-    log.info(f"  Got {len(weather)} data points")
-    date = [w['date'] for w in weather]
+    markersize = 2
+    currentweather = {}
 
     ##-------------------------------------------------------------------------
+    ## Temperature Plot
+    log.info('Build temperature plot')
+    plot_temperature = figure(width=900, height=100, x_axis_type="datetime",
+                              y_range=(25,95),
+                              x_range=(end - timedelta(hours=span_hours), end),
+                              )
+
+    plot_values = cfg['Weather'].get('plot_temperature').split(',')
+    query_dict = {'date': {'$gt': start, '$lt': end}}
+    for plot_value in plot_values:
+        collection, name = plot_value.split(':')
+        log.debug(f'  Querying mongo collection {collection}')
+        query_result = mongo_query(collection, query_dict)
+        plot_vals = np.array([(d['date'], d[name]) for d in query_result])
+        log.debug(f'  Got {len(plot_vals)} entries')
+        if 'temperature' not in currentweather.keys():
+            currentweather['date'] = plot_vals[-1][0]
+            currentweather['temp'] = plot_vals[-1][1]
+        plot_temperature.circle(plot_vals[:,0],
+                               plot_vals[:,1]*1.8+32,
+                               size=markersize, color="blue", alpha=0.8)
+    plot_temperature.yaxis.axis_label = 'Temp (F)'
+    plot_temperature.yaxis.formatter = NumeralTickFormatter(format="0,0")
+    plot_temperature.yaxis.ticker = [30, 50, 70, 90]
+    plot_temperature.xaxis.visible = False
+
+    ##-------------------------------------------------------------------------
+    ## Cloudiness Plot
+    log.info('Build cloudiness plot')
+    plot_cloudiness = figure(width=900, height=100, x_axis_type="datetime",
+                             y_range=(-50,5),
+                             x_range=(end - timedelta(hours=span_hours), end),
+                             )
+    plot_values = cfg['Weather'].get('plot_cloudiness').split(',')
+    query_dict = {'date': {'$gt': start, '$lt': end}}
+    for plot_value in plot_values:
+        collection, name = plot_value.split(':')
+        log.debug(f'  Querying mongo collection {collection}')
+        query_result = mongo_query(collection, query_dict)
+        plot_vals = np.array([(d['date'], d[name]) for d in query_result])
+        log.debug(f'  Got {len(plot_vals)} entries')
+        if 'clouds' not in currentweather.keys():
+            currentweather['clouds'] = plot_vals[-1][1]
+        where_vcloudy = np.where(plot_vals[:,1] >= weather_limits['cloudy'])
+        plot_cloudiness.circle(plot_vals[where_vcloudy][:,0],
+                               plot_vals[where_vcloudy][:,1],
+                               size=markersize, color="red", alpha=0.8)
+
+        where_cloudy = np.where((plot_vals[:,1] < weather_limits['cloudy'])\
+                                & (plot_vals[:,1] <= weather_limits['clear']))
+        plot_cloudiness.circle(plot_vals[where_cloudy][:,0],
+                               plot_vals[where_cloudy][:,1],
+                               size=markersize, color="orange", alpha=0.8)
+
+        where_clear = np.where(plot_vals[:,1] < weather_limits['clear'])
+        plot_cloudiness.circle(plot_vals[where_clear][:,0],
+                               plot_vals[where_clear][:,1],
+                               size=markersize, color="green", alpha=0.8)
+
+    plot_cloudiness.yaxis.axis_label = 'Cloudiness (C)'
+    plot_cloudiness.yaxis.formatter = NumeralTickFormatter(format="0,0")
+    plot_cloudiness.xaxis.visible = False
+
+    ##-------------------------------------------------------------------------
+    ## Wind Plot
+    log.info('Build wind plot')
+    plot_wind_speed = figure(width=900, height=100, x_axis_type="datetime",
+                             y_range=(-3,85),
+                             x_range=(end - timedelta(hours=span_hours), end),
+                             )
+    plot_values = cfg['Weather'].get('plot_wind_speed').split(',')
+    query_dict = {'date': {'$gt': start, '$lt': end}}
+    for plot_value in plot_values:
+        collection, name = plot_value.split(':')
+        log.debug(f'  Querying mongo collection {collection}')
+        query_result = mongo_query(collection, query_dict)
+        plot_vals = np.array([(d['date'], d[name]) for d in query_result])
+        log.debug(f'  Got {len(plot_vals)} entries')
+        if 'wind' not in currentweather.keys():
+            currentweather['wind'] = plot_vals[-1][1]
+
+        where_vwindy = np.where(plot_vals[:,1] >= weather_limits['windy'])
+        plot_wind_speed.circle(plot_vals[where_vwindy][:,0],
+                               plot_vals[where_vwindy][:,1],
+                               size=markersize, color="red", alpha=0.8)
+
+        where_windy = np.where((plot_vals[:,1] < weather_limits['windy'])\
+                                & (plot_vals[:,1] <= weather_limits['calm']))
+        plot_wind_speed.circle(plot_vals[where_windy][:,0],
+                               plot_vals[where_windy][:,1],
+                               size=markersize, color="orange", alpha=0.8)
+
+        where_calm = np.where(plot_vals[:,1] < weather_limits['calm'])
+        plot_wind_speed.circle(plot_vals[where_calm][:,0],
+                               plot_vals[where_calm][:,1],
+                               size=markersize, color="green", alpha=0.8)
+
+    plot_wind_speed.yaxis.axis_label = 'Wind (kph)'
+    plot_wind_speed.yaxis.formatter = NumeralTickFormatter(format="0,0")
+    plot_wind_speed.yaxis.ticker = [0, 20, 40, 60, 80]
+    plot_wind_speed.xaxis.visible = False
+
+    ##-------------------------------------------------------------------------
+    ## Rain Plot
+    log.info('Build rain plot')
+    plot_rain = figure(width=900, height=60, x_axis_type="datetime",
+                       y_range=(1000,2800),
+                       x_range=(end - timedelta(hours=span_hours), end),
+                       )
+    plot_values = cfg['Weather'].get('plot_rain').split(',')
+    query_dict = {'date': {'$gt': start, '$lt': end}}
+    for plot_value in plot_values:
+        collection, name = plot_value.split(':')
+        log.debug(f'  Querying mongo collection {collection}')
+        query_result = mongo_query(collection, query_dict)
+        plot_vals = np.array([(d['date'], d[name]) for d in query_result])
+        log.debug(f'  Got {len(plot_vals)} entries')
+        if 'rain' not in currentweather.keys():
+            currentweather['rain'] = plot_vals[-1][1]
+
+        where_dry = np.where(plot_vals[:,1] >= weather_limits['dry'])
+        plot_rain.circle(plot_vals[where_dry][:,0],
+                         plot_vals[where_dry][:,1],
+                         size=markersize, color="green", alpha=0.8)
+
+        where_wet = np.where((plot_vals[:,1] < weather_limits['dry'])\
+                             & (plot_vals[:,1] <= weather_limits['wet']))
+        plot_rain.circle(plot_vals[where_wet][:,0],
+                         plot_vals[where_wet][:,1],
+                         size=markersize, color="orange", alpha=0.8)
+
+        where_rain = np.where(plot_vals[:,1] < weather_limits['wet'])
+        plot_rain.circle(plot_vals[where_rain][:,0],
+                         plot_vals[where_rain][:,1],
+                         size=markersize, color="red", alpha=0.8)
+
+    plot_rain.yaxis.axis_label = 'Rain'
+    plot_rain.yaxis.formatter = NumeralTickFormatter(format="0.0a")
+    plot_rain.xaxis.visible = False
+
+    ##-------------------------------------------------------------------------
+    ## Safe Plot
+    log.info('Build safe plot')
+    plot_safe = figure(width=900, height=50, x_axis_type="datetime",
+                       y_range=(-0.2,1.2),
+                       x_range=(end - timedelta(hours=span_hours), end),
+                       )
+    plot_values = cfg['Weather'].get('plot_safe').split(',')
+    query_dict = {'date': {'$gt': start, '$lt': end}}
+
+    for plot_value in plot_values:
+        collection, name = plot_value.split(':')
+        log.debug(f'  Querying mongo collection {collection}')
+        query_result = mongo_query(collection, query_dict)
+        plot_vals = np.array([(d['date'], d[name]) for d in query_result])
+        log.debug(f'  Got {len(plot_vals)} entries')
+        if 'safe' not in currentweather.keys():
+            currentweather['safe'] = plot_vals[-1][1]
+        where_safe = np.where(plot_vals[:,1] == True)
+        plot_safe.circle(plot_vals[where_safe][:,0],
+                         plot_vals[where_safe][:,1],
+                         size=markersize, color="green", alpha=0.8)
+        where_unsafe = np.where(plot_vals[:,1] != True)
+        plot_safe.circle(plot_vals[where_unsafe][:,0],
+                         plot_vals[where_unsafe][:,1],
+                         size=markersize, color="red", alpha=0.8)
+    plot_safe.yaxis.axis_label = 'Safe'
+    plot_safe.xaxis.axis_label = 'Time (UT)'
+    plot_safe.yaxis.formatter = NumeralTickFormatter(format="0,0")
+    plot_safe.yaxis.ticker = [0,1]
+    plot_safe.xaxis.visible = False
+
+    ##-------------------------------------------------------------------------
+    ## Telescope Status Plot
+    ##-------------------------------------------------------------------------
+
     ## Telescope Status Query
     log.info(f"Querying telescope status database")
     query_dict = {'date': {'$gt': start, '$lt': end}}
@@ -58,7 +229,6 @@ def generate_weather_plot(telescope, date=None, plot_ndays=1, span_hours=24):
         else:
             telstatus[i]['dome_numerical_status'] = shutter_values[d['dome_shutterstatus']]
 
-    ##-------------------------------------------------------------------------
     ## IQMon Query
     log.info(f"Querying IQMon results database")
     query_dict = {'telescope': telescope,
@@ -73,151 +243,13 @@ def generate_weather_plot(telescope, date=None, plot_ndays=1, span_hours=24):
     iqmon_flat_dates = [d['date'] for d in iqmon if d['imtype'] in ['FLAT', 'TWIFLAT', 'DOMEFLAT']]
     iqmon_flat_alt = [0.5 for d in iqmon if d['imtype'] in ['FLAT', 'TWIFLAT', 'DOMEFLAT']]
 
-    markersize = 2
-
-
-    ##-------------------------------------------------------------------------
-    ## Temperature Plot
-#     log.info('Build temperature plot')
-#     temp = [w['temp']*1.8+32 for w in weather]
-#     temperature_plot = figure(width=900, height=100, x_axis_type="datetime",
-#                               y_range=(25,95),
-#                               x_range=(end - timedelta(hours=12), end),
-#                               )
-#     temperature_plot.circle(date, temp,
-#                             size=markersize, color="blue", alpha=0.8)
-#     temperature_plot.yaxis.axis_label = 'Temp (F)'
-#     temperature_plot.yaxis.formatter = NumeralTickFormatter(format="0,0")
-#     temperature_plot.yaxis.ticker = [30, 50, 70, 90]
-#     temperature_plot.xaxis.visible = False
-
-    ##-------------------------------------------------------------------------
-    ## Cloudiness Plot
-    log.info('Build cloudiness plot')
-    clouds = [w['clouds'] for w in weather]
-    cloudiness_plot = figure(width=900, height=100, x_axis_type="datetime",
-                             y_range=(-50,5),
-                             x_range=(end - timedelta(hours=span_hours), end),
-                             )
-    very_cloudy_x = [date[i] for i,val in enumerate(clouds)\
-                     if val >= weather_limits['cloudy']]
-    very_cloudy_y = [val for i,val in enumerate(clouds)\
-                     if val >= weather_limits['cloudy']]
-    cloudiness_plot.circle(very_cloudy_x, very_cloudy_y,
-                           size=markersize, color="red", alpha=0.8)
-    cloudy_x = [date[i] for i,val in enumerate(clouds)\
-                if val < weather_limits['cloudy']\
-                and val >= weather_limits['clear']]
-    cloudy_y = [val for i,val in enumerate(clouds)\
-                if val < weather_limits['cloudy']\
-                and val >= weather_limits['clear']]
-    cloudiness_plot.circle(cloudy_x, cloudy_y,
-                           size=markersize, color="orange", alpha=0.8)
-    clear_x = [date[i] for i,val in enumerate(clouds)\
-               if val < weather_limits['clear']]
-    clear_y = [val for i,val in enumerate(clouds)\
-               if val < weather_limits['clear']]
-    cloudiness_plot.circle(clear_x, clear_y,
-                           size=markersize, color="green", alpha=0.8)
-    cloudiness_plot.yaxis.axis_label = 'Cloudiness (C)'
-    cloudiness_plot.yaxis.formatter = NumeralTickFormatter(format="0,0")
-    cloudiness_plot.xaxis.visible = False
-
-
-    ##-------------------------------------------------------------------------
-    ## Wind Plot
-    log.info('Build wind plot')
-    wind = [w['wind'] for w in weather]
-    wind_plot = figure(width=900, height=100, x_axis_type="datetime",
-                       y_range=(-3,85), x_range=cloudiness_plot.x_range,
-                       )
-    very_windy_x = [date[i] for i,val in enumerate(wind)\
-                     if val >= weather_limits['windy']]
-    very_windy_y = [val for i,val in enumerate(wind)\
-                     if val >= weather_limits['windy']]
-    wind_plot.circle(very_windy_x, very_windy_y,
-                     size=markersize, color="red", alpha=0.8)
-    windy_x = [date[i] for i,val in enumerate(wind)\
-                if val < weather_limits['windy']\
-                and val >= weather_limits['calm']]
-    windy_y = [val for i,val in enumerate(wind)\
-                if val < weather_limits['windy']\
-                and val >= weather_limits['calm']]
-    wind_plot.circle(windy_x, windy_y,
-                     size=markersize, color="orange", alpha=0.8)
-    calm_x = [date[i] for i,val in enumerate(wind)\
-               if val < weather_limits['calm']]
-    calm_y = [val for i,val in enumerate(wind)\
-               if val < weather_limits['calm']]
-    wind_plot.circle(calm_x, calm_y,
-                     size=markersize, color="green", alpha=0.8)
-    wind_plot.yaxis.axis_label = 'Wind (kph)'
-    wind_plot.yaxis.formatter = NumeralTickFormatter(format="0,0")
-    wind_plot.yaxis.ticker = [0, 20, 40, 60, 80]
-    wind_plot.xaxis.visible = False
-
-
-    ##-------------------------------------------------------------------------
-    ## Rain Plot
-    log.info('Build rain plot')
-    rain = [w['rain'] for w in weather]
-    rain_plot = figure(width=900, height=60, x_axis_type="datetime",
-                       y_range=(1000,2800), x_range=cloudiness_plot.x_range,
-                       )
-    dry_x = [date[i] for i,val in enumerate(rain)\
-             if val >= weather_limits['dry']]
-    dry_y = [val for i,val in enumerate(rain)\
-             if val >= weather_limits['dry']]
-    rain_plot.circle(dry_x, dry_y,
-                     size=markersize, color="green", alpha=0.8)
-    wet_x = [date[i] for i,val in enumerate(rain)\
-                if val < weather_limits['dry']\
-                and val >= weather_limits['wet']]
-    wet_y = [val for i,val in enumerate(rain)\
-                if val < weather_limits['dry']\
-                and val >= weather_limits['wet']]
-    rain_plot.circle(wet_x, wet_y,
-                     size=markersize, color="orange", alpha=0.8)
-    rain_x = [date[i] for i,val in enumerate(rain)\
-               if val < weather_limits['wet']]
-    rain_y = [val for i,val in enumerate(rain)\
-               if val < weather_limits['wet']]
-    rain_plot.circle(rain_x, rain_y,
-                     size=markersize, color="red", alpha=0.8)
-    rain_plot.yaxis.axis_label = 'Rain'
-    rain_plot.yaxis.formatter = NumeralTickFormatter(format="0.0a")
-    rain_plot.xaxis.visible = False
-
-    ##-------------------------------------------------------------------------
-    ## Safe Plot
-    log.info('Build safe plot')
-    safe = [w['safe'] for w in weather]
-    safe_date = [w['date'] for w in weather]
-    safe_plot = figure(width=900, height=50, x_axis_type="datetime",
-                       y_range=(-0.2,1.2), x_range=cloudiness_plot.x_range,
-                       )
-    width = (max(date)-min(date))/len(date)/2
-    safe_dates = [date for i,date in enumerate(date) if safe[i] == True]
-    unsafe_dates = [date for i,date in enumerate(date) if safe[i] != True]
-    safe_plot.circle(safe_dates, [1]*len(safe_dates),
-                     size=markersize, color="green", alpha=0.8)
-    safe_plot.circle(unsafe_dates, [0]*len(unsafe_dates),
-                     size=markersize, color="red", alpha=0.8)
-#     safe_plot.varea(x=safe_dates, y1=[0]*len(safe_dates), y2=[1]*len(safe_dates), color="green")
-#     safe_plot.varea(x=unsafe_dates, y1=[0]*len(unsafe_dates), y2=[1]*len(unsafe_dates), color="red")
-    safe_plot.yaxis.axis_label = 'Safe'
-    safe_plot.xaxis.axis_label = 'Time (UT)'
-    safe_plot.yaxis.formatter = NumeralTickFormatter(format="0,0")
-    safe_plot.yaxis.ticker = [0,1]
-    safe_plot.xaxis.visible = False
-
-    ##-------------------------------------------------------------------------
-    ## Telescope Status Plot
+    ## Build Telescope Status plot
     log.info('Build Telescope Status plot')
     dome = [s['dome_numerical_status'] for s in telstatus]
     dome_date = [s['date'] for s in telstatus]
     dome_plot = figure(width=900, height=100, x_axis_type="datetime",
-                       y_range=(-0.2,1.2), x_range=cloudiness_plot.x_range,
+                       y_range=(-0.2,1.2),
+                       x_range=(end - timedelta(hours=span_hours), end),
                        )
     open_date = [dome_date[i] for i,d in enumerate(dome) if d < 0.5]
     open_dome = [d for i,d in enumerate(dome) if d < 0.5]
@@ -241,23 +273,23 @@ def generate_weather_plot(telescope, date=None, plot_ndays=1, span_hours=24):
     dome_plot.xaxis.axis_label = 'UT Time'
 
     ##-------------------------------------------------------------------------
-    ## Overplot Twilights
-    plot_info = [(cloudiness_plot, 5, -50),
-                 (wind_plot, 100, -3),
-                 (rain_plot, 2800, 1000),
-                 (safe_plot, 1.2, -0.2),
-                 ]
-    overplot_twilights(plot_info, end, plot_ndays=plot_ndays)
-
-    ##-------------------------------------------------------------------------
     ## Render
-    log.info(f"Rendering bokeh plot")
-    script, div = components(column(#temperature_plot,
-                                    cloudiness_plot,
-                                    rain_plot,
-                                    wind_plot,
-                                    safe_plot,
-                                    dome_plot,
-                                    ))
+    log.info(f"Overplotting twilights")
+    plot_info_list = [('plot_temperature', plot_temperature, 25, 95),
+                      ('plot_cloudiness', plot_cloudiness, 5, -50),
+                      ('plot_wind_speed', plot_wind_speed, 100, -3),
+                      ('plot_rain', plot_rain, 2800, 1000),
+                      ('plot_safe', plot_safe, 1.2, -0.2),
+                      ]
+    plotlist = []
+    for i,plot_info in enumerate(plot_info_list):
+        if cfg['Weather'].get(plot_info[0], None) is not None:
+            overplot_twilights(plot_info, end, plot_ndays=plot_ndays)#, log=log)
+            if i != 0:
+                plot_info[1].x_range = plot_info_list[0][1].x_range
+            plotlist.append(plot_info[1])
 
-    return script, div, weather, telstatus
+    log.info(f"Rendering bokeh plot")
+    script, div = components(column(plotlist))
+
+    return script, div, currentweather

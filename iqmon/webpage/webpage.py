@@ -45,13 +45,12 @@ def status(telescope):
     cfg = configparser.ConfigParser()
     cfg.read(cfg_path)
 
-    script, div, weather, telstatus = generate_weather_plot(telescope, plot_ndays=2, span_hours=12)
+    script, div, currentweather = generate_weather_plot(telescope, plot_ndays=2, span_hours=12)
 
     ## Format currentweather
     log.info(f"Querying weather limits")
     query_result = mongo_query('weather_limits', {})
     weather_limits = query_result[0]
-    currentweather = weather[-1]
     currentweather['age'] = (datetime.utcnow() - currentweather['date']).total_seconds()
     currentweather['temp F'] = currentweather['temp']*1.8 + 32
     if currentweather['clouds'] > weather_limits['cloudy']:
@@ -73,36 +72,53 @@ def status(telescope):
     else:
         currentweather['rain status'] = 'rain'
 
+
+    ## Telescope Status Query
+    log.info(f"Querying telescope status database")
+    query_dict = {'date': {'$gt': tick-timedelta(minutes=5), '$lt': tick}}
+    query_result = mongo_query(f'{telescope}status', query_dict)
+    telstatus = [d for d in query_result]
+    log.info(f"  Got {len(telstatus)} data points")
+    shutter_values = {0: 0, 1: 1, 2: 0, 3: 1, 4: 4}
+    for i,d in enumerate(telstatus):
+        if d['dome_shutterstatus'] == 4 and i > 0:
+            telstatus[i]['dome_numerical_status'] = telstatus[i-1]['dome_numerical_status']
+        else:
+            telstatus[i]['dome_numerical_status'] = shutter_values[d['dome_shutterstatus']]
     ## Format currentstatus
     dome_string = {0: 'Open', 1: 'Closed', 2: 'Opening', 3: 'Closing', 4: 'Unknown'}
     dome_color = {0: 'green', 1: 'red', 2: 'orange', 3: 'orange', 4: 'black'}
-    currentstatus = telstatus[-1]
-    currentstatus['age'] = (datetime.utcnow() - currentstatus['date']).total_seconds()
-    if currentstatus['dome_shutterstatus'] == 4:
-        query_dict = {'dome_shutterstatus': {'$ne': 4}}
-        query_result = mongo_query(f'{telescope}status', query_dict,
-                                   sort=[('date', pymongo.DESCENDING)])
-        last_shutter = query_result.next()
-        currentstatus['dome_string'] = dome_string[last_shutter['dome_shutterstatus']]
-        currentstatus['dome_color'] = dome_color[last_shutter['dome_shutterstatus']]
+    try:
+        currentstatus = telstatus[-1]
+    except:
+        currentstatus = {}
     else:
-        currentstatus['dome_string'] = dome_string[currentstatus['dome_shutterstatus']]
-        currentstatus['dome_color'] = dome_color[currentstatus['dome_shutterstatus']]
-    if currentstatus['connected'] is True:
-        currentstatus['alt'] = f"{currentstatus['alt']:.1f}"
-        currentstatus['az'] = f"{currentstatus['az']:.1f}"
-        if currentstatus['slewing'] is True:
-            currentstatus['slew status'] = 'slewing'
-        elif currentstatus['tracking'] is True:
-            currentstatus['slew status'] = 'tracking'
-        elif currentstatus['park'] is True:
-            currentstatus['slew status'] = 'parked'
+        currentstatus['age'] = (datetime.utcnow() - currentstatus['date']).total_seconds()
+        if currentstatus['dome_shutterstatus'] == 4:
+            query_dict = {'dome_shutterstatus': {'$ne': 4}}
+            query_result = mongo_query(f'{telescope}status', query_dict,
+                                       sort=[('date', pymongo.DESCENDING)])
+            last_shutter = query_result.next()
+            currentstatus['dome_string'] = dome_string[last_shutter['dome_shutterstatus']]
+            currentstatus['dome_color'] = dome_color[last_shutter['dome_shutterstatus']]
         else:
-            currentstatus['slew status'] = 'stationary'
-    else:
-        currentstatus['slew status'] = ''
-        currentstatus['alt'] = ''
-        currentstatus['az'] = ''
+            currentstatus['dome_string'] = dome_string[currentstatus['dome_shutterstatus']]
+            currentstatus['dome_color'] = dome_color[currentstatus['dome_shutterstatus']]
+        if currentstatus['connected'] is True:
+            currentstatus['alt'] = f"{currentstatus['alt']:.1f}"
+            currentstatus['az'] = f"{currentstatus['az']:.1f}"
+            if currentstatus['slewing'] is True:
+                currentstatus['slew status'] = 'slewing'
+            elif currentstatus['tracking'] is True:
+                currentstatus['slew status'] = 'tracking'
+            elif currentstatus['park'] is True:
+                currentstatus['slew status'] = 'parked'
+            else:
+                currentstatus['slew status'] = 'stationary'
+        else:
+            currentstatus['slew status'] = ''
+            currentstatus['alt'] = ''
+            currentstatus['az'] = ''
 
     log.info(f"Rendering flask template")
     result = flask.render_template('status.html',
@@ -131,7 +147,7 @@ def status(telescope):
 def nightWeather(telescope, date):
     log.info(f'Building {__name__} nightWeather {telescope}')
 
-    script, div, weather, telstatus = generate_weather_plot(telescope, date=date)
+    script, div, currentweather = generate_weather_plot(telescope, date=date)
 
     log.info(f"Rendering template")
     return flask.render_template('nightPlot.html',
