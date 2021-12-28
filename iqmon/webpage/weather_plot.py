@@ -55,12 +55,13 @@ def generate_weather_plot(telescope, date=None, plot_ndays=1, span_hours=24):
         query_result = mongo_query(collection, query_dict)
         plot_vals = np.array([(d['date'], d[name]) for d in query_result])
         log.debug(f'  Got {len(plot_vals)} entries')
-        if 'temperature' not in currentweather.keys():
+        if len(plot_vals) > 0:
+            plot_temperature.circle(plot_vals[:,0],
+                                   plot_vals[:,1]*1.8+32,
+                                   size=markersize, color="blue", alpha=0.8)
+        if date is None and 'temperature' not in currentweather.keys():
             currentweather['date'] = plot_vals[-1][0]
             currentweather['temp'] = plot_vals[-1][1]
-        plot_temperature.circle(plot_vals[:,0],
-                               plot_vals[:,1]*1.8+32,
-                               size=markersize, color="blue", alpha=0.8)
     plot_temperature.yaxis.axis_label = 'Temp (F)'
     plot_temperature.yaxis.formatter = NumeralTickFormatter(format="0,0")
     plot_temperature.yaxis.ticker = [30, 50, 70, 90]
@@ -81,24 +82,24 @@ def generate_weather_plot(telescope, date=None, plot_ndays=1, span_hours=24):
         query_result = mongo_query(collection, query_dict)
         plot_vals = np.array([(d['date'], d[name]) for d in query_result])
         log.debug(f'  Got {len(plot_vals)} entries')
-        if 'clouds' not in currentweather.keys():
+        if len(plot_vals) > 0:
+            where_vcloudy = np.where(plot_vals[:,1] >= weather_limits['cloudy'])
+            plot_cloudiness.circle(plot_vals[where_vcloudy][:,0],
+                                   plot_vals[where_vcloudy][:,1],
+                                   size=markersize, color="red", alpha=0.8)
+
+            where_cloudy = np.where((plot_vals[:,1] < weather_limits['cloudy'])\
+                                    & (plot_vals[:,1] <= weather_limits['clear']))
+            plot_cloudiness.circle(plot_vals[where_cloudy][:,0],
+                                   plot_vals[where_cloudy][:,1],
+                                   size=markersize, color="orange", alpha=0.8)
+
+            where_clear = np.where(plot_vals[:,1] < weather_limits['clear'])
+            plot_cloudiness.circle(plot_vals[where_clear][:,0],
+                                   plot_vals[where_clear][:,1],
+                                   size=markersize, color="green", alpha=0.8)
+        if date is None and 'clouds' not in currentweather.keys():
             currentweather['clouds'] = plot_vals[-1][1]
-        where_vcloudy = np.where(plot_vals[:,1] >= weather_limits['cloudy'])
-        plot_cloudiness.circle(plot_vals[where_vcloudy][:,0],
-                               plot_vals[where_vcloudy][:,1],
-                               size=markersize, color="red", alpha=0.8)
-
-        where_cloudy = np.where((plot_vals[:,1] < weather_limits['cloudy'])\
-                                & (plot_vals[:,1] <= weather_limits['clear']))
-        plot_cloudiness.circle(plot_vals[where_cloudy][:,0],
-                               plot_vals[where_cloudy][:,1],
-                               size=markersize, color="orange", alpha=0.8)
-
-        where_clear = np.where(plot_vals[:,1] < weather_limits['clear'])
-        plot_cloudiness.circle(plot_vals[where_clear][:,0],
-                               plot_vals[where_clear][:,1],
-                               size=markersize, color="green", alpha=0.8)
-
     plot_cloudiness.yaxis.axis_label = 'Cloudiness (C)'
     plot_cloudiness.yaxis.formatter = NumeralTickFormatter(format="0,0")
     plot_cloudiness.xaxis.visible = False
@@ -118,25 +119,24 @@ def generate_weather_plot(telescope, date=None, plot_ndays=1, span_hours=24):
         query_result = mongo_query(collection, query_dict)
         plot_vals = np.array([(d['date'], d[name]) for d in query_result])
         log.debug(f'  Got {len(plot_vals)} entries')
-        if 'wind' not in currentweather.keys():
+        if len(plot_vals) > 0:
+            where_vwindy = np.where(plot_vals[:,1] >= weather_limits['windy'])
+            plot_wind_speed.circle(plot_vals[where_vwindy][:,0],
+                                   plot_vals[where_vwindy][:,1],
+                                   size=markersize, color="red", alpha=0.8)
+
+            where_windy = np.where((plot_vals[:,1] < weather_limits['windy'])\
+                                    & (plot_vals[:,1] <= weather_limits['calm']))
+            plot_wind_speed.circle(plot_vals[where_windy][:,0],
+                                   plot_vals[where_windy][:,1],
+                                   size=markersize, color="orange", alpha=0.8)
+
+            where_calm = np.where(plot_vals[:,1] < weather_limits['calm'])
+            plot_wind_speed.circle(plot_vals[where_calm][:,0],
+                                   plot_vals[where_calm][:,1],
+                                   size=markersize, color="green", alpha=0.8)
+        if date is None and 'wind' not in currentweather.keys():
             currentweather['wind'] = plot_vals[-1][1]
-
-        where_vwindy = np.where(plot_vals[:,1] >= weather_limits['windy'])
-        plot_wind_speed.circle(plot_vals[where_vwindy][:,0],
-                               plot_vals[where_vwindy][:,1],
-                               size=markersize, color="red", alpha=0.8)
-
-        where_windy = np.where((plot_vals[:,1] < weather_limits['windy'])\
-                                & (plot_vals[:,1] <= weather_limits['calm']))
-        plot_wind_speed.circle(plot_vals[where_windy][:,0],
-                               plot_vals[where_windy][:,1],
-                               size=markersize, color="orange", alpha=0.8)
-
-        where_calm = np.where(plot_vals[:,1] < weather_limits['calm'])
-        plot_wind_speed.circle(plot_vals[where_calm][:,0],
-                               plot_vals[where_calm][:,1],
-                               size=markersize, color="green", alpha=0.8)
-
     plot_wind_speed.yaxis.axis_label = 'Wind (kph)'
     plot_wind_speed.yaxis.formatter = NumeralTickFormatter(format="0,0")
     plot_wind_speed.yaxis.ticker = [0, 20, 40, 60, 80]
@@ -157,25 +157,24 @@ def generate_weather_plot(telescope, date=None, plot_ndays=1, span_hours=24):
         query_result = mongo_query(collection, query_dict)
         plot_vals = np.array([(d['date'], d[name]) for d in query_result])
         log.debug(f'  Got {len(plot_vals)} entries')
-        if 'rain' not in currentweather.keys():
+        if len(plot_vals) > 0:
+            where_dry = np.where(plot_vals[:,1] >= weather_limits['dry'])
+            plot_rain.circle(plot_vals[where_dry][:,0],
+                             plot_vals[where_dry][:,1],
+                             size=markersize, color="green", alpha=0.8)
+
+            where_wet = np.where((plot_vals[:,1] < weather_limits['dry'])\
+                                 & (plot_vals[:,1] <= weather_limits['wet']))
+            plot_rain.circle(plot_vals[where_wet][:,0],
+                             plot_vals[where_wet][:,1],
+                             size=markersize, color="orange", alpha=0.8)
+
+            where_rain = np.where(plot_vals[:,1] < weather_limits['wet'])
+            plot_rain.circle(plot_vals[where_rain][:,0],
+                             plot_vals[where_rain][:,1],
+                             size=markersize, color="red", alpha=0.8)
+        if date is None and 'rain' not in currentweather.keys():
             currentweather['rain'] = plot_vals[-1][1]
-
-        where_dry = np.where(plot_vals[:,1] >= weather_limits['dry'])
-        plot_rain.circle(plot_vals[where_dry][:,0],
-                         plot_vals[where_dry][:,1],
-                         size=markersize, color="green", alpha=0.8)
-
-        where_wet = np.where((plot_vals[:,1] < weather_limits['dry'])\
-                             & (plot_vals[:,1] <= weather_limits['wet']))
-        plot_rain.circle(plot_vals[where_wet][:,0],
-                         plot_vals[where_wet][:,1],
-                         size=markersize, color="orange", alpha=0.8)
-
-        where_rain = np.where(plot_vals[:,1] < weather_limits['wet'])
-        plot_rain.circle(plot_vals[where_rain][:,0],
-                         plot_vals[where_rain][:,1],
-                         size=markersize, color="red", alpha=0.8)
-
     plot_rain.yaxis.axis_label = 'Rain'
     plot_rain.yaxis.formatter = NumeralTickFormatter(format="0.0a")
     plot_rain.xaxis.visible = False
@@ -196,16 +195,17 @@ def generate_weather_plot(telescope, date=None, plot_ndays=1, span_hours=24):
         query_result = mongo_query(collection, query_dict)
         plot_vals = np.array([(d['date'], d[name]) for d in query_result])
         log.debug(f'  Got {len(plot_vals)} entries')
-        if 'safe' not in currentweather.keys():
+        if len(plot_vals) > 0:
+            where_safe = np.where(plot_vals[:,1] == True)
+            plot_safe.circle(plot_vals[where_safe][:,0],
+                             plot_vals[where_safe][:,1],
+                             size=markersize, color="green", alpha=0.8)
+            where_unsafe = np.where(plot_vals[:,1] != True)
+            plot_safe.circle(plot_vals[where_unsafe][:,0],
+                             plot_vals[where_unsafe][:,1],
+                             size=markersize, color="red", alpha=0.8)
+        if date is None and 'safe' not in currentweather.keys():
             currentweather['safe'] = plot_vals[-1][1]
-        where_safe = np.where(plot_vals[:,1] == True)
-        plot_safe.circle(plot_vals[where_safe][:,0],
-                         plot_vals[where_safe][:,1],
-                         size=markersize, color="green", alpha=0.8)
-        where_unsafe = np.where(plot_vals[:,1] != True)
-        plot_safe.circle(plot_vals[where_unsafe][:,0],
-                         plot_vals[where_unsafe][:,1],
-                         size=markersize, color="red", alpha=0.8)
     plot_safe.yaxis.axis_label = 'Safe'
     plot_safe.xaxis.axis_label = 'Time (UT)'
     plot_safe.yaxis.formatter = NumeralTickFormatter(format="0,0")

@@ -102,9 +102,9 @@ def overplot_twilights(plot_list, plot_end, plot_ndays=1, log=None):
         for plot_info in plot_list:
             for j in range(len(twilights)-1):
                 name, plot, top, bottom = plot_info
-                if log is not None: log.info(f'  Adding plot quads')
                 plot.quad(top=[top], bottom=[bottom],
                            left=[twilights[j][0]], right=[twilights[j+1][0]],
                            color="blue", alpha=twilights[j+1][2])
+        if log is not None: log.info(f'  Added twilights for {days} days ago')
     return
 
