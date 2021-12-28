@@ -288,6 +288,7 @@ def generate_weather_plot(telescope, date=None, plot_ndays=1, span_hours=24):
             if i != 0:
                 plot_info[1].x_range = plot_info_list[0][1].x_range
             plotlist.append(plot_info[1])
+    plotlist.append(dome_plot)
 
     log.info(f"Rendering bokeh plot")
     script, div = components(column(plotlist))
