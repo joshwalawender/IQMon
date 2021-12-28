@@ -281,16 +281,18 @@ def generate_weather_plot(telescope, date=None, plot_ndays=1, span_hours=24):
                       ('plot_rain', plot_rain, 2800, 1000),
                       ('plot_safe', plot_safe, 1.2, -0.2),
                       ]
-    plotlist = []
+    plot_column_list = []
+    plot_twilights_list = []
     for i,plot_info in enumerate(plot_info_list):
         if cfg['Weather'].get(plot_info[0], None) is not None:
-            overplot_twilights(plot_info, end, plot_ndays=plot_ndays)#, log=log)
             if i != 0:
                 plot_info[1].x_range = plot_info_list[0][1].x_range
-            plotlist.append(plot_info[1])
-    plotlist.append(dome_plot)
+            plot_column_list.append(plot_info[1])
+            plot_twilights_list.append(plot_info)
+    overplot_twilights(plot_twilights_list, end, plot_ndays=plot_ndays, log=log)
+    plot_column_list.append(dome_plot)
 
     log.info(f"Rendering bokeh plot")
-    script, div = components(column(plotlist))
+    script, div = components(column(plot_column_list))
 
     return script, div, currentweather
