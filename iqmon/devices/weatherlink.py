@@ -30,7 +30,7 @@ args = p.parse_args()
 class DavisWeatherLink():
     def __init__(self, IP='192.168.4.76',
                  mongoIP='192.168.4.49', mongoport=32768,
-                 dbname='weather', collectionname='DavisWeatherLink'):
+                 dbname='weather'):
 
         self.log = logging.getLogger('DavisWeatherLink')
         if len(self.log.handlers) < 1:
@@ -50,7 +50,6 @@ class DavisWeatherLink():
         self.mongoIP = mongoIP
         self.mongoport = mongoport
         self.dbname = dbname
-        self.collectionname = collectionname
         self.client = None
         self.db = None
         self.collection = None
@@ -58,7 +57,7 @@ class DavisWeatherLink():
             try:
                 self.client = pymongo.MongoClient(mongoIP, mongoport)
                 self.db = self.client[dbname]
-                self.collection = self.db[collectionname]
+                self.collection = self.db[self.name]
                 self.log.info(f'Connected to mongoDB at {self.mongoIP}:{self.mongoport}')
             except Exception as err:
                 self.log.error(f'ERROR: failed to connect to mongoDB at {self.mongoIP}:{self.mongoport}')
@@ -69,7 +68,7 @@ class DavisWeatherLink():
         try:
             r = requests.get(self.url)
         except Exception as err:
-            self.log.error(f'Exception getting data from WeatherLink:')
+            self.log.error(f'Exception getting data from {self.name}')
             self.log.error(err)
             return {}
 
@@ -80,38 +79,38 @@ class DavisWeatherLink():
         if type(conditions) == list:
             conditions = conditions[0]
         if error is None:
-            self.log.info(f"Got {len(conditions.keys())} data points from Weather Link")
+            self.log.info(f"Got {len(conditions.keys())} data points from {self.name}")
         else:
-            self.log.error(f'Got error from WeatherLink at {data["timestamp"]}')
+            self.log.error(f'Got error from {self.name} at {data["timestamp"]}')
             self.log.error(error)
 
-        mongodata = {'DWLL date': datetime.fromtimestamp(data.get('ts'))}
-        keys = [('temp', 'DWLL outside temperature', float),
-                ('hum', 'DWLL outside humidity', float),
-                ('dew_point', 'DWLL outside dew point', float),
-                ('wet_bulb', 'DWLL wet bulb', float),
-                ('heat_index', 'DWLL heat index', float),
-                ('wind_chill', 'DWLL wind chill', float),
-                ('wind_speed_last', 'DWLL wind speed', float),
-                ('wind_dir_last', 'DWLL wind direction', float),
-                ('wind_speed_avg_last_10_min', 'DWLL wind speed (10 min avg)', float),
-                ('wind_dir_scalar_avg_last_10_min', 'DWLL wind direction (10 min avg)', float),
-                ('wind_speed_hi_last_10_min', 'DWLL wind speed (10 min high)', float),
-                ('wind_dir_at_hi_speed_last_10_min', 'DWLL wind direction (at 10 min high)', float),
-                ('rain_size', 'DWLL rain_size', float),
-                ('rain_rate_last', 'DWLL rain rate', float),
-                ('rain_rate_hi', 'DWLL rain rate hi', float),
-                ('rainfall_last_15_min', 'DWLL rainfall last 15 min', float),
-                ('rain_rate_hi_last_15_min', 'DWLL rain rate hi last 15 min', float),
-                ('rainfall_last_60_min', 'DWLL rainfall last 1 hour', float),
-                ('rainfall_last_24_hr', 'DWLL rainfall last 24 hours', float),
-                ('rain_storm', 'DWLL rain storm total', float),
-                ('rain_storm_start_at', 'DWLL rain storm start', datetime),
-                ('temp_in', 'DWLL inside temperature', float),
-                ('hum_in', 'DWLL inside humidity', float),
-                ('bar_sea_level', 'DWLL bar sea level', float),
-                ('bar_trend', 'DWLL bar trend', float),
-                ('bar_absolute', 'DWLL bar absolute', float),
+        mongodata = {'date': datetime.fromtimestamp(data.get('ts'))}
+        keys = [('temp', 'outside temperature', float),
+                ('hum', 'outside humidity', float),
+                ('dew_point', 'outside dew point', float),
+                ('wet_bulb', 'wet bulb', float),
+                ('heat_index', 'heat index', float),
+                ('wind_chill', 'wind chill', float),
+                ('wind_speed_last', 'wind speed', float),
+                ('wind_dir_last', 'wind direction', float),
+                ('wind_speed_avg_last_10_min', 'wind speed (10 min avg)', float),
+                ('wind_dir_scalar_avg_last_10_min', 'wind direction (10 min avg)', float),
+                ('wind_speed_hi_last_10_min', 'wind speed (10 min high)', float),
+                ('wind_dir_at_hi_speed_last_10_min', 'wind direction (at 10 min high)', float),
+                ('rain_size', 'rain_size', float),
+                ('rain_rate_last', 'rain rate', float),
+                ('rain_rate_hi', 'rain rate hi', float),
+                ('rainfall_last_15_min', 'rainfall last 15 min', float),
+                ('rain_rate_hi_last_15_min', 'rain rate hi last 15 min', float),
+                ('rainfall_last_60_min', 'rainfall last 1 hour', float),
+                ('rainfall_last_24_hr', 'rainfall last 24 hours', float),
+                ('rain_storm', 'rain storm total', float),
+                ('rain_storm_start_at', 'rain storm start', datetime),
+                ('temp_in', 'inside temperature', float),
+                ('hum_in', 'inside humidity', float),
+                ('bar_sea_level', 'bar sea level', float),
+                ('bar_trend', 'bar trend', float),
+                ('bar_absolute', 'bar absolute', float),
                 ]
         for key, mongokey, datatype in keys:
             if conditions.get(key, None) is not None:
@@ -127,7 +126,7 @@ class DavisWeatherLink():
             try:
                 data = self.get_data()
             except Exception as err:
-                self.log.error(f'Error polling WeatherLink:')
+                self.log.error(f'Error polling {self.name}')
                 self.log.error(err)
             if self.collection is not None:
                 try:
@@ -141,7 +140,7 @@ class DavisWeatherLink():
 
 
 def monitor_davis_weather_link():
-
+    devicename = 'DavisWeatherLink'
     # Read Config File
     cfg = configparser.ConfigParser()
     if args.config is not None:
@@ -157,8 +156,8 @@ def monitor_davis_weather_link():
         cfg_path = Path(__file__).absolute().parent.parent/'configs'/cfg_name
         cfg.read(cfg_path)
 
-    sleeptime = cfg['DavisWeatherLink'].getfloat('sleep', 60)
-    IP = cfg['DavisWeatherLink'].get('address', None)
+    sleeptime = cfg[devicename].getfloat('sleep', 60)
+    IP = cfg[devicename].get('address', None)
     if IP is not None:
         d = DavisWeatherLink(IP=IP,
                              mongoIP=cfg['mongo'].get('host'),

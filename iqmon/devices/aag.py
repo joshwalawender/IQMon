@@ -1,3 +1,4 @@
+from pathlib import Path
 import sys
 import os
 import logging
@@ -25,14 +26,15 @@ args = p.parse_args()
 ## Query AAG Solo for Weather Data
 ##-------------------------------------------------------------------------
 def get_aagsolo_once():
+    devicename = 'AAGSolo'
+
     log = logging.getLogger('AAG')
     if len(log.handlers) < 1:
         log.setLevel(logging.DEBUG)
         ## Set up console output
         LogConsoleHandler = logging.StreamHandler()
         LogConsoleHandler.setLevel(logging.INFO)
-        LogFormat = logging.Formatter('%(asctime)s %(levelname)8s: %(message)s',
-                                      datefmt='%Y%m%d %H:%M:%S')
+        LogFormat = logging.Formatter('%(asctime)s %(levelname)8s: %(message)s')
         LogConsoleHandler.setFormatter(LogFormat)
         log.addHandler(LogConsoleHandler)
 
@@ -47,20 +49,20 @@ def get_aagsolo_once():
             log.error(e)
             args.config = None
     if args.config is None:
-        cfg_name='pipeline_hokuula.cfg'
+        cfg_name='pipeline.cfg'
         cfg_path = Path(__file__).absolute().parent.parent/'configs'/cfg_name
         cfg.read(cfg_path)
 
     log.info('Getting Weather status')
-    IP = cfg['AAGSolo'].get('address', None)
+    IP = cfg[devicename].get('address', None)
     if IP is None:
         return
-    querydate = dt.utcnow()
+    querydate = datetime.utcnow()
     address = f'http://{IP}/cgi-bin/cgiLastData'
     try:
         r = requests.get(address)
     except:
-        log.error('Failed to connect to AAG Solo')
+        log.error(f'Failed to connect to {devicename}')
         return
     lines = r.text.splitlines()
     result = {}
@@ -69,18 +71,18 @@ def get_aagsolo_once():
         result[str(key)] = str(val)
         log.debug('  {} = {}'.format(key, val))
     log.info('  Done.')
-    mongodoc = {"AAG date": dt.strptime(result['dataGMTTime'], '%Y/%m/%d %H:%M:%S'),
-                "AAG querydate": querydate,
-                "AAG cloud value": float(result['clouds']),
-                "AAG outside temperature": float(result['temp']),
-                "AAG wind": float(result['wind']),
-                "AAG gust": float(result['gust']),
-                "AAG rain value": int(result['rain']),
-                "AAG light value": int(result['light']),
-                "AAG switch": int(result['switch']),
-                "AAG safe": {'1': True, '0': False}[result['safe']],
+    mongodoc = {"date": datetime.strptime(result['dataGMTTime'], '%Y/%m/%d %H:%M:%S'),
+                "querydate": querydate,
+                "cloud value": float(result['clouds']),
+                "outside temperature": float(result['temp']),
+                "wind value": float(result['wind']),
+                "gust value": float(result['gust']),
+                "rain value": int(result['rain']),
+                "light value": int(result['light']),
+                "switch": int(result['switch']),
+                "safe": {'1': True, '0': False}[result['safe']],
                }
-    age = (weatherdoc["querydate"] - weatherdoc["date"]).total_seconds()
+    age = (mongodoc["querydate"] - mongodoc["date"]).total_seconds()
     log.debug('  Data age = {:.1f} seconds'.format(age))
 
     log.debug(f'Connecting to mongoDB')
@@ -88,9 +90,8 @@ def get_aagsolo_once():
     mongo_host = cfg['mongo'].get('host')
     mongo_port = cfg['mongo'].getint('port')
     mongo_db = cfg['mongo'].get('db')
-    collection_name = 'AAGSolo'
     mongoclient = pymongo.MongoClient(mongo_host, mongo_port)
-    collection = mongoclient[mongo_db][collection_name]
+    collection = mongoclient[mongo_db][devicename]
 
     try:
         inserted_id = collection.insert_one(mongodoc).inserted_id
@@ -104,12 +105,13 @@ def get_aagsolo_once():
 
 
 def monitor_aag():
+    devicename = 'AAGSolo'
     cfg_path = Path(__file__).parent.parent / 'configs' / 'pipeline.cfg'
     cfg = configparser.ConfigParser()
     cfg.read(cfg_path)
     while True:
         get_aagsolo_once()
-        time.sleep(cfg['AAGSolo'].getfloat('sleep', 60))
+        sleep(cfg[devicename].getfloat('sleep', 60))
 
 
 if __name__ == '__main__':
