@@ -70,9 +70,11 @@ def get_aagsolo_once():
         key, val = line.split('=')
         result[str(key)] = str(val)
         log.debug('  {} = {}'.format(key, val))
-    log.info('  Done.')
+    log.info(f'  Got {len(result.keys())} results')
     mongodoc = {"date": datetime.strptime(result['dataGMTTime'], '%Y/%m/%d %H:%M:%S'),
                 "querydate": querydate,
+                "cwinfo": result['cwinfo'],
+                "dew point": float(result['dewp']),
                 "cloud value": float(result['clouds']),
                 "outside temperature": float(result['temp']),
                 "wind value": float(result['wind']),
@@ -83,10 +85,15 @@ def get_aagsolo_once():
                 "safe": {'1': True, '0': False}[result['safe']],
                }
     age = (mongodoc["querydate"] - mongodoc["date"]).total_seconds()
-    log.debug('  Data age = {:.1f} seconds'.format(age))
+    if len(result.keys()) != len(mongodoc.keys()) or len(result.keys()) != 12:
+        log.warning(f'Possible missing keys')
+        log.info(result)
+        log.info(f'  Prepared mongodoc with {len(mongodoc.keys())} keys')
+        log.info(mongodoc)
+    if age > 60:
+        log.warning(f'Data age = {age:.1f} seconds')
 
-    log.debug(f'Connecting to mongoDB')
-
+    log.info(f'Connecting to mongoDB')
     mongo_host = cfg['mongo'].get('host')
     mongo_port = cfg['mongo'].getint('port')
     mongo_db = cfg['mongo'].get('db')
