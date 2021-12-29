@@ -56,13 +56,13 @@
         <td style="text-align: right;">Cloudiness</td>
         <td style="text-align: left;">
         {% if 'cloud status' in currentweather.keys() %}
-            {{ currentweather['cloud status'] }} ({{ '{:.1f} C'.format(currentweather['clouds']) }})
+            {{ currentweather['cloud status'] }} ({{ '{:.1f} C'.format(currentweather['cloud value']) }})
         {% endif %}
         </td>
         <td style="text-align: right;">Ambient Temperature</td>
         <td style="text-align: left;">
-        {% if 'temp' in currentweather.keys() %}
-            {{ '{:.1f}'.format(currentweather['temp']) }}
+        {% if 'outside temperature' in currentweather.keys() %}
+            {{ '{:.1f}'.format(currentweather['outside temperature']) }}
         {% endif %}
         </td>
     </tr>
@@ -70,7 +70,7 @@
         <td style="text-align: right;">Wind Speed</td>
         <td style="text-align: left;">
         {% if 'wind status' in currentweather.keys() %}
-            {{ currentweather['wind status'] }} ({{ '{:.1f} kph'.format(currentweather['wind']) }})
+            {{ currentweather['wind status'] }} ({{ '{:.1f} kph'.format(currentweather['wind value']) }})
         {% endif %}
         </td>
         <td style="text-align: right;">Gusts</td>
@@ -83,7 +83,7 @@
         <td style="text-align: right;">Rain</td>
         <td style="text-align: left;">
         {% if 'rain status' in currentweather.keys() %}
-            {{ currentweather['rain status'] }} ({{ '{:d}'.format(currentweather['rain']) }})
+            {{ currentweather['rain status'] }} ({{ '{:d}'.format(currentweather['rain value']) }})
         {% endif %}
         </td>
         <td style="text-align: right;">Weather Data Age</td>

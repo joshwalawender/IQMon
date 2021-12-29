@@ -46,51 +46,67 @@ def status(telescope):
     tick = datetime.utcnow()
 
     cfg = get_config()
-    script, div, currentweather = generate_weather_plot(cfg, plot_ndays=2, span_hours=12)
+    script, div = generate_weather_plot(cfg, plot_ndays=2, span_hours=12)
 
     ## Format currentweather
     log.info(f"Querying weather limits")
     query_result = mongo_query('weather_limits', {}, cfg)
     weather_limits = query_result[0]
 
-    try:
-        currentweather['age'] = (datetime.utcnow() - currentweather['date']).total_seconds()
-    except Exception as e:
-        log.error(f"Failed to handle currentweather age")
-        log.error(currentweather)
-
-    try:
-        if currentweather['clouds'] > weather_limits['cloudy']:
-            currentweather['cloud status'] = 'very cloudy'
-        elif currentweather['clouds'] > weather_limits['clear']:
-            currentweather['cloud status'] = 'cloudy'
-        else:
-            currentweather['cloud status'] = 'clear'
-    except Exception as e:
-        log.error(f"Failed to handle currentweather clouds")
-        log.error(currentweather)
-
-    try:
-        if currentweather['wind'] > weather_limits['windy']:
-            currentweather['wind status'] = 'very windy'
-        elif currentweather['wind'] > weather_limits['calm']:
-            currentweather['wind status'] = 'windy'
-        else:
-            currentweather['wind status'] = 'calm'
-    except Exception as e:
-        log.error(f"Failed to handle currentweather wind")
-        log.error(currentweather)
-
-    try:
-        if currentweather['rain'] > weather_limits['dry']:
-            currentweather['rain status'] = 'dry'
-        elif currentweather['rain'] > weather_limits['wet']:
-            currentweather['rain status'] = 'wet'
-        else:
-            currentweather['rain status'] = 'rain'
-    except Exception as e:
-        log.error(f"Failed to handle currentweather rain")
-        log.error(currentweather)
+    ## Get Currentweather:
+    ## temperature, clouds, wind, gust, rain, safe
+    log.info(f'Get current weather')
+    currentweather = {}
+    devices = cfg['Weather'].get('devices').split(',')
+    query_dict = {'date': {'$gt': tick-timedelta(minutes=10), '$lt': tick}}
+    for device in devices:
+        deviceweather = [d for d in mongo_query(device, query_dict, cfg, last=True)]
+        if len(deviceweather) > 0:
+            currentdeviceweather = deviceweather[-1]
+        # Look for outside temperature
+        if 'outside temperature' in currentdeviceweather.keys()\
+             and 'outside temperature' not in currentweather.keys():
+            log.info(f"{device} outside temperature {currentdeviceweather['outside temperature']}")
+            currentweather['outside temperature'] = currentdeviceweather['outside temperature']
+        # Look for date
+        if 'date' in currentdeviceweather.keys()\
+             and 'date' not in currentweather.keys():
+            log.info(f"{device} date {currentdeviceweather['date']}")
+            currentweather['date'] = currentdeviceweather['date']
+            currentweather['age'] = (datetime.utcnow() - currentweather['date']).total_seconds()
+        # Look for clouds
+        if 'cloud value' in currentdeviceweather.keys()\
+             and 'cloud value' not in currentweather.keys():
+            log.info(f"{device} cloud value {currentdeviceweather['cloud value']}")
+            currentweather['cloud value'] = currentdeviceweather['cloud value']
+            if currentweather['cloud value'] > weather_limits['cloudy']:
+                currentweather['cloud status'] = 'very cloudy'
+            elif currentweather['cloud value'] > weather_limits['clear']:
+                currentweather['cloud status'] = 'cloudy'
+            else:
+                currentweather['cloud status'] = 'clear'
+        # Look for wind
+        if 'wind value' in currentdeviceweather.keys()\
+             and 'wind value' not in currentweather.keys():
+            log.info(f"{device} wind value {currentdeviceweather['wind value']}")
+            currentweather['wind value'] = currentdeviceweather['wind value']
+            if currentweather['wind value'] > weather_limits['windy']:
+                currentweather['wind status'] = 'very windy'
+            elif currentweather['wind value'] > weather_limits['calm']:
+                currentweather['wind status'] = 'windy'
+            else:
+                currentweather['wind status'] = 'calm'
+        # Look for rain
+        if 'rain value' in currentdeviceweather.keys()\
+             and 'rain value' not in currentweather.keys():
+            log.info(f"{device} rain value {currentdeviceweather['rain value']}")
+            currentweather['rain value'] = currentdeviceweather['rain value']
+            if currentweather['rain value'] > weather_limits['dry']:
+                currentweather['rain status'] = 'dry'
+            elif currentweather['rain value'] > weather_limits['wet']:
+                currentweather['rain status'] = 'wet'
+            else:
+                currentweather['rain status'] = 'rain'
 
     ## Telescope Status Query
     log.info(f"Querying telescope status database")
@@ -166,7 +182,7 @@ def status(telescope):
 def nightWeather(telescope, date):
     log.info(f'Building {__name__} nightWeather {telescope}')
     cfg = get_config()
-    script, div, currentweather = generate_weather_plot(cfg, date=date)
+    script, div = generate_weather_plot(cfg, date=date)
 
     log.info(f"Rendering template")
     return flask.render_template('nightPlot.html',

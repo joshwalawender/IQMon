@@ -26,7 +26,8 @@ log.addHandler(LogFileHandler)
 ##-------------------------------------------------------------------------
 ## Function: mongo_query
 ##-------------------------------------------------------------------------
-def mongo_query(collection, query_dict, cfg, distinct=False, count=False,
+def mongo_query(collection, query_dict, cfg,
+                distinct=False, count=False, last=False,
                 sort=[('date', pymongo.ASCENDING)]):
     log.debug(f'Connecting to mongo db, collection {collection}')
     mongo_host = cfg['mongo'].get('host')
@@ -38,6 +39,8 @@ def mongo_query(collection, query_dict, cfg, distinct=False, count=False,
         query_result = mongo_iqmon.distinct(query_dict)
     elif count is True:
         query_result = mongo_iqmon.find(query_dict).count()
+    elif last is True:
+        query_result = mongo_iqmon.find(query_dict, sort=sort).limit(1)
     else:
         query_result = mongo_iqmon.find(query_dict, sort=sort)
     mongoclient.close()

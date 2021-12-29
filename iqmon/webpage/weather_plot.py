@@ -181,10 +181,6 @@ def generate_weather_plot(cfg, date=None, plot_ndays=1, span_hours=24):
                 plot_rain.circle(plot_vals[where_rain][:,0],
                                  plot_vals[where_rain][:,1],
                                  size=markersize, color="red", alpha=0.8)
-            if date is None and 'rain' not in currentweather.keys():
-                currentweather['rain'] = plot_vals[-1][1]
-            if date is None and 'date' not in currentweather.keys():
-                currentweather['date'] = plot_vals[-1][0]
         plot_rain.yaxis.axis_label = 'Rain'
         plot_rain.yaxis.formatter = NumeralTickFormatter(format="0.0a")
         plot_rain.xaxis.visible = False
@@ -215,10 +211,6 @@ def generate_weather_plot(cfg, date=None, plot_ndays=1, span_hours=24):
                 plot_safe.circle(plot_vals[where_unsafe][:,0],
                                  plot_vals[where_unsafe][:,1],
                                  size=markersize, color="red", alpha=0.8)
-            if date is None and 'safe' not in currentweather.keys():
-                currentweather['safe'] = plot_vals[-1][1]
-            if date is None and 'date' not in currentweather.keys():
-                currentweather['date'] = plot_vals[-1][0]
         plot_safe.yaxis.axis_label = 'Safe'
         plot_safe.xaxis.axis_label = 'Time (UT)'
         plot_safe.yaxis.formatter = NumeralTickFormatter(format="0,0")
@@ -318,4 +310,4 @@ def generate_weather_plot(cfg, date=None, plot_ndays=1, span_hours=24):
     log.info(f"Rendering bokeh plot for {plot_column_list}")
     script, div = components(column(plot_column_list))
 
-    return script, div, currentweather
+    return script, div
