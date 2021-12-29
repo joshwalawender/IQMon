@@ -228,7 +228,7 @@ def generate_weather_plot(cfg, date=None, plot_ndays=1, span_hours=24):
     ##-------------------------------------------------------------------------
     ## Telescope Status Plot
     ##-------------------------------------------------------------------------
-    if cfg['Weather'].get('plot_dome', False) is True:
+    if cfg['Weather'].getboolean('plot_dome', False) is True:
         ## Telescope Status Query
         log.info(f"Querying telescope status database")
         query_dict = {'date': {'$gt': start, '$lt': end}}
@@ -312,7 +312,7 @@ def generate_weather_plot(cfg, date=None, plot_ndays=1, span_hours=24):
             plot_twilights_list.append(plot_info)
     overplot_twilights(plot_twilights_list, end, cfg, plot_ndays=plot_ndays, log=log)
 
-    if cfg['Weather'].get('plot_dome', False) is True:
+    if cfg['Weather'].getboolean('plot_dome', False) is True:
         plot_column_list.append(dome_plot)
 
     log.info(f"Rendering bokeh plot for {plot_column_list}")
