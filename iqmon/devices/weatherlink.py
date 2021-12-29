@@ -33,11 +33,12 @@ args = p.parse_args()
 class DavisWeatherLink():
     def __init__(self, IP='192.168.4.76',
                  mongoIP='192.168.4.49', mongoport=49153,
-                 dbname='weather', tzoffset=0):
+                 dbname='weather', tzoffset=0, temperature_units='F'):
         self.IP = IP
         self.name = 'DavisWeatherLink'
         self.url = f'http://{self.IP}/v1/current_conditions'
         self.tzoffset = tzoffset
+        self.temperature_units = temperature_units
 
         self.log = logging.getLogger(self.name)
         if len(self.log.handlers) < 1:
@@ -121,6 +122,7 @@ class DavisWeatherLink():
             if conditions.get(key, None) is not None:
                 mongodata[mongokey] = datatype(conditions.get(key, None))
         self.log.info(f"Parsed {len(mongodata.keys())} data points")
+        mongodata['temperature units'] = self.temperature_units
 
         return mongodata
 
@@ -150,13 +152,15 @@ def monitor_davis_weather_link():
 
     sleeptime = cfg[devicename].getfloat('sleep', 60)
     tzoffset = cfg[devicename].getfloat('TZoffset', 0)
+    temperature_units = cfg[devicename].get('temperature_units', 'F')
     IP = cfg[devicename].get('address', None)
     if IP is not None:
         d = DavisWeatherLink(IP=IP,
                              mongoIP=cfg['mongo'].get('host'),
                              mongoport=cfg['mongo'].getint('port'),
                              dbname=cfg['mongo'].get('db'),
-                             tzoffset=tzoffset
+                             tzoffset=tzoffset,
+                             temperature_units=temperature_units,
                              )
         d.poll(sleep=sleeptime)
 

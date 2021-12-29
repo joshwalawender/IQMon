@@ -54,11 +54,17 @@ def generate_weather_plot(cfg, date=None, plot_ndays=1, span_hours=24):
             log.debug(f'  Querying mongo collection {collection}')
             query_result = mongo_query(collection, query_dict, cfg)
             plot_vals = np.array([(d['date'], d[name]) for d in query_result])
+
+            temperature_units = cfg[collection].get('temperature_units', 'F')
+            if temperature_units == 'C':
+                log.info('  Converting temperature plot from C to F')
+                plot_vals[:,1] = plot_vals[:,1]*1.8+32
+
             log.debug(f'  Got {len(plot_vals)} entries')
             if len(plot_vals) > 0:
                 plot_temperature.circle(plot_vals[:,0],
-                                       plot_vals[:,1]*1.8+32,
-                                       size=markersize, color="blue", alpha=0.8)
+                                        plot_vals[:,1],
+                                        size=markersize, color="blue", alpha=0.8)
             if date is None and 'temp' not in currentweather.keys():
                 currentweather['temp'] = plot_vals[-1][1]
             if date is None and 'date' not in currentweather.keys():

@@ -75,8 +75,8 @@ def get_aagsolo_once():
                 "querydate": querydate,
                 "cwinfo": result['cwinfo'],
                 "dew point": float(result['dewp']),
-                "cloud value": float(result['clouds']),
                 "outside temperature": float(result['temp']),
+                "cloud value": float(result['clouds']),
                 "wind value": float(result['wind']),
                 "gust value": float(result['gust']),
                 "rain value": int(result['rain']),
@@ -84,6 +84,10 @@ def get_aagsolo_once():
                 "switch": int(result['switch']),
                 "safe": {'1': True, '0': False}[result['safe']],
                }
+    temperature_units = cfg[devicename].get('temperature_units', None)
+    if temperature_units is not None:
+        mongodoc['temperature units'] = temperature_units
+
     age = (mongodoc["querydate"] - mongodoc["date"]).total_seconds()
     if len(result.keys()) != len(mongodoc.keys()) or len(result.keys()) != 12:
         log.warning(f'Possible missing keys')
