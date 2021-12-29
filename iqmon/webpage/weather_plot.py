@@ -89,7 +89,7 @@ def generate_weather_plot(telescope, date=None, plot_ndays=1, span_hours=24):
                                    size=markersize, color="red", alpha=0.8)
 
             where_cloudy = np.where((plot_vals[:,1] < weather_limits['cloudy'])\
-                                    & (plot_vals[:,1] <= weather_limits['clear']))
+                                    & (plot_vals[:,1] >= weather_limits['clear']))
             plot_cloudiness.circle(plot_vals[where_cloudy][:,0],
                                    plot_vals[where_cloudy][:,1],
                                    size=markersize, color="orange", alpha=0.8)
@@ -126,7 +126,7 @@ def generate_weather_plot(telescope, date=None, plot_ndays=1, span_hours=24):
                                    size=markersize, color="red", alpha=0.8)
 
             where_windy = np.where((plot_vals[:,1] < weather_limits['windy'])\
-                                    & (plot_vals[:,1] <= weather_limits['calm']))
+                                    & (plot_vals[:,1] >= weather_limits['calm']))
             plot_wind_speed.circle(plot_vals[where_windy][:,0],
                                    plot_vals[where_windy][:,1],
                                    size=markersize, color="orange", alpha=0.8)
@@ -164,7 +164,7 @@ def generate_weather_plot(telescope, date=None, plot_ndays=1, span_hours=24):
                              size=markersize, color="green", alpha=0.8)
 
             where_wet = np.where((plot_vals[:,1] < weather_limits['dry'])\
-                                 & (plot_vals[:,1] <= weather_limits['wet']))
+                                 & (plot_vals[:,1] >= weather_limits['wet']))
             plot_rain.circle(plot_vals[where_wet][:,0],
                              plot_vals[where_wet][:,1],
                              size=markersize, color="orange", alpha=0.8)
