@@ -11,7 +11,7 @@ from bokeh.embed import components
 from bokeh.layouts import column
 from bokeh.models import DatetimeTickFormatter, NumeralTickFormatter, DatetimeTicker
 
-from iqmon.webpage import mongo_query, get_twilights, overplot_twilights
+from iqmon.webpage import mongo_query
 
 log = logging.getLogger('FlaskLogger')
 
