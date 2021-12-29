@@ -71,7 +71,7 @@ def generate_weather_plot(telescope, date=None, plot_ndays=1, span_hours=24):
     ## Cloudiness Plot
     log.info('Build cloudiness plot')
     plot_cloudiness = figure(width=900, height=100, x_axis_type="datetime",
-                             y_range=(-50,5),
+                             y_range=(-50,10),
                              x_range=(end - timedelta(hours=span_hours), end),
                              )
     plot_values = cfg['Weather'].get('plot_cloudiness').split(',')
@@ -146,7 +146,7 @@ def generate_weather_plot(telescope, date=None, plot_ndays=1, span_hours=24):
     ## Rain Plot
     log.info('Build rain plot')
     plot_rain = figure(width=900, height=60, x_axis_type="datetime",
-                       y_range=(1000,2800),
+                       y_range=(500,2800),
                        x_range=(end - timedelta(hours=span_hours), end),
                        )
     plot_values = cfg['Weather'].get('plot_rain').split(',')
@@ -276,9 +276,9 @@ def generate_weather_plot(telescope, date=None, plot_ndays=1, span_hours=24):
     ## Render
     log.info(f"Overplotting twilights")
     plot_info_list = [('plot_temperature', plot_temperature, 25, 95),
-                      ('plot_cloudiness', plot_cloudiness, 5, -50),
+                      ('plot_cloudiness', plot_cloudiness, 10, -50),
                       ('plot_wind_speed', plot_wind_speed, 100, -3),
-                      ('plot_rain', plot_rain, 2800, 1000),
+                      ('plot_rain', plot_rain, 2800, 500),
                       ('plot_safe', plot_safe, 1.2, -0.2),
                       ]
     plot_column_list = []
