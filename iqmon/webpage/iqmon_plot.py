@@ -11,6 +11,7 @@ from bokeh.embed import components
 from bokeh.layouts import column
 from bokeh.models import DatetimeTickFormatter, NumeralTickFormatter, DatetimeTicker
 
+from iqmon import get_config
 from iqmon.webpage import mongo_query
 
 log = logging.getLogger('FlaskLogger')
@@ -20,9 +21,7 @@ log = logging.getLogger('FlaskLogger')
 ## Function: generate_iqmon_plot
 ##-------------------------------------------------------------------------
 def generate_iqmon_plot(telescope, date=None, plot_ndays=1, span_hours=24):
-    cfg_path = Path(__file__).parent.parent / 'configs' / 'pipeline.cfg'
-    cfg = configparser.ConfigParser()
-    cfg.read(cfg_path)
+    cfg = get_config()
 
     if date is None:
         end = datetime.utcnow()
@@ -36,7 +35,7 @@ def generate_iqmon_plot(telescope, date=None, plot_ndays=1, span_hours=24):
     log.info(f"Querying IQMon results database")
     query_dict = {'telescope': telescope,
                   'date': {'$gt': start, '$lt': end}}
-    query_result = mongo_query('iqmon', query_dict)
+    query_result = mongo_query('iqmon', query_dict, cfg)
     iqmon = [d for d in query_result]
     log.info(f"  Got {len(iqmon)} data points")
 

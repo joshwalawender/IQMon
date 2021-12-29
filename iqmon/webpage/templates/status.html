@@ -2,7 +2,7 @@
 
 <html>
 <head>
-    <title>VYSOS Status</title>
+    <title>{{ telescope }} Status</title>
     <meta http-equiv="content-type"
     content="text/html;">
 
@@ -43,9 +43,11 @@
     <tr>
         <th style="width: 200px; text-align: right;">Weather</th>
         <th style="width: 200px; text-align: left;">
-        {% if currentweather['safe'] == True %} <font color="green">Safe</font>
-        {% elif currentweather['safe'] == False %} <font color="red">Unsafe</font>
-        {% else %} <font color="red">Unknown</font> {% endif %}
+        {% if 'safe' in currentweather.keys() %}
+            {% if currentweather['safe'] == True %} <font color="green">Safe</font>
+            {% elif currentweather['safe'] == False %} <font color="red">Unsafe</font>
+            {% else %} <font color="red">Unknown</font> {% endif %}
+        {% endif %}
         </th>
         <th style="width: 200px; text-align: right;">{{ now.strftime('%Y/%m/%d %H:%M:%S HST') }}</th>
         <th style="width: 200px; text-align: left;">{{ utcnow.strftime('%Y/%m/%d %H:%M:%S UT') }}</th>
@@ -53,17 +55,23 @@
     <tr>
         <td style="text-align: right;">Cloudiness</td>
         <td style="text-align: left;">
-        {{ currentweather['cloud status'] }} ({{ '{:.1f} C'.format(currentweather['clouds']) }})
+        {% if 'cloud status' in currentweather.keys() %}
+            {{ currentweather['cloud status'] }} ({{ '{:.1f} C'.format(currentweather['clouds']) }})
+        {% endif %}
         </td>
         <td style="text-align: right;">Ambient Temperature</td>
         <td style="text-align: left;">
-        {{ '{:.1f} C, {:.1f} F'.format(currentweather['temp'], currentweather['temp F']) }}
+        {% if 'temp' in currentweather.keys() %}
+            {{ '{:.1f}'.format(currentweather['temp']) }}
+        {% endif %}
         </td>
     </tr>
     <tr>
         <td style="text-align: right;">Wind Speed</td>
         <td style="text-align: left;">
-        {{ currentweather['wind status'] }} ({{ '{:.1f} kph'.format(currentweather['wind']) }})
+        {% if 'wind status' in currentweather.keys() %}
+            {{ currentweather['wind status'] }} ({{ '{:.1f} kph'.format(currentweather['wind']) }})
+        {% endif %}
         </td>
         <td style="text-align: right;">Gusts</td>
         <td style="text-align: left;">
@@ -74,11 +82,15 @@
     <tr>
         <td style="text-align: right;">Rain</td>
         <td style="text-align: left;">
-        {{ currentweather['rain status'] }} ({{ '{:d}'.format(currentweather['rain']) }})
+        {% if 'rain status' in currentweather.keys() %}
+            {{ currentweather['rain status'] }} ({{ '{:d}'.format(currentweather['rain']) }})
+        {% endif %}
         </td>
         <td style="text-align: right;">Weather Data Age</td>
         <td style="text-align: left;">
-        {{ '{:.0f}s'.format(currentweather['age']) }}
+        {% if 'age' in currentweather.keys() %}
+            {{ '{:.0f}s'.format(currentweather['age']) }}
+        {% endif %}
         </td>
     </tr>
 </table>

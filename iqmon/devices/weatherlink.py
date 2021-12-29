@@ -3,6 +3,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 import configparser
 import logging
+import argparse
 import requests
 import json
 import pymongo
@@ -10,6 +11,8 @@ import pymongo
 import socket
 import struct
 import time
+
+from iqmon import get_config
 
 
 ##-------------------------------------------------------------------------
@@ -29,10 +32,14 @@ args = p.parse_args()
 ##-------------------------------------------------------------------------
 class DavisWeatherLink():
     def __init__(self, IP='192.168.4.76',
-                 mongoIP='192.168.4.49', mongoport=32768,
-                 dbname='weather'):
+                 mongoIP='192.168.4.49', mongoport=49153,
+                 dbname='weather', tzoffset=0):
+        self.IP = IP
+        self.name = 'DavisWeatherLink'
+        self.url = f'http://{self.IP}/v1/current_conditions'
+        self.tzoffset = tzoffset
 
-        self.log = logging.getLogger('DavisWeatherLink')
+        self.log = logging.getLogger(self.name)
         if len(self.log.handlers) < 1:
             self.log.setLevel(logging.DEBUG)
             ## Set up console output
@@ -43,9 +50,6 @@ class DavisWeatherLink():
             LogConsoleHandler.setFormatter(LogFormat)
             self.log.addHandler(LogConsoleHandler)
 
-        self.IP = IP
-        self.name = 'DavisWeatherLink'
-        self.url = f'http://{self.IP}/v1/current_conditions'
         # Mongo Setup
         self.mongoIP = mongoIP
         self.mongoport = mongoport
@@ -84,7 +88,8 @@ class DavisWeatherLink():
             self.log.error(f'Got error from {self.name} at {data["timestamp"]}')
             self.log.error(error)
 
-        mongodata = {'date': datetime.fromtimestamp(data.get('ts'))}
+        mongodata = {'date': datetime.fromtimestamp(data.get('ts'))\
+                             - timedelta(hours=self.tzoffset)}
         keys = [('temp', 'outside temperature', float),
                 ('hum', 'outside humidity', float),
                 ('dew_point', 'outside dew point', float),
@@ -141,28 +146,17 @@ class DavisWeatherLink():
 
 def monitor_davis_weather_link():
     devicename = 'DavisWeatherLink'
-    # Read Config File
-    cfg = configparser.ConfigParser()
-    if args.config is not None:
-        cfg_file = Path(args.config)
-        try:
-            cfg.read(cfg_path)
-        except:
-            print(f"Could not read config file: {cfg_path}")
-            print(e)
-            args.config = None
-    if args.config is None:
-        cfg_name='pipeline_hokuula.cfg'
-        cfg_path = Path(__file__).absolute().parent.parent/'configs'/cfg_name
-        cfg.read(cfg_path)
+    cfg = get_config()
 
     sleeptime = cfg[devicename].getfloat('sleep', 60)
+    tzoffset = cfg[devicename].getfloat('TZoffset', 0)
     IP = cfg[devicename].get('address', None)
     if IP is not None:
         d = DavisWeatherLink(IP=IP,
                              mongoIP=cfg['mongo'].get('host'),
                              mongoport=cfg['mongo'].getint('port'),
                              dbname=cfg['mongo'].get('db'),
+                             tzoffset=tzoffset
                              )
         d.poll(sleep=sleeptime)
 

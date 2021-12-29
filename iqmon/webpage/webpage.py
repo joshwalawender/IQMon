@@ -6,7 +6,8 @@ import pymongo
 from datetime import datetime, timedelta
 import numpy as np
 
-from iqmon.webpage import mongo_query, get_twilights, overplot_twilights
+from iqmon import get_config
+from iqmon.webpage import mongo_query
 from iqmon.webpage.weather_plot import generate_weather_plot
 from iqmon.webpage.iqmon_plot import generate_iqmon_plot
 
@@ -29,7 +30,10 @@ def static_path(telescope, date, filename):
 @app.route("/")
 def hello():
     log.info(f'Building {__name__} hello')
-    return status('V5')
+
+    cfg = get_config()
+
+    return status(cfg['Telescope'].get('name'))
 
 
 ##-------------------------------------------------------------------------
@@ -41,42 +45,57 @@ def status(telescope):
     log.info(f'Building {__name__} status')
     tick = datetime.utcnow()
 
-    cfg_path = Path(__file__).parent.parent / 'configs' / 'pipeline.cfg'
-    cfg = configparser.ConfigParser()
-    cfg.read(cfg_path)
-
-    script, div, currentweather = generate_weather_plot(telescope, plot_ndays=2, span_hours=12)
+    cfg = get_config()
+    script, div, currentweather = generate_weather_plot(cfg, plot_ndays=2, span_hours=12)
 
     ## Format currentweather
     log.info(f"Querying weather limits")
-    query_result = mongo_query('weather_limits', {})
+    query_result = mongo_query('weather_limits', {}, cfg)
     weather_limits = query_result[0]
-    currentweather['age'] = (datetime.utcnow() - currentweather['date']).total_seconds()
-    currentweather['temp F'] = currentweather['temp']*1.8 + 32
-    if currentweather['clouds'] > weather_limits['cloudy']:
-        currentweather['cloud status'] = 'very cloudy'
-    elif currentweather['clouds'] > weather_limits['clear']:
-        currentweather['cloud status'] = 'cloudy'
-    else:
-        currentweather['cloud status'] = 'clear'
-    if currentweather['wind'] > weather_limits['windy']:
-        currentweather['wind status'] = 'very windy'
-    elif currentweather['wind'] > weather_limits['calm']:
-        currentweather['wind status'] = 'windy'
-    else:
-        currentweather['wind status'] = 'calm'
-    if currentweather['rain'] > weather_limits['dry']:
-        currentweather['rain status'] = 'dry'
-    elif currentweather['rain'] > weather_limits['wet']:
-        currentweather['rain status'] = 'wet'
-    else:
-        currentweather['rain status'] = 'rain'
 
+    try:
+        currentweather['age'] = (datetime.utcnow() - currentweather['date']).total_seconds()
+    except Exception as e:
+        log.error(f"Failed to handle currentweather age")
+        log.error(currentweather)
+
+    try:
+        if currentweather['clouds'] > weather_limits['cloudy']:
+            currentweather['cloud status'] = 'very cloudy'
+        elif currentweather['clouds'] > weather_limits['clear']:
+            currentweather['cloud status'] = 'cloudy'
+        else:
+            currentweather['cloud status'] = 'clear'
+    except Exception as e:
+        log.error(f"Failed to handle currentweather clouds")
+        log.error(currentweather)
+
+    try:
+        if currentweather['wind'] > weather_limits['windy']:
+            currentweather['wind status'] = 'very windy'
+        elif currentweather['wind'] > weather_limits['calm']:
+            currentweather['wind status'] = 'windy'
+        else:
+            currentweather['wind status'] = 'calm'
+    except Exception as e:
+        log.error(f"Failed to handle currentweather wind")
+        log.error(currentweather)
+
+    try:
+        if currentweather['rain'] > weather_limits['dry']:
+            currentweather['rain status'] = 'dry'
+        elif currentweather['rain'] > weather_limits['wet']:
+            currentweather['rain status'] = 'wet'
+        else:
+            currentweather['rain status'] = 'rain'
+    except Exception as e:
+        log.error(f"Failed to handle currentweather rain")
+        log.error(currentweather)
 
     ## Telescope Status Query
     log.info(f"Querying telescope status database")
     query_dict = {'date': {'$gt': tick-timedelta(minutes=5), '$lt': tick}}
-    query_result = mongo_query(f'{telescope}status', query_dict)
+    query_result = mongo_query(f'{telescope}status', query_dict, cfg)
     telstatus = [d for d in query_result]
     log.info(f"  Got {len(telstatus)} data points")
     shutter_values = {0: 0, 1: 1, 2: 0, 3: 1, 4: 4}
@@ -96,7 +115,7 @@ def status(telescope):
         currentstatus['age'] = (datetime.utcnow() - currentstatus['date']).total_seconds()
         if currentstatus['dome_shutterstatus'] == 4:
             query_dict = {'dome_shutterstatus': {'$ne': 4}}
-            query_result = mongo_query(f'{telescope}status', query_dict,
+            query_result = mongo_query(f'{telescope}status', query_dict, cfg,
                                        sort=[('date', pymongo.DESCENDING)])
             last_shutter = query_result.next()
             currentstatus['dome_string'] = dome_string[last_shutter['dome_shutterstatus']]
@@ -146,8 +165,8 @@ def status(telescope):
 @app.route("/<string:telescope>/weather/<string:date>")
 def nightWeather(telescope, date):
     log.info(f'Building {__name__} nightWeather {telescope}')
-
-    script, div, currentweather = generate_weather_plot(telescope, date=date)
+    cfg = get_config()
+    script, div, currentweather = generate_weather_plot(cfg, date=date)
 
     log.info(f"Rendering template")
     return flask.render_template('nightPlot.html',
@@ -165,7 +184,7 @@ def nightWeather(telescope, date):
 @app.route("/<string:telescope>/report/<string:date>")
 def nightReport(telescope, date):
     log.info(f'Building {__name__} iqmonReport {telescope}')
-
+    cfg = get_config()
     script, div = generate_iqmon_plot(telescope, date=date)
 
     log.info(f"Rendering template")
@@ -185,13 +204,14 @@ def nightReport(telescope, date):
 def imageList(telescope, date):
     log.info(f'Building {__name__} imageList {telescope} {date}')
     subject = date
+    cfg = get_config()
 
     log.info(f"Querying image database")
     start = datetime.strptime(date, '%Y%m%dUT')
     end = start + timedelta(days=1)
     query_dict = {'telescope': telescope,
                   'date': {'$gt': start, '$lt': end}}
-    query_result = mongo_query('iqmon', query_dict)
+    query_result = mongo_query('iqmon', query_dict, cfg)
     image_list = [d for d in query_result]
     flat_count = len([d for d in image_list if d['imtype'] in ['FLAT', 'TWIFLAT']])
     cal_count = len([d for d in image_list if d['imtype'] in ['BIAS', 'DARK']])
@@ -200,7 +220,7 @@ def imageList(telescope, date):
     log.info(f"Got {len(image_list)} images")
 
     log.info(f"Getting IQMon limits")
-    query_result = mongo_query('V5limits', {})
+    query_result = mongo_query('V5limits', {}, cfg)
     iqmon_limits = query_result[0]
     for key in iqmon_limits:
         log.info(f"  {key} : {iqmon_limits[key]}")
@@ -229,10 +249,11 @@ def imageList(telescope, date):
 @app.route("/<string:telescope>/nights/")
 def nightList(telescope):
     log.info(f'Building {__name__} nightList {telescope}')
+    cfg = get_config()
 
     log.info(f"Querying image database")
     query_dict = 'UT date string'
-    query_result = mongo_query('iqmon', query_dict, distinct=True)
+    query_result = mongo_query('iqmon', query_dict, cfg, distinct=True)
     night_list = sorted(query_result, reverse=True)
     log.info(f"  Found {len(night_list)} nights")
 
@@ -244,7 +265,7 @@ def nightList(telescope):
         end = start + timedelta(days=1)
         query_dict = {'telescope': telescope,
                       'date': {'$gt': start, '$lt': end}}
-        query_result = mongo_query('iqmon', query_dict)
+        query_result = mongo_query('iqmon', query_dict, cfg)
         image_list = [d for d in query_result]
         night_info['n images'] = len(image_list)
         nights.append(night_info)

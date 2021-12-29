@@ -28,7 +28,7 @@ args = p.parse_args()
 def get_aagsolo_once():
     devicename = 'AAGSolo'
 
-    log = logging.getLogger('AAG')
+    log = logging.getLogger(devicename)
     if len(log.handlers) < 1:
         log.setLevel(logging.DEBUG)
         ## Set up console output

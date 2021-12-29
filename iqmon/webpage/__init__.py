@@ -1,5 +1,4 @@
 from pathlib import Path
-import configparser
 import logging
 import pymongo
 from datetime import datetime, timedelta
@@ -27,11 +26,8 @@ log.addHandler(LogFileHandler)
 ##-------------------------------------------------------------------------
 ## Function: mongo_query
 ##-------------------------------------------------------------------------
-def mongo_query(collection, query_dict, distinct=False, count=False,
+def mongo_query(collection, query_dict, cfg, distinct=False, count=False,
                 sort=[('date', pymongo.ASCENDING)]):
-    cfg_path = Path(__file__).parent.parent / 'configs' / 'pipeline.cfg'
-    cfg = configparser.ConfigParser()
-    cfg.read(cfg_path)
     log.debug(f'Connecting to mongo db, collection {collection}')
     mongo_host = cfg['mongo'].get('host')
     mongo_port = cfg['mongo'].getint('port')
@@ -51,12 +47,8 @@ def mongo_query(collection, query_dict, distinct=False, count=False,
 ##-------------------------------------------------------------------------
 ## Function: get_twilights
 ##-------------------------------------------------------------------------
-def get_twilights(start, end, nsample=256):
+def get_twilights(start, end, cfg, nsample=256):
     """ Determine sunrise and sunset times """
-    cfg_path = Path(__file__).parent.parent / 'configs' / 'pipeline.cfg'
-    cfg = configparser.ConfigParser()
-    cfg.read(cfg_path)
-
     location = c.EarthLocation(
         lat=cfg['Telescope'].getfloat('site_lat'),
         lon=cfg['Telescope'].getfloat('site_lon'),
@@ -94,11 +86,12 @@ def get_twilights(start, end, nsample=256):
 ##-------------------------------------------------------------------------
 ## Function: overplot_twilights
 ##-------------------------------------------------------------------------
-def overplot_twilights(plot_list, plot_end, plot_ndays=1, log=None):
+def overplot_twilights(plot_list, plot_end, cfg, plot_ndays=1, log=None):
     for days in range(1,plot_ndays+1):
         if log is not None: log.info(f'Getting twilights for {days} days ago')
         twilights = get_twilights(plot_end-timedelta(days=days),
-                                  plot_end-timedelta(days=days-1))
+                                  plot_end-timedelta(days=days-1),
+                                  cfg)
         for plot_info in plot_list:
             for j in range(len(twilights)-1):
                 name, plot, top, bottom = plot_info
