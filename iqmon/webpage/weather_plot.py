@@ -81,7 +81,7 @@ def generate_weather_plot(cfg, date=None, plot_ndays=1, span_hours=24):
             plot_temperature.legend.visible = False
         plot_temperature.yaxis.axis_label = 'Temp (F)'
         plot_temperature.yaxis.formatter = NumeralTickFormatter(format="0,0")
-        plot_temperature.yaxis.ticker = [30, 50, 70, 90]
+        plot_temperature.yaxis.ticker = [10,30, 50, 70, 90, 110]
         plot_temperature.xaxis.visible = False
 
     ##-------------------------------------------------------------------------
@@ -142,6 +142,7 @@ def generate_weather_plot(cfg, date=None, plot_ndays=1, span_hours=24):
             plot_humidity.legend.visible = False
         plot_humidity.yaxis.axis_label = 'Humidity (%)'
         plot_humidity.yaxis.formatter = NumeralTickFormatter(format="0,0")
+        plot_humidity.yaxis.ticker = [0, 20, 40, 60, 80, 100]
         plot_humidity.xaxis.visible = False
 
     ##-------------------------------------------------------------------------
