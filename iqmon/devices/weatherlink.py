@@ -80,9 +80,14 @@ class DavisWeatherLink():
         result = json.loads(r.text)
         data = result.get('data', [])
         error = result.get('error', None)
-        conditions = data.get('conditions', None)
-        if type(conditions) == list:
-            conditions = conditions[0]
+        conditions_list = data.get('conditions', None)
+        conditions = {}
+        if type(conditions_list) == list:
+            for entry in conditions_list:
+                conditions.update(entry)
+        else:
+            conditions.update(conditions_list)
+
         if error is None:
             self.log.info(f"Got {len(conditions.keys())} data points from {self.name}")
         else:
