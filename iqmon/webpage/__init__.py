@@ -2,6 +2,7 @@ from pathlib import Path
 import logging
 import pymongo
 from datetime import datetime, timedelta
+from time import sleep
 
 from astroplan import Observer
 from astropy import coordinates as c
@@ -36,13 +37,14 @@ def mongo_query(collection, query_dict, cfg,
     mongoclient = pymongo.MongoClient(mongo_host, mongo_port)
     mongo_iqmon = mongoclient[mongo_db][collection]
     if distinct is True:
-        query_result = mongo_iqmon.distinct(query_dict)
+        query_result = list(mongo_iqmon.distinct(query_dict))
     elif count is True:
         query_result = mongo_iqmon.find(query_dict).count()
     elif last is True:
-        query_result = mongo_iqmon.find(query_dict, sort=sort).limit(1)
+        query_result = list(mongo_iqmon.find(query_dict,
+                            sort=[('date', pymongo.DESCENDING)]).limit(1))
     else:
-        query_result = mongo_iqmon.find(query_dict, sort=sort)
+        query_result = list(mongo_iqmon.find(query_dict, sort=sort))
     mongoclient.close()
     return query_result
 
