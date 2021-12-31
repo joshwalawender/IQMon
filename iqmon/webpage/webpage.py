@@ -25,15 +25,27 @@ def static_path(telescope, date, filename):
 
 
 ##-------------------------------------------------------------------------
-## status: /
+## current weather: /
 ##-------------------------------------------------------------------------
 @app.route("/")
-def hello():
-    log.info(f'Building {__name__} hello')
-
+def currentWeather():
     cfg = get_config()
-
-    return status(cfg['Telescope'].get('name'))
+    date = datetime.utcnow().strftime('%Y%m%dUT')
+    telescope = cfg['Telescope'].get('name', None)
+    
+    if telescope in [None, 'None', 'none']:
+        log.info(f'Building {__name__} nightWeather')
+        script, div = generate_weather_plot(cfg, date=None)
+        log.info(f"Rendering template")
+        return flask.render_template('nightPlot.html',
+                                     telescope=telescope,
+                                     date=date,
+                                     title='Weather',
+                                     script=script,
+                                     div=div,
+                                     )
+    else:
+        return status(telescope)
 
 
 ##-------------------------------------------------------------------------
@@ -60,7 +72,7 @@ def status(telescope):
     devices = cfg['Weather'].get('devices').split(',')
     query_dict = {'date': {'$gt': tick-timedelta(minutes=10), '$lt': tick}}
     for device in devices:
-        deviceweather = [d for d in mongo_query(device, query_dict, cfg, last=True)]
+        deviceweather = mongo_query(device, query_dict, cfg, last=True)
         if len(deviceweather) > 0:
             currentdeviceweather = deviceweather[-1]
         # Look for outside temperature
@@ -73,7 +85,7 @@ def status(telescope):
              and 'date' not in currentweather.keys():
             log.info(f"{device} date {currentdeviceweather['date']}")
             currentweather['date'] = currentdeviceweather['date']
-            currentweather['age'] = (datetime.utcnow() - currentweather['date']).total_seconds()
+            currentweather['age'] = (tick - currentweather['date']).total_seconds()
         # Look for clouds
         if 'cloud value' in currentdeviceweather.keys()\
              and 'cloud value' not in currentweather.keys():
