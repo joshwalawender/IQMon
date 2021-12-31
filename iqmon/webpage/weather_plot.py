@@ -119,7 +119,7 @@ def generate_weather_plot(cfg, date=None, plot_ndays=1, span_hours=24):
                                            size=markersize, color="orange",
                                            line_alpha=0.8, fill_alpha=0.8)
 
-                    where_nothumid = np.where(plot_vals[:,1] < weather_limits['not humid'])
+                    where_nothumid = np.where(plot_vals[:,1] < weather_limits['humid'])
                     plot_humidity.circle(plot_vals[where_nothumid][:,0],
                                            plot_vals[where_nothumid][:,1],
                                            legend_label=f"{name}",
@@ -205,20 +205,20 @@ def generate_weather_plot(cfg, date=None, plot_ndays=1, span_hours=24):
             plot_vals = np.array([(d['date'], d[name]) for d in query_result if name in d.keys()])
             log.debug(f'  Got {len(plot_vals)} entries')
             if len(plot_vals) > 0:
-                where_vwindy = np.where(plot_vals[:,1] >= weather_limits['windy'])
+                where_vwindy = np.where(plot_vals[:,1] >= weather_limits['very windy'])
                 plot_wind_speed.circle(plot_vals[where_vwindy][:,0],
                                        plot_vals[where_vwindy][:,1],
                                        size=markersize, color="red",
                                        line_alpha=0.8, fill_alpha=0.8)
 
-                where_windy = np.where((plot_vals[:,1] < weather_limits['windy'])\
-                                        & (plot_vals[:,1] >= weather_limits['calm']))
+                where_windy = np.where((plot_vals[:,1] < weather_limits['very windy'])\
+                                        & (plot_vals[:,1] >= weather_limits['windy']))
                 plot_wind_speed.circle(plot_vals[where_windy][:,0],
                                        plot_vals[where_windy][:,1],
                                        size=markersize, color="orange",
                                        line_alpha=0.8, fill_alpha=0.8)
 
-                where_calm = np.where(plot_vals[:,1] < weather_limits['calm'])
+                where_calm = np.where(plot_vals[:,1] < weather_limits['windy'])
                 plot_wind_speed.circle(plot_vals[where_calm][:,0],
                                        plot_vals[where_calm][:,1],
                                        size=markersize, color="green",
