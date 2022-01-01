@@ -42,7 +42,8 @@ def generate_weather_plot(cfg, date=None, plot_ndays=1, span_hours=24):
         log.info('Build temperature plot')
         limit_string = cfg['Weather'].get(f'plot_temperature_limits', '25,95')
         ymin,ymax = limit_string.split(',')
-        plot_temperature = figure(width=900, height=120, x_axis_type="datetime",
+        height = cfg['Weather'].getint('plot_temperature_height', 120)
+        plot_temperature = figure(width=900, height=height, x_axis_type="datetime",
                                   y_range=(float(ymin),float(ymax)),
                                   x_range=(end - timedelta(hours=span_hours), end),
                                   )
@@ -90,7 +91,8 @@ def generate_weather_plot(cfg, date=None, plot_ndays=1, span_hours=24):
         log.info('Build humidity plot')
         limit_string = cfg['Weather'].get(f'plot_humidity_limits', '40,100')
         ymin,ymax = limit_string.split(',')
-        plot_humidity = figure(width=900, height=120, x_axis_type="datetime",
+        height = cfg['Weather'].getint('plot_humidity_height', 120)
+        plot_humidity = figure(width=900, height=height, x_axis_type="datetime",
                                  y_range=(float(ymin),float(ymax)),
                                  x_range=(end - timedelta(hours=span_hours), end),
                                  )
@@ -151,7 +153,8 @@ def generate_weather_plot(cfg, date=None, plot_ndays=1, span_hours=24):
         log.info('Build cloudiness plot')
         limit_string = cfg['Weather'].get(f'plot_cloudiness_limits', '-50,10')
         ymin,ymax = limit_string.split(',')
-        plot_cloudiness = figure(width=900, height=120, x_axis_type="datetime",
+        height = cfg['Weather'].getint('plot_cloudiness_height', 120)
+        plot_cloudiness = figure(width=900, height=height, x_axis_type="datetime",
                                  y_range=(float(ymin),float(ymax)),
                                  x_range=(end - timedelta(hours=span_hours), end),
                                  )
@@ -192,7 +195,8 @@ def generate_weather_plot(cfg, date=None, plot_ndays=1, span_hours=24):
         log.info('Build wind plot')
         limit_string = cfg['Weather'].get(f'plot_wind_speed_limits', '-3,85')
         ymin,ymax = limit_string.split(',')
-        plot_wind_speed = figure(width=900, height=120, x_axis_type="datetime",
+        height = cfg['Weather'].getint('plot_wind_speed_height', 120)
+        plot_wind_speed = figure(width=900, height=height, x_axis_type="datetime",
                                  y_range=(float(ymin),float(ymax)),
                                  x_range=(end - timedelta(hours=span_hours), end),
                                  )
@@ -221,8 +225,33 @@ def generate_weather_plot(cfg, date=None, plot_ndays=1, span_hours=24):
                 where_calm = np.where(plot_vals[:,1] < weather_limits['windy'])
                 plot_wind_speed.circle(plot_vals[where_calm][:,0],
                                        plot_vals[where_calm][:,1],
+                                       legend_label=f"{name}",
                                        size=markersize, color="green",
                                        line_alpha=0.8, fill_alpha=0.8)
+
+        if cfg['Weather'].get('plot_wind_gust', None) is not None:
+            plot_values = cfg['Weather'].get('plot_wind_gust').split(',')
+            query_dict = {'date': {'$gt': start, '$lt': end}}
+            for plot_value in plot_values:
+                collection, name = plot_value.split(':')
+                log.debug(f'  Querying mongo collection {collection}')
+                query_result = mongo_query(collection, query_dict, cfg)
+                plot_vals = np.array([(d['date'], d[name]) for d in query_result if name in d.keys()])
+                log.debug(f'  Got {len(plot_vals)} entries')
+                if len(plot_vals) > 0:
+                    plot_wind_speed.line(plot_vals[:,0],
+                                         plot_vals[:,1],
+                                         legend_label=f"{name}",
+                                         line_width=markersize, color="black",
+                                         line_alpha=0.3)
+        if len(plot_values) > 1 or cfg['Weather'].get('plot_wind_gust', None) is not None:
+            plot_wind_speed.legend.location = "top_left"
+            plot_wind_speed.legend.margin = 0
+            plot_wind_speed.legend.padding = 0
+            plot_wind_speed.legend.spacing = 0
+            plot_wind_speed.legend.label_text_font_size = '8pt'
+        else:
+            plot_wind_speed.legend.visible = False
         plot_wind_speed.yaxis.axis_label = 'Wind (kph)'
         plot_wind_speed.yaxis.formatter = NumeralTickFormatter(format="0,0")
         plot_wind_speed.yaxis.ticker = [0, 20, 40, 60, 80]
@@ -234,7 +263,8 @@ def generate_weather_plot(cfg, date=None, plot_ndays=1, span_hours=24):
         log.info('Build rain plot')
         limit_string = cfg['Weather'].get(f'plot_rain_limits', '500,2800')
         ymin,ymax = limit_string.split(',')
-        plot_rain = figure(width=900, height=60, x_axis_type="datetime",
+        height = cfg['Weather'].getint('plot_rain_height', 60)
+        plot_rain = figure(width=900, height=height, x_axis_type="datetime",
                                   y_range=(float(ymin),float(ymax)),
                            x_range=(end - timedelta(hours=span_hours), end),
                            )
@@ -273,7 +303,8 @@ def generate_weather_plot(cfg, date=None, plot_ndays=1, span_hours=24):
     ## Safe Plot
     if cfg['Weather'].get('plot_safe', None) is not None:
         log.info('Build safe plot')
-        plot_safe = figure(width=900, height=60, x_axis_type="datetime",
+        height = cfg['Weather'].getint('plot_safe_height', 60)
+        plot_safe = figure(width=900, height=height, x_axis_type="datetime",
                            y_range=(-0.2,1.2),
                            x_range=(end - timedelta(hours=span_hours), end),
                            )
@@ -336,7 +367,8 @@ def generate_weather_plot(cfg, date=None, plot_ndays=1, span_hours=24):
         log.info('Build Telescope Status plot')
         dome = [s['dome_numerical_status'] for s in telstatus]
         dome_date = [s['date'] for s in telstatus]
-        dome_plot = figure(width=900, height=60, x_axis_type="datetime",
+        height = cfg['Weather'].getint('plot_dome_height', 60)
+        dome_plot = figure(width=900, height=height, x_axis_type="datetime",
                            y_range=(-0.2,1.2),
                            x_range=(end - timedelta(hours=span_hours), end),
                            )
@@ -392,7 +424,7 @@ def generate_weather_plot(cfg, date=None, plot_ndays=1, span_hours=24):
         plot_column_list.append(dome_plot)
 
     # Add time log
-    plot_column_list[-1].plot_height += 50
+    plot_column_list[-1].plot_height += 40
     plot_column_list[-1].xaxis.visible = True
     plot_column_list[-1].xaxis.formatter = DatetimeTickFormatter(hourmin=['%H:%M'])
     plot_column_list[-1].xaxis.ticker = DatetimeTicker(desired_num_ticks=24)
