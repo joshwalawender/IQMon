@@ -9,6 +9,9 @@ import pymongo
 import requests
 import configparser
 
+from iqmon import get_webpage_config
+from iqmon.devices import insert_mongodoc
+
 
 ##-------------------------------------------------------------------------
 ## Parse Command Line Arguments
@@ -27,6 +30,7 @@ args = p.parse_args()
 ##-------------------------------------------------------------------------
 def get_aagsolo_once():
     devicename = 'AAGSolo'
+    cfg = get_webpage_config()
 
     log = logging.getLogger(devicename)
     if len(log.handlers) < 1:
@@ -37,21 +41,6 @@ def get_aagsolo_once():
         LogFormat = logging.Formatter('%(asctime)s %(levelname)8s: %(message)s')
         LogConsoleHandler.setFormatter(LogFormat)
         log.addHandler(LogConsoleHandler)
-
-    # Read Config File
-    cfg = configparser.ConfigParser()
-    if args.config is not None:
-        cfg_file = Path(args.config)
-        try:
-            cfg.read(cfg_path)
-        except Exception as e:
-            log.error(f"Could not read config file: {cfg_path}")
-            log.error(e)
-            args.config = None
-    if args.config is None:
-        cfg_name='pipeline.cfg'
-        cfg_path = Path(__file__).absolute().parent.parent/'configs'/cfg_name
-        cfg.read(cfg_path)
 
     log.info('Getting Weather status')
     IP = cfg[devicename].get('address', None)
@@ -89,7 +78,7 @@ def get_aagsolo_once():
         mongodoc['temperature units'] = temperature_units
 
     age = (mongodoc["querydate"] - mongodoc["date"]).total_seconds()
-    if len(result.keys()) != len(mongodoc.keys()) or len(result.keys()) != 12:
+    if len(result.keys()) != len(mongodoc.keys())-1 or len(result.keys()) != 12:
         log.warning(f'Possible missing keys')
         log.info(result)
         log.info(f'  Prepared mongodoc with {len(mongodoc.keys())} keys')
@@ -97,29 +86,13 @@ def get_aagsolo_once():
     if age > 60:
         log.warning(f'Data age = {age:.1f} seconds')
 
-    log.info(f'Connecting to mongoDB')
-    mongo_host = cfg['mongo'].get('host')
-    mongo_port = cfg['mongo'].getint('port')
-    mongo_db = cfg['mongo'].get('db')
-    mongoclient = pymongo.MongoClient(mongo_host, mongo_port)
-    collection = mongoclient[mongo_db][devicename]
-
-    try:
-        inserted_id = collection.insert_one(mongodoc).inserted_id
-        log.info("  Inserted document with id: {}".format(inserted_id))
-    except:
-        e = sys.exc_info()[0]
-        log.error('Failed to add new document')
-        log.error(e)
-    mongoclient.close()
+    insert_mongodoc(devicename, mongodoc, log=log)
     logging.shutdown()
 
 
 def monitor_aag():
     devicename = 'AAGSolo'
-    cfg_path = Path(__file__).parent.parent / 'configs' / 'pipeline.cfg'
-    cfg = configparser.ConfigParser()
-    cfg.read(cfg_path)
+    cfg = get_webpage_config()
     while True:
         get_aagsolo_once()
         sleep(cfg[devicename].getfloat('sleep', 60))

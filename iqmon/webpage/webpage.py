@@ -6,7 +6,7 @@ import pymongo
 from datetime import datetime, timedelta
 import numpy as np
 
-from iqmon import get_config
+from iqmon import get_webpage_config, get_all_configs
 from iqmon.webpage import mongo_query
 from iqmon.webpage.weather_plot import generate_weather_plot
 from iqmon.webpage.iqmon_plot import generate_iqmon_plot
@@ -25,27 +25,31 @@ def static_path(telescope, date, filename):
 
 
 ##-------------------------------------------------------------------------
-## current weather: /
+## base: /
 ##-------------------------------------------------------------------------
 @app.route("/")
-def currentWeather():
-    cfg = get_config()
-    date = datetime.utcnow().strftime('%Y%m%dUT')
-    telescope = cfg['Telescope'].get('name', None)
+def base():
+    log.info(f'')
+    log.info(f'Building {__name__} base')
+    webcfg, cfgs = get_all_configs()
     
-    if telescope in [None, 'None', 'none']:
+    if len(cfgs.keys()) == 0:
         log.info(f'Building {__name__} nightWeather')
-        script, div = generate_weather_plot(cfg, date=None)
+        script, div = generate_weather_plot(webcfg, None, date=None)
         log.info(f"Rendering template")
         return flask.render_template('nightPlot.html',
-                                     telescope=telescope,
-                                     date=date,
+                                     telescope=None,
+                                     date=datetime.utcnow().strftime('%Y%m%dUT'),
                                      title='Weather',
                                      script=script,
                                      div=div,
                                      )
     else:
-        return status(telescope)
+        if 'primary' in cfgs.keys():
+            telescope = cfgs['primary']
+            return status(telescope)
+        else:
+            return 'Hello World'
 
 
 ##-------------------------------------------------------------------------
@@ -57,24 +61,29 @@ def status(telescope):
     log.info(f'Building {__name__} status')
     tick = datetime.utcnow()
 
-    cfg = get_config()
-    script, div = generate_weather_plot(cfg, plot_ndays=2, span_hours=12)
+    webcfg, cfgs = get_all_configs()
+    if telescope not in cfgs.keys():
+        return f'Could not find config for "{telescope}"'
+    telcfg = cfgs[telescope]
+    script, div = generate_weather_plot(webcfg, telcfg, plot_ndays=2, span_hours=12)
 
     ## Format currentweather
     log.info(f"Querying weather limits")
-    query_result = mongo_query('weather_limits', {}, cfg)
+    query_result = mongo_query('weather_limits', {}, webcfg)
     weather_limits = query_result[0]
 
     ## Get Currentweather:
     ## temperature, clouds, wind, gust, rain, safe
     log.info(f'Get current weather')
     currentweather = {}
-    devices = cfg['Weather'].get('devices').split(',')
+    devices = webcfg['Weather'].get('devices').split(',')
     query_dict = {'date': {'$gt': tick-timedelta(minutes=10), '$lt': tick}}
     for device in devices:
-        deviceweather = mongo_query(device, query_dict, cfg, last=True)
+        deviceweather = mongo_query(device, query_dict, webcfg, last=True)
         if len(deviceweather) > 0:
             currentdeviceweather = deviceweather[-1]
+        else:
+            currentdeviceweather = {}
         # Look for outside temperature
         if 'outside temperature' in currentdeviceweather.keys()\
              and 'outside temperature' not in currentweather.keys():
@@ -123,7 +132,7 @@ def status(telescope):
     ## Telescope Status Query
     log.info(f"Querying telescope status database")
     query_dict = {'date': {'$gt': tick-timedelta(minutes=5), '$lt': tick}}
-    query_result = mongo_query(f'{telescope}status', query_dict, cfg)
+    query_result = mongo_query(f'{telescope}status', query_dict, telcfg)
     telstatus = [d for d in query_result]
     log.info(f"  Got {len(telstatus)} data points")
     shutter_values = {0: 0, 1: 1, 2: 0, 3: 1, 4: 4}
@@ -143,7 +152,7 @@ def status(telescope):
         currentstatus['age'] = (datetime.utcnow() - currentstatus['date']).total_seconds()
         if currentstatus['dome_shutterstatus'] == 4:
             query_dict = {'dome_shutterstatus': {'$ne': 4}}
-            query_result = mongo_query(f'{telescope}status', query_dict, cfg,
+            query_result = mongo_query(f'{telescope}status', query_dict, telcfg,
                                        sort=[('date', pymongo.DESCENDING)])
             last_shutter = query_result.next()
             currentstatus['dome_string'] = dome_string[last_shutter['dome_shutterstatus']]
@@ -177,9 +186,9 @@ def status(telescope):
                                    utcnow=datetime.utcnow(),
                                    script=script,
                                    div=div,
-                                   image=cfg['WebPage'].get('image', ''),
-                                   image_link=cfg['WebPage'].get('image_link', ''),
-                                   image_title=cfg['WebPage'].get('image_title', ''),
+                                   image=webcfg['WebPage'].get('image', ''),
+                                   image_link=webcfg['WebPage'].get('image_link', ''),
+                                   image_title=webcfg['WebPage'].get('image_title', ''),
                                    )
     tock = datetime.utcnow()
     duration = (tock-tick).total_seconds()
@@ -193,8 +202,11 @@ def status(telescope):
 @app.route("/<string:telescope>/weather/<string:date>")
 def nightWeather(telescope, date):
     log.info(f'Building {__name__} nightWeather {telescope}')
-    cfg = get_config()
-    script, div = generate_weather_plot(cfg, date=date)
+    webcfg, cfgs = get_all_configs()
+    if telescope not in cfgs.keys():
+        return f'Could not find config for "{telescope}"'
+    telcfg = cfgs[telescope]
+    script, div = generate_weather_plot(webcfg, telcfg, date=date)
 
     log.info(f"Rendering template")
     return flask.render_template('nightPlot.html',
@@ -212,8 +224,10 @@ def nightWeather(telescope, date):
 @app.route("/<string:telescope>/report/<string:date>")
 def nightReport(telescope, date):
     log.info(f'Building {__name__} iqmonReport {telescope}')
-    cfg = get_config()
-    script, div = generate_iqmon_plot(telescope, date=date)
+    webcfg, cfgs = get_all_configs()
+    if telescope not in cfgs.keys():
+        return f'Could not find config for "{telescope}"'
+    script, div = generate_iqmon_plot(cfgs[telescope], date=date)
 
     log.info(f"Rendering template")
     return flask.render_template('nightPlot.html',
@@ -232,14 +246,17 @@ def nightReport(telescope, date):
 def imageList(telescope, date):
     log.info(f'Building {__name__} imageList {telescope} {date}')
     subject = date
-    cfg = get_config()
+    webcfg, cfgs = get_all_configs()
+    if telescope not in cfgs.keys():
+        return f'Could not find config for "{telescope}"'
+    telcfg = cfgs[telescope]
 
     log.info(f"Querying image database")
     start = datetime.strptime(date, '%Y%m%dUT')
     end = start + timedelta(days=1)
     query_dict = {'telescope': telescope,
                   'date': {'$gt': start, '$lt': end}}
-    query_result = mongo_query('iqmon', query_dict, cfg)
+    query_result = mongo_query('iqmon', query_dict, telcfg)
     image_list = [d for d in query_result]
     flat_count = len([d for d in image_list if d['imtype'] in ['FLAT', 'TWIFLAT']])
     cal_count = len([d for d in image_list if d['imtype'] in ['BIAS', 'DARK']])
@@ -248,7 +265,7 @@ def imageList(telescope, date):
     log.info(f"Got {len(image_list)} images")
 
     log.info(f"Getting IQMon limits")
-    query_result = mongo_query('V5limits', {}, cfg)
+    query_result = mongo_query('V5limits', {}, telcfg)
     iqmon_limits = query_result[0]
     for key in iqmon_limits:
         log.info(f"  {key} : {iqmon_limits[key]}")
@@ -277,11 +294,14 @@ def imageList(telescope, date):
 @app.route("/<string:telescope>/nights/")
 def nightList(telescope):
     log.info(f'Building {__name__} nightList {telescope}')
-    cfg = get_config()
+    webcfg, cfgs = get_all_configs()
+    if telescope not in cfgs.keys():
+        return f'Could not find config for "{telescope}"'
+    telcfg = cfgs[telescope]
 
     log.info(f"Querying image database")
     query_dict = 'UT date string'
-    query_result = mongo_query('iqmon', query_dict, cfg, distinct=True)
+    query_result = mongo_query('iqmon', query_dict, telcfg, distinct=True)
     night_list = sorted(query_result, reverse=True)
     log.info(f"  Found {len(night_list)} nights")
 
@@ -293,7 +313,7 @@ def nightList(telescope):
         end = start + timedelta(days=1)
         query_dict = {'telescope': telescope,
                       'date': {'$gt': start, '$lt': end}}
-        query_result = mongo_query('iqmon', query_dict, cfg)
+        query_result = mongo_query('iqmon', query_dict, telcfg)
         image_list = [d for d in query_result]
         night_info['n images'] = len(image_list)
         nights.append(night_info)

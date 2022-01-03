@@ -52,14 +52,14 @@ def mongo_query(collection, query_dict, cfg,
 ##-------------------------------------------------------------------------
 ## Function: get_twilights
 ##-------------------------------------------------------------------------
-def get_twilights(start, end, cfg, nsample=256):
+def get_twilights(start, end, webcfg, nsample=256):
     """ Determine sunrise and sunset times """
     location = c.EarthLocation(
-        lat=cfg['Telescope'].getfloat('site_lat'),
-        lon=cfg['Telescope'].getfloat('site_lon'),
-        height=cfg['Telescope'].getfloat('site_elevation'),
+        lat=webcfg['site'].getfloat('site_lat'),
+        lon=webcfg['site'].getfloat('site_lon'),
+        height=webcfg['site'].getfloat('site_elevation'),
     )
-    obs = Observer(location=location, name=cfg['Telescope'].get('name'))
+    obs = Observer(location=location, name=webcfg['site'].get('name', ''))
     sunset = obs.sun_set_time(Time(start), which='next').datetime
     sunrise = obs.sun_rise_time(Time(start), which='next').datetime
 
@@ -91,12 +91,12 @@ def get_twilights(start, end, cfg, nsample=256):
 ##-------------------------------------------------------------------------
 ## Function: overplot_twilights
 ##-------------------------------------------------------------------------
-def overplot_twilights(plot_list, plot_end, cfg, plot_ndays=1, log=None):
+def overplot_twilights(plot_list, plot_end, webcfg, plot_ndays=1, log=None):
     for days in range(1,plot_ndays+1):
         if log is not None: log.info(f'Getting twilights for {days} days ago')
         twilights = get_twilights(plot_end-timedelta(days=days),
                                   plot_end-timedelta(days=days-1),
-                                  cfg)
+                                  webcfg)
         for plot_info in plot_list:
             for j in range(len(twilights)-1):
                 name, plot, top, bottom = plot_info
