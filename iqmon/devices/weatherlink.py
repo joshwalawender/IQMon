@@ -108,15 +108,6 @@ class DavisWeatherLink():
                 ('wind_dir_scalar_avg_last_10_min', 'wind direction (10 min avg)', float),
                 ('wind_speed_hi_last_10_min', 'wind gust', float),
                 ('wind_dir_at_hi_speed_last_10_min', 'wind gust direction', float),
-                ('rain_size', 'rain_size', float),
-                ('rain_rate_last', 'rain rate', float),
-                ('rain_rate_hi', 'rain rate hi', float),
-                ('rainfall_last_15_min', 'rainfall last 15 min', float),
-                ('rain_rate_hi_last_15_min', 'rain rate hi last 15 min', float),
-                ('rainfall_last_60_min', 'rainfall last 1 hour', float),
-                ('rainfall_last_24_hr', 'rainfall last 24 hours', float),
-                ('rain_storm', 'rain storm total', float),
-                ('rain_storm_start_at', 'rain storm start', datetime.fromtimestamp),
                 ('temp_in', 'inside temperature', float),
                 ('hum_in', 'inside humidity', float),
                 ('bar_sea_level', 'bar sea level', float),
@@ -126,6 +117,21 @@ class DavisWeatherLink():
         for key, mongokey, datatype in keys:
             if conditions.get(key, None) is not None:
                 mongodata[mongokey] = datatype(conditions.get(key, None))
+        # Handle rain units
+        rain_size_dict = {1: 0.01, 2: 0.2, 3:  0.1, 4: 0.001}
+        rain_size_units = {1: 'in', 2: 'mm', 3: 'mm', 4:"in"}
+        mongodata['rain size'] = rain_size_dict[int(conditions.get('rain_size'))]
+        mongodata['rain units'] = rain_size_units[int(conditions.get('rain_size'))]
+        mongodata['rain rate'] = conditions.get('rain_rate_last')*mongodata['rain size']
+        mongodata['rain rate hi'] = conditions.get('rain_rate_hi')*mongodata['rain size']
+        mongodata['rainfall last 15 min'] = conditions.get('rainfall_last_15_min')*mongodata['rain size']
+        mongodata['rain rate hi last 15 min'] = conditions.get('rain_rate_hi_last_15_min')*mongodata['rain size']
+        mongodata['rainfall last 1 hour'] = conditions.get('rainfall_last_60_min')*mongodata['rain size']
+        mongodata['rainfall last 24 hours'] = conditions.get('rainfall_last_24_hr')*mongodata['rain size']
+        mongodata['rain storm total'] = conditions.get('rain_storm')*mongodata['rain size']
+        mongodata['rain storm start'] = datetime.fromtimestamp(conditions.get('rain_storm_start_at'))\
+                                        - timedelta(hours=self.tzoffset)
+
         self.log.info(f"Parsed {len(mongodata.keys())} data points")
         mongodata['temperature units'] = self.temperature_units
 
