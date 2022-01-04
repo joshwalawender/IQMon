@@ -12,7 +12,7 @@ import socket
 import struct
 import time
 
-from iqmon import get_config
+from iqmon import get_webpage_config
 
 
 ##-------------------------------------------------------------------------
@@ -116,7 +116,7 @@ class DavisWeatherLink():
                 ('rainfall_last_60_min', 'rainfall last 1 hour', float),
                 ('rainfall_last_24_hr', 'rainfall last 24 hours', float),
                 ('rain_storm', 'rain storm total', float),
-                ('rain_storm_start_at', 'rain storm start', datetime),
+                ('rain_storm_start_at', 'rain storm start', datetime.fromtimestamp),
                 ('temp_in', 'inside temperature', float),
                 ('hum_in', 'inside humidity', float),
                 ('bar_sea_level', 'bar sea level', float),
@@ -140,7 +140,7 @@ class DavisWeatherLink():
             except Exception as err:
                 self.log.error(f'Error polling {self.name}')
                 self.log.error(err)
-            if self.collection is not None:
+            if self.collection is not None and data is not None:
                 try:
                     inserted_id = self.collection.insert_one(data).inserted_id
                     self.log.info(f"  Inserted mongo document {inserted_id}")
@@ -153,7 +153,7 @@ class DavisWeatherLink():
 
 def monitor_davis_weather_link():
     devicename = 'DavisWeatherLink'
-    cfg = get_config()
+    cfg = get_webpage_config()
 
     sleeptime = cfg[devicename].getfloat('sleep', 60)
     tzoffset = cfg[devicename].getfloat('TZoffset', 0)
