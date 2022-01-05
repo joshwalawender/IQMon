@@ -129,8 +129,9 @@ class DavisWeatherLink():
         mongodata['rainfall last 1 hour'] = conditions.get('rainfall_last_60_min')*mongodata['rain size']
         mongodata['rainfall last 24 hours'] = conditions.get('rainfall_last_24_hr')*mongodata['rain size']
         mongodata['rain storm total'] = conditions.get('rain_storm')*mongodata['rain size']
-        mongodata['rain storm start'] = datetime.fromtimestamp(conditions.get('rain_storm_start_at'))\
-                                        - timedelta(hours=self.tzoffset)
+        if conditions.get('rain_storm_start_at') is not None:
+            mongodata['rain storm start'] = datetime.fromtimestamp(conditions.get('rain_storm_start_at'))\
+                                            - timedelta(hours=self.tzoffset)
 
         self.log.info(f"Parsed {len(mongodata.keys())} data points")
         mongodata['temperature units'] = self.temperature_units
@@ -146,6 +147,7 @@ class DavisWeatherLink():
             except Exception as err:
                 self.log.error(f'Error polling {self.name}')
                 self.log.error(err)
+                data = None
             if self.collection is not None and data is not None:
                 try:
                     inserted_id = self.collection.insert_one(data).inserted_id
