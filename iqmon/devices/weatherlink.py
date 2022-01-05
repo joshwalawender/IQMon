@@ -119,7 +119,7 @@ class DavisWeatherLink():
                 mongodata[mongokey] = datatype(conditions.get(key, None))
         # Handle rain units
         rain_size_dict = {1: 0.01, 2: 0.2, 3:  0.1, 4: 0.001}
-        rain_size_units = {1: 'in', 2: 'mm', 3: 'mm', 4:"in"}
+        rain_size_units = {1: 'in', 2: 'mm', 3: 'mm', 4: 'in'}
         mongodata['rain size'] = rain_size_dict[int(conditions.get('rain_size'))]
         mongodata['rain units'] = rain_size_units[int(conditions.get('rain_size'))]
         mongodata['rain rate'] = conditions.get('rain_rate_last')*mongodata['rain size']
