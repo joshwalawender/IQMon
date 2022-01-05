@@ -13,7 +13,7 @@ def get_webpage_config():
     for file in files_to_try:
         webcfg_path = Path(file).expanduser()
         try:
-            webcfg.read(webcfg_path)
+            webcfg.read(webcfg_path, encoding='utf8')
         except:
             pass
         if webcfg.sections() != []:
@@ -29,7 +29,7 @@ def get_pipeline_config(config_file='~/.iqmon_pipeline.cfg'):
     if config_file is not None:
         cfg_path = Path(config_file).expanduser()
         try:
-            cfg.read(cfg_path)
+            cfg.read(cfg_path, encoding='utf8')
         except:
             config_file = None
     if config_file is None:
