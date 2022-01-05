@@ -2,6 +2,10 @@ import requests
 import json
 
 
+from iqmon import get_webpage_config
+from iqmon.devices import insert_mongodoc
+
+
 ##-------------------------------------------------------------------------
 ## get_alpaca
 ##-------------------------------------------------------------------------
@@ -31,7 +35,6 @@ def get_alpaca(address, devicetype, devicenumber=0):
                 'focuser': [],
                 }
 
-    commands = 
     log.info(f'Getting {devicetype} Status')
     for command in commands:
         try:
@@ -51,7 +54,7 @@ def get_alpaca(address, devicetype, devicenumber=0):
 ##-------------------------------------------------------------------------
 ## poll_ASCOM_devices
 ##-------------------------------------------------------------------------
-def poll_ASCOM_devices():
+def poll_ALPACA_devices():
     webcfg = get_webpage_config()
     
     for device in ['telescope', 'focuser', 'dome']:
@@ -75,3 +78,5 @@ def poll_ASCOM_devices():
                 get_alpaca(address, device, **deviceargs)
 
 
+if __name__ == '__main__':
+    poll_ALPACA_devices()

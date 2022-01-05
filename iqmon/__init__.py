@@ -5,19 +5,20 @@ import configparser
 ##-------------------------------------------------------------------------
 ## Function: get_webpage_config
 ##-------------------------------------------------------------------------
-def get_webpage_config(config_file='~/.iqmon_webpage.cfg'):
+def get_webpage_config():
     webcfg = configparser.ConfigParser()
-    if config_file is not None:
-        webcfg_path = Path(config_file).expanduser()
+    files_to_try = ['~/.iqmon_webpage.cfg', '~/.iqmon_webpage.cfg.lnk',
+                    Path(__file__).absolute().parent/'configs'/'webpage.cfg',
+                    ]
+    for file in files_to_try:
+        webcfg_path = Path(file).expanduser()
         try:
             webcfg.read(webcfg_path)
         except:
-            config_file = None
-    if config_file is None:
-        webcfg_name='webpage.cfg'
-        webcfg_path = Path(__file__).absolute().parent/'configs'/webcfg_name
-        webcfg.read(cfg_path)
-    return webcfg
+            pass
+        if webcfg.sections() != []:
+            return webcfg
+    return None
 
 
 ##-------------------------------------------------------------------------
@@ -41,7 +42,7 @@ def get_pipeline_config(config_file='~/.iqmon_pipeline.cfg'):
 ##-------------------------------------------------------------------------
 ## Function: get_all_configs
 ##-------------------------------------------------------------------------
-def get_all_configs(config_file='~/.iqmon_webpage.cfg'):
+def get_all_configs():
     webcfg = get_webpage_config(config_file=config_file)
 
     cfgs = {}
