@@ -103,8 +103,12 @@ def get_focuser(devicename, temperature_unit='C'):
         focuser_temp = np.median(focuser_temps)
         if (focuser_temp > -20) and (focuser_temp < 150):
             log.debug('  focuser temperature = {focuser_temp:.1f}')
-            mongodoc['temperature'] = focuser_temp
-            mongodoc['temperature unit'] = temperature_unit
+            if temperature_unit = 'C':
+                mongodoc['temperature'] = focuser_temp*1.8+32
+                mongodoc['temperature unit'] = 'F'
+            else:
+                mongodoc['temperature'] = focuser_temp
+                mongodoc['temperature unit'] = temperature_unit
 
     ## Get Position
     try:
