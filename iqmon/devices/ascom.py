@@ -93,10 +93,11 @@ def get_focuser(devicename, temperature_unit='C'):
     for i in range(0,3,1):
         try:
             newtemp = float(focuser.Temperature)
-            logger.debug('  Queried focuser temperature = {newtemp:.1f}')
+            log.debug('  Queried focuser temperature = {newtemp:.1f}')
             focuser_temps.append(newtemp)
-        except:
-            pass
+        except Exception as e:
+            log.warning('Failed to get focuser temperature')
+            log.warning(e)
     if len(focuser_temps) > 0:
         ## Filter out bad values
         focuser_temp = np.median(focuser_temps)
@@ -109,8 +110,9 @@ def get_focuser(devicename, temperature_unit='C'):
     try:
         mongodoc['position'] = int(focuser.Position)
         logger.debug('  focuser position = {mongodoc["position"]:d}')
-    except:
-        pass
+    except Exception as e:
+        log.warning('Failed to get focuser position')
+        log.warning(e)
 
     log.info(f'  Got {len(mongodoc)} entries')
     log.info(mongodoc)
