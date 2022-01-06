@@ -3,7 +3,6 @@ import pymongo
 import time
 
 from iqmon import get_webpage_config
-from iqmon.devices import ascom, alpaca
 
 def insert_mongodoc(collection, mongodoc, log=None):
     cfg = get_webpage_config()
@@ -22,13 +21,3 @@ def insert_mongodoc(collection, mongodoc, log=None):
         if log: log.error(e)
         else: print(e)
     mongoclient.close()
-
-
-def poll_ascom_and_alpaca():
-    webcfg = get_webpage_config()
-    sleeptime = webcfg['devices'].getint('polling_time', 30)
-    while True:
-        ascom.poll_ASCOM_devices()
-        alpaca.poll_ALPACA_devices()
-        time.sleep(sleeptime)
-        

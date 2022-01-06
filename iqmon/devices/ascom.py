@@ -130,28 +130,30 @@ def get_dome(devicename):
 ##-------------------------------------------------------------------------
 def poll_ASCOM_devices():
     webcfg = get_webpage_config()
-    
+    sleeptime = webcfg['devices'].getint('polling_time', 30)
     devfunctions = {'telescope': get_telescope,
                     'focuser': get_focuser,
                     'dome': get_dome,
                     }
-    for device in ['telescope', 'focuser', 'dome']:
-        deviceinfostring = webcfg['devices'].get(device, None)
-        if deviceinfostring is not None:
-            deviceinfo = deviceinfostring.split(',')
-            if len(deviceinfo) < 2 and deviceinfo[0] == 'ASCOM':
-                raise Exception(f'Device specification incomplete: {deviceinfostring}')
-            elif len(deviceinfo) == 2 and deviceinfo[0] == 'ASCOM':
-                devfunctions[device](deviceinfo[1])
-            elif len(deviceinfo) > 2 and deviceinfo[0] == 'ASCOM':
-                for entry in deviceinfo[2:]:
-                    deviceargs = {}
-                    try:
-                        key, val = entry.split(':')
-                        deviceargs[key] = val
-                    except:
-                        raise Exception(f'Device arguments not parsed: {deviceinfostring}')
-                devfunctions[device](deviceinfo[1], **deviceargs)
+    while True:
+        for device in ['telescope', 'focuser', 'dome']:
+            deviceinfostring = webcfg['devices'].get(device, None)
+            if deviceinfostring is not None:
+                deviceinfo = deviceinfostring.split(',')
+                if len(deviceinfo) < 2 and deviceinfo[0] == 'ASCOM':
+                    raise Exception(f'Device specification incomplete: {deviceinfostring}')
+                elif len(deviceinfo) == 2 and deviceinfo[0] == 'ASCOM':
+                    devfunctions[device](deviceinfo[1])
+                elif len(deviceinfo) > 2 and deviceinfo[0] == 'ASCOM':
+                    for entry in deviceinfo[2:]:
+                        deviceargs = {}
+                        try:
+                            key, val = entry.split(':')
+                            deviceargs[key] = val
+                        except:
+                            raise Exception(f'Device arguments not parsed: {deviceinfostring}')
+                    devfunctions[device](deviceinfo[1], **deviceargs)
+        time.sleep(sleeptime)
 
 
 if __name__ == '__main__':

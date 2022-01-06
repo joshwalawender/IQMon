@@ -1,4 +1,5 @@
 import sys
+import time
 import requests
 import json
 import logging
@@ -63,26 +64,28 @@ def get_alpaca(address, devicetype, devicenumber=0):
 ##-------------------------------------------------------------------------
 def poll_ALPACA_devices():
     webcfg = get_webpage_config()
-    
-    for device in ['telescope', 'focuser', 'dome']:
-        deviceinfostring = webcfg['devices'].get(device, None)
-        if deviceinfostring is not None:
-            deviceinfo = deviceinfostring.split(',')
-            if len(deviceinfo) < 2 and deviceinfo[0] == 'ALPACA':
-                raise Exception(f'Device specification incomplete: {deviceinfostring}')
-            elif len(deviceinfo) == 2 and deviceinfo[0] == 'ALPACA':
-                address = deviceinfo[1]
-                get_alpaca(address, device, devicenumber=0)
-            elif len(deviceinfo) > 2 and deviceinfo[0] == 'ALPACA':
-                for entry in deviceinfo[2:]:
-                    deviceargs = {}
-                    try:
-                        key, val = entry.split(':')
-                        deviceargs[key] = val
-                    except:
-                        raise Exception(f'Device arguments not parsed: {deviceinfostring}')
-                address = deviceinfo[1]
-                get_alpaca(address, device, **deviceargs)
+    sleeptime = webcfg['devices'].getint('polling_time', 30)
+    while True:
+        for device in ['telescope', 'focuser', 'dome']:
+            deviceinfostring = webcfg['devices'].get(device, None)
+            if deviceinfostring is not None:
+                deviceinfo = deviceinfostring.split(',')
+                if len(deviceinfo) < 2 and deviceinfo[0] == 'ALPACA':
+                    raise Exception(f'Device specification incomplete: {deviceinfostring}')
+                elif len(deviceinfo) == 2 and deviceinfo[0] == 'ALPACA':
+                    address = deviceinfo[1]
+                    get_alpaca(address, device, devicenumber=0)
+                elif len(deviceinfo) > 2 and deviceinfo[0] == 'ALPACA':
+                    for entry in deviceinfo[2:]:
+                        deviceargs = {}
+                        try:
+                            key, val = entry.split(':')
+                            deviceargs[key] = val
+                        except:
+                            raise Exception(f'Device arguments not parsed: {deviceinfostring}')
+                    address = deviceinfo[1]
+                    get_alpaca(address, device, **deviceargs)
+        time.sleep(sleeptime)
 
 
 if __name__ == '__main__':
