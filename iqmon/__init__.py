@@ -7,7 +7,7 @@ import configparser
 ##-------------------------------------------------------------------------
 def get_webpage_config():
     webcfg = configparser.ConfigParser()
-    files_to_try = ['~/.iqmon_webpage.cfg', '~/.iqmon_webpage.cfg.lnk',
+    files_to_try = ['~/.iqmon_webpage.cfg', '~/iqmon_webpage.cfg',
                     Path(__file__).absolute().parent/'configs'/'webpage.cfg',
                     ]
     for file in files_to_try:

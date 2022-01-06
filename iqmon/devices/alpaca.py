@@ -1,5 +1,9 @@
+import sys
 import requests
 import json
+import logging
+from datetime import datetime, timedelta
+import pymongo
 
 
 from iqmon import get_webpage_config
@@ -21,32 +25,35 @@ def get_alpaca(address, devicetype, devicenumber=0):
         log.addHandler(LogConsoleHandler)
 
     url = f"{address}/api/v1/{devicetype}/{devicenumber}"
+    if url[0:7] != 'http://':
+        url = 'http://' + url
     mongodoc = {'date': datetime.utcnow(),
                 'source': f'ALPACA:{url}'}
 
-    commands = {'dome': [('connected', str),
-                         ('shutterstatus', str),
-                         ('atpark', str),
-                         ('athome', str),
+    commands = {'dome': [('connected', bool),
+                         ('shutterstatus', int),
+                         ('atpark', bool),
+                         ('athome', bool),
                          ('azimuth', float),
-                         ('slaved', str),
-                         ('slewing', str)],
+                         ('slaved', bool),
+                         ('slewing', bool)],
                 'telescope': [],
                 'focuser': [],
                 }
 
-    log.info(f'Getting {devicetype} Status')
-    for command in commands:
+    log.info(f'Getting {devicetype} info')
+    for command in commands[devicetype]:
         try:
+            log.info(f'  Getting {url}/{command[0]}')
             r = requests.get(f"{url}/{command[0]}")
             j = json.loads(r.text)
-            mongodoc[command] = command[1](j['Value'])
+            mongodoc[command[0]] = command[1](j['Value'])
         except:
-            logger.warning(f'  Failed to get {devicetype} status: {command}')
+            log.warning(f'  Failed to get {command[0]}')
         else:
-            logger.debug(f'  {command} = {mongodoc[command]}')
+            log.info(f'  Got {devicetype} {command[0]} = {mongodoc[command[0]]}')
 
-    log.info(f'  Got {len(mongodoc)} entries')
+    log.info(f'Got {len(mongodoc)} entries')
     insert_mongodoc(devicetype, mongodoc, log=log)
     logging.shutdown()
 
