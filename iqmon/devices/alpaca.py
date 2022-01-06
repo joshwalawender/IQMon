@@ -20,7 +20,7 @@ def get_alpaca(address, devicetype, devicenumber=0):
         log.setLevel(logging.DEBUG)
         ## Set up console output
         LogConsoleHandler = logging.StreamHandler()
-        LogConsoleHandler.setLevel(logging.INFO)
+        LogConsoleHandler.setLevel(logging.DEBUG)
         LogFormat = logging.Formatter('%(asctime)s %(levelname)8s: %(message)s')
         LogConsoleHandler.setFormatter(LogFormat)
         log.addHandler(LogConsoleHandler)
