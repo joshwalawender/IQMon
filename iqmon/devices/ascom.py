@@ -52,6 +52,7 @@ def get_telescope(devicename):
         mongodoc['connected'] = False
 
     log.info(f'  Got {len(mongodoc)} entries')
+    log.info(mongodoc)
     insert_mongodoc('telescope', mongodoc, log=log)
     logging.shutdown()
 
@@ -111,6 +112,7 @@ def get_focuser(devicename, temperature_unit='C'):
         pass
 
     log.info(f'  Got {len(mongodoc)} entries')
+    log.info(mongodoc)
     insert_mongodoc('focuser', mongodoc, log=log)
     logging.shutdown()
 
@@ -140,7 +142,7 @@ def poll_ASCOM_devices():
             if len(deviceinfo) < 2 and deviceinfo[0] == 'ASCOM':
                 raise Exception(f'Device specification incomplete: {deviceinfostring}')
             elif len(deviceinfo) == 2 and deviceinfo[0] == 'ASCOM':
-                devfunctions[device](deviceinfo[0])
+                devfunctions[device](deviceinfo[1])
             elif len(deviceinfo) > 2 and deviceinfo[0] == 'ASCOM':
                 for entry in deviceinfo[2:]:
                     deviceargs = {}
@@ -149,7 +151,7 @@ def poll_ASCOM_devices():
                         deviceargs[key] = val
                     except:
                         raise Exception(f'Device arguments not parsed: {deviceinfostring}')
-                devfunctions[device](deviceinfo[0], **deviceargs)
+                devfunctions[device](deviceinfo[1], **deviceargs)
 
 
 if __name__ == '__main__':

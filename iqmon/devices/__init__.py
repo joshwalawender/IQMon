@@ -1,8 +1,9 @@
 import sys
 import pymongo
+import time
 
 from iqmon import get_webpage_config
-
+from iqmon.devices import ascom, alpaca
 
 def insert_mongodoc(collection, mongodoc, log=None):
     cfg = get_webpage_config()
@@ -23,10 +24,11 @@ def insert_mongodoc(collection, mongodoc, log=None):
     mongoclient.close()
 
 
-def query_non_weather_devices(cfg=None):
-    if cfg is None:
-        cfg = get_config()
-
-    # Telescope
-    if cfg['devices'].get('telescope', None) is not None:
-        query_type, 
+def poll_ascom_and_alpaca():
+    webcfg = get_webpage_config()
+    sleeptime = webcfg['devices'].getint('polling_time', 30)
+    while True:
+        ascom.poll_ASCOM_devices()
+        alpaca.poll_ALPACA_devices()
+        time.sleep(sleeptime)
+        

@@ -43,7 +43,7 @@ def get_pipeline_config(config_file='~/.iqmon_pipeline.cfg'):
 ## Function: get_all_configs
 ##-------------------------------------------------------------------------
 def get_all_configs():
-    webcfg = get_webpage_config(config_file=config_file)
+    webcfg = get_webpage_config()
 
     cfgs = {}
     pipeline_config_files = webcfg['Telescopes'].get('pipeline_config_files', None)
