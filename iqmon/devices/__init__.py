@@ -1,6 +1,5 @@
 import sys
 import pymongo
-import time
 
 from iqmon import get_webpage_config
 
