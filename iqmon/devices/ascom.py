@@ -38,10 +38,8 @@ def get_telescope(telname, devicename):
         return
 
     try:
-        log.info(ASCOMtel.Connected)
-        log.info(type(ASCOMtel.Connected))
         mongodoc['connected'] = bool(ASCOMtel.Connected),
-        log.debug(f'  Telescope Connected = {mongodoc["connected"]}')
+        log.info(f'  Telescope Connected = {mongodoc["connected"]}')
         if mongodoc['connected']:
             mongodoc['park'] = bool(ASCOMtel.AtPark)
             mongodoc['slewing'] = bool(ASCOMtel.Slewing)
