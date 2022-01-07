@@ -141,6 +141,8 @@ def poll_ASCOM_devices():
     webcfg, cfgs = get_all_configs()
     if 'primary' in cfgs.keys():
         defaulttelescope = cfgs['primary']
+    else:
+        defaulttelescope = None
 
     ## create a parser object for understanding command-line arguments
     p = argparse.ArgumentParser(description='''
