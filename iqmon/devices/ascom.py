@@ -38,12 +38,14 @@ def get_telescope(telname, devicename):
         return
 
     try:
+        log.info(ASCOMtel.Connected)
+        log.info(type(ASCOMtel.Connected))
         mongodoc['connected'] = bool(ASCOMtel.Connected),
         log.debug(f'  Telescope Connected = {mongodoc["connected"]}')
         if mongodoc['connected']:
-            mongodoc['park'] = ASCOMtel.AtPark
-            mongodoc['slewing'] = ASCOMtel.Slewing
-            mongodoc['tracking'] = ASCOMtel.Tracking
+            mongodoc['park'] = bool(ASCOMtel.AtPark)
+            mongodoc['slewing'] = bool(ASCOMtel.Slewing)
+            mongodoc['tracking'] = bool(ASCOMtel.Tracking)
             mongodoc['alt'] = float(ASCOMtel.Altitude)
             mongodoc['az'] = float(ASCOMtel.Azimuth)
     except pywintypes.com_error as err:
