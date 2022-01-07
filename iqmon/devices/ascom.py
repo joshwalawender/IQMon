@@ -9,7 +9,7 @@ import numpy as np
 import win32com.client
 import pywintypes
 
-from iqmon import get_webpage_config
+from iqmon import get_all_configs
 from iqmon.devices import insert_mongodoc
 
 
