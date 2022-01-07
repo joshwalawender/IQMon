@@ -137,15 +137,27 @@ def get_dome(devicename):
 ## poll_ASCOM_devices
 ##-------------------------------------------------------------------------
 def poll_ASCOM_devices():
-    webcfg = get_webpage_config()
-    sleeptime = webcfg['devices'].getint('polling_time', 30)
+    webcfg, cfgs = get_all_configs()
+    if 'primary' in cfgs.keys():
+        defaulttelescope = cfgs['primary']
+
+    ## create a parser object for understanding command-line arguments
+    p = argparse.ArgumentParser(description='''
+    ''')
+    p.add_argument("-t", "--telescope", dest="telescope", type=str,
+                   default=defaulttelescope,
+                   help="Which telescope is this polling.")
+    args = p.parse_args()
+
+    cfg = cfgs[args.telescope]
+    sleeptime = cfg['devices'].getint('polling_time', 30)
     devfunctions = {'telescope': get_telescope,
                     'focuser': get_focuser,
                     'dome': get_dome,
                     }
     while True:
         for device in ['telescope', 'focuser', 'dome']:
-            deviceinfostring = webcfg['devices'].get(device, None)
+            deviceinfostring = cfg['devices'].get(device, None)
             if deviceinfostring is not None:
                 deviceinfo = deviceinfostring.split(',')
                 if len(deviceinfo) < 2 and deviceinfo[0] == 'ASCOM':

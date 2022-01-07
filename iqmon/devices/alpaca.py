@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import pymongo
 
 
-from iqmon import get_webpage_config
+from iqmon import get_all_configs
 from iqmon.devices import insert_mongodoc
 
 
@@ -64,7 +64,6 @@ def get_alpaca(address, telescope, devicetype, devicenumber=0):
 ##-------------------------------------------------------------------------
 def poll_ALPACA_devices():
     webcfg, cfgs = get_all_configs()
-
     if 'primary' in cfgs.keys():
         defaulttelescope = cfgs['primary']
 
