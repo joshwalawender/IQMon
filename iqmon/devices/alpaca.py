@@ -14,7 +14,7 @@ from iqmon.devices import insert_mongodoc
 ##-------------------------------------------------------------------------
 ## get_alpaca
 ##-------------------------------------------------------------------------
-def get_alpaca(address, devicetype, devicenumber=0):
+def get_alpaca(address, telescope, devicetype, devicenumber=0):
     log = logging.getLogger(devicetype)
     if len(log.handlers) < 1:
         log.setLevel(logging.DEBUG)
@@ -55,7 +55,7 @@ def get_alpaca(address, devicetype, devicenumber=0):
             log.info(f'  Got {devicetype} {command[0]} = {mongodoc[command[0]]}')
 
     log.info(f'Got {len(mongodoc)} entries')
-    insert_mongodoc(devicetype, mongodoc, log=log)
+    insert_mongodoc(f"{telescope}_{devicetype}", mongodoc, log=log)
     logging.shutdown()
 
 
@@ -63,18 +63,32 @@ def get_alpaca(address, devicetype, devicenumber=0):
 ## poll_ASCOM_devices
 ##-------------------------------------------------------------------------
 def poll_ALPACA_devices():
-    webcfg = get_webpage_config()
-    sleeptime = webcfg['devices'].getint('polling_time', 30)
+    webcfg, cfgs = get_all_configs()
+
+    if 'primary' in cfgs.keys():
+        defaulttelescope = cfgs['primary']
+
+    ## create a parser object for understanding command-line arguments
+    p = argparse.ArgumentParser(description='''
+    ''')
+    p.add_argument("-t", "--telescope", dest="telescope", type=str,
+                   default=defaulttelescope,
+                   help="Which telescope is this polling.")
+    args = p.parse_args()
+
+    cfg = cfgs[args.telescope]
+    sleeptime = cfg['devices'].getint('polling_time', 30)
     while True:
         for device in ['telescope', 'focuser', 'dome']:
-            deviceinfostring = webcfg['devices'].get(device, None)
+            deviceinfostring = cfg['devices'].get(device, None)
             if deviceinfostring is not None:
                 deviceinfo = deviceinfostring.split(',')
                 if len(deviceinfo) < 2 and deviceinfo[0] == 'ALPACA':
-                    raise Exception(f'Device specification incomplete: {deviceinfostring}')
+                    msg = f'Device specification incomplete: {deviceinfostring}'
+                    raise Exception(msg)
                 elif len(deviceinfo) == 2 and deviceinfo[0] == 'ALPACA':
                     address = deviceinfo[1]
-                    get_alpaca(address, device, devicenumber=0)
+                    get_alpaca(address, args.telescope, device, devicenumber=0)
                 elif len(deviceinfo) > 2 and deviceinfo[0] == 'ALPACA':
                     for entry in deviceinfo[2:]:
                         deviceargs = {}
@@ -82,9 +96,10 @@ def poll_ALPACA_devices():
                             key, val = entry.split(':')
                             deviceargs[key] = val
                         except:
-                            raise Exception(f'Device arguments not parsed: {deviceinfostring}')
+                            msg = f'Device info not parsed: {deviceinfostring}'
+                            raise Exception(ms)
                     address = deviceinfo[1]
-                    get_alpaca(address, device, **deviceargs)
+                    get_alpaca(address, args.telescope, device, **deviceargs)
         time.sleep(sleeptime)
 
 
