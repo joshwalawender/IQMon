@@ -129,37 +129,49 @@ def status(telescope):
             else:
                 currentweather['rain status'] = 'rain'
 
-    ## Telescope Status Query
-    log.info(f"Querying telescope status database")
+    ## Dome Status
+    log.info(f"Querying dome status database")
     query_dict = {'date': {'$gt': tick-timedelta(minutes=5), '$lt': tick}}
-    query_result = mongo_query(f'{telescope}status', query_dict, telcfg)
-    telstatus = [d for d in query_result]
-    log.info(f"  Got {len(telstatus)} data points")
+    query_result = mongo_query(f'{telescope}_dome', query_dict, telcfg)
+    domestatus = [d for d in query_result]
+    log.info(f"  Got {len(domestatus)} data points")
     shutter_values = {0: 0, 1: 1, 2: 0, 3: 1, 4: 4}
-    for i,d in enumerate(telstatus):
-        if d['dome_shutterstatus'] == 4 and i > 0:
-            telstatus[i]['dome_numerical_status'] = telstatus[i-1]['dome_numerical_status']
+    for i,d in enumerate(domestatus):
+        if d['shutterstatus'] == 4 and i > 0:
+            domestatus[i]['open_closed'] = domestatus[i-1]['open_closed']
         else:
-            telstatus[i]['dome_numerical_status'] = shutter_values[d['dome_shutterstatus']]
+            domestatus[i]['open_closed'] = shutter_values[d['shutterstatus']]
     ## Format currentstatus
     dome_string = {0: 'Open', 1: 'Closed', 2: 'Opening', 3: 'Closing', 4: 'Unknown'}
     dome_color = {0: 'green', 1: 'red', 2: 'orange', 3: 'orange', 4: 'black'}
     try:
-        currentstatus = telstatus[-1]
+        currentstatus = domestatus[-1]
     except:
         currentstatus = {}
     else:
         currentstatus['age'] = (datetime.utcnow() - currentstatus['date']).total_seconds()
-        if currentstatus['dome_shutterstatus'] == 4:
-            query_dict = {'dome_shutterstatus': {'$ne': 4}}
-            query_result = mongo_query(f'{telescope}status', query_dict, telcfg,
+        if currentstatus['shutterstatus'] == 4:
+            query_dict = {'shutterstatus': {'$ne': 4}}
+            query_result = mongo_query(f'{telescope}_dome', query_dict, telcfg,
                                        sort=[('date', pymongo.DESCENDING)])
             last_shutter = query_result.next()
-            currentstatus['dome_string'] = dome_string[last_shutter['dome_shutterstatus']]
-            currentstatus['dome_color'] = dome_color[last_shutter['dome_shutterstatus']]
+            currentstatus['dome_string'] = dome_string[last_shutter['shutterstatus']]
+            currentstatus['dome_color'] = dome_color[last_shutter['shutterstatus']]
         else:
-            currentstatus['dome_string'] = dome_string[currentstatus['dome_shutterstatus']]
-            currentstatus['dome_color'] = dome_color[currentstatus['dome_shutterstatus']]
+            currentstatus['dome_string'] = dome_string[currentstatus['shutterstatus']]
+            currentstatus['dome_color'] = dome_color[currentstatus['shutterstatus']]
+
+    ## Telescope Status
+    log.info(f"Querying telescope status database")
+    query_dict = {'date': {'$gt': tick-timedelta(minutes=5), '$lt': tick}}
+    query_result = mongo_query(f'{telescope}_telescope', query_dict, telcfg)
+    telescopestatus = [d for d in query_result]
+    log.info(f"  Got {len(telescopestatus)} data points")
+    ## Format currentstatus
+    if len(telescopestatus) > 0:
+        log.info(currentstatus)
+        currentstatus.update(telescopestatus[-1])
+        log.info(currentstatus)
         if currentstatus['connected'] is True:
             currentstatus['alt'] = f"{currentstatus['alt']:.1f}"
             currentstatus['az'] = f"{currentstatus['az']:.1f}"

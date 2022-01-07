@@ -354,21 +354,21 @@ def generate_weather_plot(webcfg, telcfg, date=None, plot_ndays=1, span_hours=24
         plot_safe.xaxis.visible = False
 
     ##-------------------------------------------------------------------------
-    ## Telescope Status Plot
+    ## Dome Status Plot
     ##-------------------------------------------------------------------------
     if webcfg['Weather'].getboolean('plot_dome', False) is True and telcfg is not None:
         telescope = telcfg['Telescope'].get('name')
         ## Telescope Status Query
-        log.info(f"Querying telescope status database")
+        log.info(f"Querying dome status database")
         query_dict = {'date': {'$gt': start, '$lt': end}}
-        telstatus = mongo_query(f'{telescope}status', query_dict, telcfg)
-        log.info(f"  Got {len(telstatus)} data points")
+        domestatus = mongo_query(f'{telescope}_dome', query_dict, telcfg)
+        log.info(f"  Got {len(domestatus)} data points")
         shutter_values = {0: 0, 1: 1, 2: 0, 3: 1, 4: 4}
-        for i,d in enumerate(telstatus):
-            if d['dome_shutterstatus'] == 4 and i > 0:
-                telstatus[i]['dome_numerical_status'] = telstatus[i-1]['dome_numerical_status']
+        for i,d in enumerate(domestatus):
+            if d['shutterstatus'] == 4 and i > 0:
+                domestatus[i]['open_closed'] = domestatus[i-1]['open_closed']
             else:
-                telstatus[i]['dome_numerical_status'] = shutter_values[d['dome_shutterstatus']]
+                domestatus[i]['open_closed'] = shutter_values[d['shutterstatus']]
 
         ## IQMon Query
         log.info(f"Querying IQMon results database")
@@ -385,8 +385,8 @@ def generate_weather_plot(webcfg, telcfg, date=None, plot_ndays=1, span_hours=24
 
         ## Build Telescope Status plot
         log.info('Build Telescope Status plot')
-        dome = [s['dome_numerical_status'] for s in telstatus]
-        dome_date = [s['date'] for s in telstatus]
+        dome = [s['open_closed'] for s in domestatus]
+        dome_date = [s['date'] for s in domestatus]
         height = webcfg['Weather'].getint('plot_dome_height', 60)
         dome_plot = figure(width=900, height=height, x_axis_type="datetime",
                            y_range=(-0.2,1.2),
