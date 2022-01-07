@@ -52,13 +52,22 @@ def generate_weather_plot(webcfg, telcfg, date=None, plot_ndays=1, span_hours=24
             collection, name = plot_value.split(':')
             log.debug(f'  Querying mongo collection {collection}')
             query_result = mongo_query(collection, query_dict, webcfg)
-            plot_vals = np.array([(d['date'], d[name]) for d in query_result if name in d.keys()])
+
+            plot_vals = []
+            for d in query_result:
+                if name in d.keys():
+                    if d.get(f"{name} units", None) == 'C':
+                        plot_vals.append((d['date'], d[name]*1.8+32))
+                    elif d.get(f"{name} unit", None) == 'C':
+                        plot_vals.append((d['date'], d[name]*1.8+32))
+                    elif d.get("temperature units", None) == 'C':
+                        plot_vals.append((d['date'], d[name]*1.8+32))
+                    else:
+                        plot_vals.append((d['date'], d[name]))
+            plot_vals = np.array(plot_vals)
+
             if len(plot_vals) == 0:
                 log.warning(f'Found 0 data points for {collection}:{name}')
-            temperature_units = webcfg[collection].get('temperature_units', 'F')
-            if temperature_units == 'C' and len(plot_vals) > 0:
-                log.info('  Converting temperature plot from C to F')
-                plot_vals[:,1] = plot_vals[:,1]*1.8+32
 
             log.debug(f'  Got {len(plot_vals)} entries')
             if len(plot_vals) > 0:
@@ -203,7 +212,20 @@ def generate_weather_plot(webcfg, telcfg, date=None, plot_ndays=1, span_hours=24
             collection, name = plot_value.split(':')
             log.debug(f'  Querying mongo collection {collection}')
             query_result = mongo_query(collection, query_dict, webcfg)
-            plot_vals = np.array([(d['date'], d[name]) for d in query_result if name in d.keys()])
+
+            plot_vals = []
+            for d in query_result:
+                if name in d.keys():
+                    if d.get(f"{name} units", None) == 'kph':
+                        plot_vals.append((d['date'], d[name]*1.61))
+                    elif d.get(f"{name} unit", None) == 'kph':
+                        plot_vals.append((d['date'], d[name]*1.61))
+                    elif d.get("wind speed units", None) == 'kph':
+                        plot_vals.append((d['date'], d[name]*1.61))
+                    else:
+                        plot_vals.append((d['date'], d[name]))
+            plot_vals = np.array(plot_vals)
+
             log.debug(f'  Got {len(plot_vals)} entries')
             if len(plot_vals) > 0:
                 where_vwindy = np.where(plot_vals[:,1] >= weather_limits['very windy'])
@@ -249,7 +271,7 @@ def generate_weather_plot(webcfg, telcfg, date=None, plot_ndays=1, span_hours=24
             plot_wind_speed.legend.label_text_font_size = '8pt'
         else:
             plot_wind_speed.legend.visible = False
-        plot_wind_speed.yaxis.axis_label = 'Wind (kph)'
+        plot_wind_speed.yaxis.axis_label = 'Wind (mph)'
         plot_wind_speed.yaxis.formatter = NumeralTickFormatter(format="0,0")
         plot_wind_speed.yaxis.ticker = [0, 20, 40, 60, 80]
         plot_wind_speed.xaxis.visible = False

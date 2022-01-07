@@ -61,7 +61,7 @@ def get_telescope(devicename):
 ##-------------------------------------------------------------------------
 ## get_focuser
 ##-------------------------------------------------------------------------
-def get_focuser(devicename, temperature_unit='C'):
+def get_focuser(devicename, temperature_units='C'):
     log = logging.getLogger('focuser')
     if len(log.handlers) < 1:
         log.setLevel(logging.DEBUG)
@@ -103,18 +103,18 @@ def get_focuser(devicename, temperature_unit='C'):
         focuser_temp = np.median(focuser_temps)
         if (focuser_temp > -20) and (focuser_temp < 150):
             log.debug('  focuser temperature = {focuser_temp:.1f}')
-            if temperature_unit == 'C':
+            if temperature_units == 'C':
                 log.debug('  Converting C to F')
                 mongodoc['temperature'] = focuser_temp*1.8+32
-                mongodoc['temperature unit'] = 'F'
+                mongodoc['temperature units'] = 'F'
             else:
                 mongodoc['temperature'] = focuser_temp
-                mongodoc['temperature unit'] = temperature_unit
+                mongodoc['temperature units'] = temperature_units
 
     ## Get Position
     try:
         mongodoc['position'] = int(focuser.Position)
-        log.debug('  focuser position = {mongodoc["position"]:d}')
+        log.debug(f'  focuser position = {mongodoc["position"]:d}')
     except Exception as e:
         log.warning('Failed to get focuser position')
         log.warning(e)

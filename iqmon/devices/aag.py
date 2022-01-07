@@ -76,6 +76,9 @@ def get_aagsolo_once():
     temperature_units = cfg[devicename].get('temperature_units', None)
     if temperature_units is not None:
         mongodoc['temperature units'] = temperature_units
+    wind_speed_units = cfg[devicename].get('wind_speed_units', None)
+    if wind_speed_units is not None:
+        mongodoc['wind speed units'] = wind_speed_units
 
     age = (mongodoc["querydate"] - mongodoc["date"]).total_seconds()
     if len(result.keys()) != len(mongodoc.keys())-1 or len(result.keys()) != 12:
