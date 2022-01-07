@@ -78,6 +78,9 @@ def poll_ALPACA_devices():
                    help="Which telescope is this polling.")
     args = p.parse_args()
 
+    if args.telescope not in cfgs.keys():
+        print(f'{args.telescope} not in configs: {cfgs.keys()}')
+        return
     cfg = cfgs[args.telescope]
     sleeptime = cfg['devices'].getint('polling_time', 30)
     while True:
