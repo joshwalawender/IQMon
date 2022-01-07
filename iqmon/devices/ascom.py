@@ -16,7 +16,7 @@ from iqmon.devices import insert_mongodoc
 ##-------------------------------------------------------------------------
 ## get_telescope
 ##-------------------------------------------------------------------------
-def get_telescope(devicename):
+def get_telescope(telname, devicename):
     log = logging.getLogger('telescope')
     if len(log.handlers) < 1:
         log.setLevel(logging.DEBUG)
@@ -55,14 +55,14 @@ def get_telescope(devicename):
 
     log.info(f'  Got {len(mongodoc)} entries')
     log.info(mongodoc)
-    insert_mongodoc('telescope', mongodoc, log=log)
+    insert_mongodoc(f'{telname}_telescope', mongodoc, log=log)
     logging.shutdown()
 
 
 ##-------------------------------------------------------------------------
 ## get_focuser
 ##-------------------------------------------------------------------------
-def get_focuser(devicename, temperature_units='C'):
+def get_focuser(telname, devicename, temperature_units='C'):
     log = logging.getLogger('focuser')
     if len(log.handlers) < 1:
         log.setLevel(logging.DEBUG)
@@ -122,7 +122,7 @@ def get_focuser(devicename, temperature_units='C'):
 
     log.info(f'  Got {len(mongodoc)} entries')
     log.info(mongodoc)
-    insert_mongodoc('focuser', mongodoc, log=log)
+    insert_mongodoc(f'{telname}_focuser', mongodoc, log=log)
     logging.shutdown()
 
 
@@ -169,7 +169,7 @@ def poll_ASCOM_devices():
                 if len(deviceinfo) < 2 and deviceinfo[0] == 'ASCOM':
                     raise Exception(f'Device specification incomplete: {deviceinfostring}')
                 elif len(deviceinfo) == 2 and deviceinfo[0] == 'ASCOM':
-                    devfunctions[device](deviceinfo[1])
+                    devfunctions[device](args.telescope, deviceinfo[1])
                 elif len(deviceinfo) > 2 and deviceinfo[0] == 'ASCOM':
                     for entry in deviceinfo[2:]:
                         deviceargs = {}
@@ -178,7 +178,7 @@ def poll_ASCOM_devices():
                             deviceargs[key] = val
                         except:
                             raise Exception(f'Device arguments not parsed: {deviceinfostring}')
-                    devfunctions[device](deviceinfo[1], **deviceargs)
+                    devfunctions[device](args.telescope, deviceinfo[1], **deviceargs)
         time.sleep(sleeptime)
 
 
