@@ -89,6 +89,10 @@ def status(telescope):
              and 'outside temperature' not in currentweather.keys():
             log.info(f"{device} outside temperature {currentdeviceweather['outside temperature']}")
             currentweather['outside temperature'] = currentdeviceweather['outside temperature']
+        if 'temperature units' in currentdeviceweather.keys()\
+             and 'temperature units' not in currentweather.keys():
+            log.info(f"{device} temperature units {currentdeviceweather['temperature units']}")
+            currentweather['temperature units'] = currentdeviceweather['temperature units']
         # Look for date
         if 'date' in currentdeviceweather.keys()\
              and 'date' not in currentweather.keys():
@@ -107,16 +111,20 @@ def status(telescope):
             else:
                 currentweather['cloud status'] = 'clear'
         # Look for wind
-        if 'wind value' in currentdeviceweather.keys()\
-             and 'wind value' not in currentweather.keys():
-            log.info(f"{device} wind value {currentdeviceweather['wind value']}")
-            currentweather['wind value'] = currentdeviceweather['wind value']
-            if currentweather['wind value'] > weather_limits['windy']:
+        if 'wind speed' in currentdeviceweather.keys()\
+             and 'wind speed' not in currentweather.keys():
+            log.info(f"{device} wind speed {currentdeviceweather['wind speed']}")
+            currentweather['wind speed'] = currentdeviceweather['wind speed']
+            if currentweather['wind speed'] > weather_limits['windy']:
                 currentweather['wind status'] = 'very windy'
-            elif currentweather['wind value'] > weather_limits['calm']:
+            elif currentweather['wind speed'] > weather_limits['calm']:
                 currentweather['wind status'] = 'windy'
             else:
                 currentweather['wind status'] = 'calm'
+        if 'wind speed units' in currentdeviceweather.keys()\
+             and 'wind speed units' not in currentweather.keys():
+            log.info(f"{device} wind speed units {currentdeviceweather['wind speed units']}")
+            currentweather['wind speed units'] = currentdeviceweather['wind speed units']
         # Look for rain
         if 'rain value' in currentdeviceweather.keys()\
              and 'rain value' not in currentweather.keys():

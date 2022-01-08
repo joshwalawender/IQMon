@@ -363,7 +363,8 @@ def generate_weather_plot(webcfg, telcfg, date=None, plot_ndays=1, span_hours=24
         query_dict = {'date': {'$gt': start, '$lt': end}}
         domestatus = mongo_query(f'{telescope}_dome', query_dict, telcfg)
         log.info(f"  Got {len(domestatus)} data points")
-        shutter_values = {0: 0, 1: 1, 2: 0, 3: 1, 4: 4}
+        # 0=open, 1=closed, 2=opening, 3=closing
+        shutter_values = {0: 0, 1: 1, 2: 0.25, 3: 0.75, 4: 4}
         for i,d in enumerate(domestatus):
             if d['shutterstatus'] == 4 and i > 0:
                 domestatus[i]['open_closed'] = domestatus[i-1]['open_closed']
@@ -392,12 +393,16 @@ def generate_weather_plot(webcfg, telcfg, date=None, plot_ndays=1, span_hours=24
                            y_range=(-0.2,1.2),
                            x_range=(end - timedelta(hours=span_hours), end),
                            )
-        open_date = [dome_date[i] for i,d in enumerate(dome) if d < 0.5]
-        open_dome = [d for i,d in enumerate(dome) if d < 0.5]
-        closed_date = [dome_date[i] for i,d in enumerate(dome) if d >= 0.5]
-        closed_dome = [d for i,d in enumerate(dome) if d >= 0.5]
-        dome_plot.line(closed_date, closed_dome, line_width=4, color="black")
-        dome_plot.line(open_date, open_dome, line_width=4, color="green")
+#         open_date = [dome_date[i] for i,d in enumerate(dome) if d < 0.5]
+#         open_dome = [d for i,d in enumerate(dome) if d < 0.5]
+#         closed_date = [dome_date[i] for i,d in enumerate(dome) if d >= 0.5]
+#         closed_dome = [d for i,d in enumerate(dome) if d >= 0.5]
+#         dome_plot.line(closed_date, closed_dome, line_width=4, color="black")
+#         dome_plot.line(open_date, open_dome, line_width=4, color="green")
+
+        dome_plot.line(dome_date, dome, line_width=4, color="black", line_alpha=0.8)
+
+        # IQMon Files
         dome_plot.circle(iqmon_obj_dates, iqmon_obj_alt,
                          size=markersize, color="blue",
                          line_alpha=0.8, fill_alpha=0.8)
