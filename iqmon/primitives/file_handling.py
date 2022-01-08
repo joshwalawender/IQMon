@@ -1,6 +1,7 @@
 from pathlib import Path
 from datetime import datetime, timedelta
 import pymongo
+import subprocess
 
 import numpy as np
 from astropy import units as u
@@ -65,7 +66,7 @@ class ReadFITS(BasePrimitive):
             mongo_host = self.cfg['mongo'].get('host')
             mongo_port = self.cfg['mongo'].getint('port')
             mongo_db = self.cfg['mongo'].get('db')
-            mongo_collection = self.cfg['mongo'].get('collection')
+            mongo_collection = 'iqmon'
             self.mongoclient = pymongo.MongoClient(mongo_host, mongo_port)
             self.mongo_iqmon = self.mongoclient[mongo_db][mongo_collection]
         except Exception as e:
@@ -157,7 +158,8 @@ class ReadFITS(BasePrimitive):
             self.log.info('Check for previous analysis of this file')
             already_processed = [d for d in self.mongo_iqmon.find( {'fitsfile': self.action.args.meta['fitsfile']} )]
             if len(already_processed) != 0\
-               and self.cfg['mongo'].getboolean('overwrite', False) is False:
+               and self.cfg['mongo'].getboolean('overwrite', False) is False\
+               and 'n_objects' in already_processed[-1].keys():
                 self.log.info(f"overwrite is {self.cfg['FileHandling'].getboolean('overwrite')}")
                 self.log.info('  File is already in the database, skipping further processing')
                 self.action.args.skip = True
@@ -191,14 +193,14 @@ class ReadFITS(BasePrimitive):
             # Pull focus info from status database
             try:
                 self.log.info(f'  Reading focus data from DB')
-                status_collection = self.mongoclient[self.cfg['mongo'].get('db')]['V5status']
+                status_collection = self.mongoclient[self.cfg['mongo'].get('db')]['V5_focuser']
                 date_obs = self.action.args.meta.get('date')
-                querydict = {"date": {"$gt": date_obs, "$lt": date_obs+timedelta(minutes=2)},
-                             "telescope": 'V5'}
-                focus_pos = [entry['focuser_position'] for entry in\
+                querydict = {"date": {"$gt": date_obs,
+                                      "$lt": date_obs+timedelta(minutes=2)}}
+                focus_pos = [entry['position'] for entry in\
                              status_collection.find(querydict).sort(\
                              [('date', pymongo.ASCENDING)])]
-                focus_temp = [entry['focuser_temperature'] for entry in\
+                focus_temp = [entry['temperature'] for entry in\
                               status_collection.find(querydict).sort(\
                               [('date', pymongo.ASCENDING)])]
                 pmean, pmed, pstd = stats.sigma_clipped_stats(focus_pos)
@@ -214,7 +216,8 @@ class ReadFITS(BasePrimitive):
                 self.log.warning(f'  Failed to read focus data from DB')
                 self.log.warning(e)
 
-        self.mongoclient.close()
+        if self.mongoclient is not None:
+            self.mongoclient.close()
 
         return self.action.args
 
@@ -340,9 +343,7 @@ class CopyFile(BasePrimitive):
         
         overwrite = self.cfg['FileHandling'].getboolean('overwrite', False)
         
-        if self.action.args.fitsfilepath.suffix in ['.fits', '.fts']:
-            self.action.args.destination_file = self.action.args.destination_dir / f"{self.action.args.fitsfilepath.name}.fz"
-        elif self.action.args.fitsfilepath.suffix == '.fz':
+        if self.action.args.fitsfilepath.suffix in ['.fits', '.fts', '.fz']:
             self.action.args.destination_file = self.action.args.destination_dir / self.action.args.fitsfilepath.name
         else:
             msg = f'File extension not handled: {self.action.args.fitsfilepath.suffix}'
@@ -355,6 +356,23 @@ class CopyFile(BasePrimitive):
             with fits.open(self.action.args.fitsfilepath, checksum=True) as hdul:
                 hdul[0].add_checksum()
                 hdul.writeto(self.action.args.destination_file, checksum=True)
+
+            # Compress Destination File
+            self.log.info('Compressing destination file')
+            compressed_file = self.action.args.destination_file.parent / f"{self.action.args.destination_file.name}.fz"
+            if compressed_file.exists() is True:
+                compressed_file.unlink()
+            self.log.debug(f'  Compressed file: {compressed_file}')
+            try:
+                self.log.debug(f'  Running fpack')
+                subprocess.call(['fpack', self.action.args.destination_file])
+            except Exception as e:
+                self.log.error(f'  fpack failed')
+                self.log.error(e)
+            if compressed_file.exists() is True:
+                self.action.args.destination_file.unlink()
+                self.action.args.destination_file = compressed_file
+                self.log.debug(f'  Destination file: {self.action.args.destination_file}')
 
         return self.action.args
 

@@ -10,6 +10,7 @@ from iqmon.primitives.image_reduction import (SubtractBias,
                                               SubtractDark,
                                               GainCorrect,
                                               CreateDeviation,
+                                              MakeMasterCalFrame,
                                               )
 from iqmon.primitives.photometry import (MakeSourceMask,
                                          CreateBackground,

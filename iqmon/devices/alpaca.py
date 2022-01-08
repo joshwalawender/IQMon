@@ -21,7 +21,7 @@ def get_alpaca(address, telescope, devicetype, devicenumber=0):
         log.setLevel(logging.DEBUG)
         ## Set up console output
         LogConsoleHandler = logging.StreamHandler()
-        LogConsoleHandler.setLevel(logging.DEBUG)
+        LogConsoleHandler.setLevel(logging.INFO)
         LogFormat = logging.Formatter('%(asctime)s %(levelname)8s: %(message)s')
         LogConsoleHandler.setFormatter(LogFormat)
         log.addHandler(LogConsoleHandler)
@@ -46,16 +46,17 @@ def get_alpaca(address, telescope, devicetype, devicenumber=0):
     log.info(f'Getting {devicetype} info')
     for command in commands[devicetype]:
         try:
-            log.info(f'  Getting {url}/{command[0]}')
+            log.debug(f'  Getting {url}/{command[0]}')
             r = requests.get(f"{url}/{command[0]}")
             j = json.loads(r.text)
             mongodoc[command[0]] = command[1](j['Value'])
         except:
             log.warning(f'  Failed to get {command[0]}')
         else:
-            log.info(f'  Got {devicetype} {command[0]} = {mongodoc[command[0]]}')
+            log.debug(f'  Got {devicetype} {command[0]} = {mongodoc[command[0]]}')
 
     log.info(f'Got {len(mongodoc)} entries')
+    log.debug(mongodoc)
     insert_mongodoc(f"{telescope}_{devicetype}", mongodoc, log=log)
     logging.shutdown()
 

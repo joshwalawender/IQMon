@@ -26,7 +26,7 @@ class RecordFile(BasePrimitive):
             mongo_host = self.cfg['mongo'].get('host')
             mongo_port = self.cfg['mongo'].getint('port')
             mongo_db = self.cfg['mongo'].get('db')
-            mongo_collection = self.cfg['mongo'].get('collection')
+            mongo_collection = 'iqmon'
             self.mongoclient = pymongo.MongoClient(mongo_host, mongo_port)
             self.mongo_iqmon = self.mongoclient[mongo_db][mongo_collection]
         except Exception as e:
