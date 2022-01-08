@@ -276,8 +276,7 @@ def imageList(telescope, date):
     end = start + timedelta(days=1)
     query_dict = {'telescope': telescope,
                   'date': {'$gt': start, '$lt': end}}
-    query_result = mongo_query('iqmon', query_dict, telcfg)
-    image_list = [d for d in query_result]
+    image_list = mongo_query('iqmon', query_dict, telcfg)
     flat_count = len([d for d in image_list if d['imtype'] in ['FLAT', 'TWIFLAT']])
     cal_count = len([d for d in image_list if d['imtype'] in ['BIAS', 'DARK']])
     object_count = len([d for d in image_list if d['imtype'] in ['OBJECT']])
@@ -285,11 +284,11 @@ def imageList(telescope, date):
     log.info(f"Got {len(image_list)} images")
 
     log.info(f"Getting IQMon limits")
-    query_result = mongo_query('V5limits', {}, telcfg)
-    iqmon_limits = query_result[0]
+    iqmon_limits = mongo_query('V5limits', {}, webcfg, sort=[])[0]
     for key in iqmon_limits:
         log.info(f"  {key} : {iqmon_limits[key]}")
 
+    log.info(f"Assigning image flags")
     for i,image in enumerate(image_list):
         for key in iqmon_limits:
             if key in image.keys():

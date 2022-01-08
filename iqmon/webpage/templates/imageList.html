@@ -102,6 +102,8 @@
 
     {% if 'perr flag' in image.keys() %}
     <td style='text-align:right;background-color:#FF5C33;'>
+    {% elif 'perr' in image.keys() %}
+    <td style='text-align:right;background-color:#70DB70;'>
     {% else %}
     <td style='text-align:right;'>
     {% endif %}
@@ -148,6 +150,8 @@
 
     {% if 'ellipticity flag' in image.keys() %}
     <td style='text-align:right;background-color:#FF5C33;'>
+    {% elif 'ellipticity' in image.keys() %}
+    <td style='text-align:right;background-color:#70DB70;'>
     {% else %}
     <td style='text-align:right;'>
     {% endif %}
@@ -158,6 +162,8 @@
 
     {% if 'fwhm flag' in image.keys() %}
     <td style='text-align:right;background-color:#FF5C33;'>
+    {% elif 'fwhm' in image.keys() %}
+    <td style='text-align:right;background-color:#70DB70;'>
     {% else %}
     <td style='text-align:right;'>
     {% endif %}
