@@ -212,10 +212,10 @@ class MakeMasterCalFrame(BasePrimitive):
         self.cfg = self.context.config.instrument
         self.context = context
         date_string = self.action.args.meta['UT date string']
-        if date_string not in self.context.keys:
-            self.context[date_string] = {}
-        if self.action.args.imtype not in self.context[date_string].keys():
-            self.context[date_string][self.action.args.imtype] = []
+#         if not hasattr(self.context, 'date_string'):
+#             self.context[date_string] = {}
+#         if self.action.args.imtype not in self.context[date_string].keys():
+#             self.context[date_string][self.action.args.imtype] = []
 
     def _pre_condition(self):
         """Check for conditions necessary to run this process"""
@@ -225,8 +225,8 @@ class MakeMasterCalFrame(BasePrimitive):
                                 not self.action.args.skip),
                   pre_condition(self, 'Image type is cal',
                                 imtype in ['BIAS', 'DARK']),
-                  pre_condition(self, 'Connected to mongo',
-                                self.mongo_iqmon is not None),
+#                   pre_condition(self, 'Connected to mongo',
+#                                 self.mongo_iqmon is not None),
                   pre_condition(self, f'do_{imtype}_subtraction is True',
                                 self.cfg['Calibrations'].getboolean(f'do_{imtype}_subtraction', True) is True),
                   ]

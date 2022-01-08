@@ -205,7 +205,7 @@ class ReadFITS(BasePrimitive):
                               [('date', pymongo.ASCENDING)])]
                 pmean, pmed, pstd = stats.sigma_clipped_stats(focus_pos)
                 tmean, tmed, tstd = stats.sigma_clipped_stats(focus_temp)
-                if pstd < 2 and tstd < 0.4:
+                if pstd < 2 and tstd < 0.7:
                     self.action.args.meta["focus_position"] = pmed
                     self.action.args.meta["focus_temperature"] = tmed
                     self.log.info(f"  Focus Position: {pmean:.0f} {pmed:.0f} {pstd:.2f}")
