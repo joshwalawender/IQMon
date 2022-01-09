@@ -63,7 +63,7 @@ def get_telescope(telname, devicename):
 ##-------------------------------------------------------------------------
 ## get_focuser
 ##-------------------------------------------------------------------------
-def get_focuser(telname, devicename, temperature_units='C'):
+def get_focuser(telname, devicename, temperature_units='F'):
     log = logging.getLogger('focuser')
     if len(log.handlers) < 1:
         log.setLevel(logging.DEBUG)
