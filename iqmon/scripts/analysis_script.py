@@ -143,7 +143,7 @@ def change_directory():
         newdir = Path(args.input).expanduser().absolute()
     else:
         date_string = datetime.utcnow().strftime('%Y%m%dUT')
-        newdir = Path(f'~/V5Data/Images/{date_string}').expanduser()
+        newdir = Path(f'/Volumes/VYSOSData/V5/Images/{date_string[:4]}/{date_string}')
 
     args.input = str(newdir)
     if newdir.exists() is False:
