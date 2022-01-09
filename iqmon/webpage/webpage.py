@@ -162,7 +162,7 @@ def status(telescope):
             query_dict = {'shutterstatus': {'$ne': 4}}
             query_result = mongo_query(f'{telescope}_dome', query_dict, telcfg,
                                        sort=[('date', pymongo.DESCENDING)])
-            last_shutter = query_result.next()
+            last_shutter = query_result[0]
             currentstatus['dome_string'] = dome_string[last_shutter['shutterstatus']]
             currentstatus['dome_color'] = dome_color[last_shutter['shutterstatus']]
         else:

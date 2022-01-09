@@ -73,7 +73,7 @@ def generate_weather_plot(webcfg, telcfg, date=None, plot_ndays=1, span_hours=24
             if len(plot_vals) > 0:
                 plot_temperature.circle(plot_vals[:,0],
                                         plot_vals[:,1],
-                                        legend_label=f"{name}",
+                                        legend_label=f"{plot_value}",
                                         color=colors[i],
                                         fill_alpha=alphas[i],
                                         line_alpha=alphas[i],
@@ -130,13 +130,13 @@ def generate_weather_plot(webcfg, telcfg, date=None, plot_ndays=1, span_hours=24
                     where_nothumid = np.where(plot_vals[:,1] < weather_limits['humid'])
                     plot_humidity.circle(plot_vals[where_nothumid][:,0],
                                            plot_vals[where_nothumid][:,1],
-                                           legend_label=f"{name}",
+                                           legend_label=f"{plot_value}",
                                            size=markersize, color="green",
                                            line_alpha=0.8, fill_alpha=0.8)
                 else:
                     plot_humidity.circle(plot_vals[:,0],
                                          plot_vals[:,1],
-                                         legend_label=f"{name}",
+                                         legend_label=f"{plot_value}",
                                          color='black',
                                          line_alpha=0.4, fill_alpha=0.4,
                                          size=markersize)
@@ -244,7 +244,7 @@ def generate_weather_plot(webcfg, telcfg, date=None, plot_ndays=1, span_hours=24
                 where_calm = np.where(plot_vals[:,1] < weather_limits['windy'])
                 plot_wind_speed.circle(plot_vals[where_calm][:,0],
                                        plot_vals[where_calm][:,1],
-                                       legend_label=f"{name}",
+                                       legend_label=f"{plot_value}",
                                        size=markersize, color="green",
                                        line_alpha=0.8, fill_alpha=0.8)
 
@@ -260,7 +260,7 @@ def generate_weather_plot(webcfg, telcfg, date=None, plot_ndays=1, span_hours=24
                 if len(plot_vals) > 0:
                     plot_wind_speed.line(plot_vals[:,0],
                                          plot_vals[:,1],
-                                         legend_label=f"{name}",
+                                         legend_label=f"{plot_value}",
                                          line_width=markersize, color="black",
                                          line_alpha=0.3)
         if len(plot_values) > 1 or webcfg['Weather'].get('plot_wind_gust', None) is not None:
