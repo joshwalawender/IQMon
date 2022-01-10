@@ -1,59 +1,33 @@
-# Readme: IQMon
+This version of IQMon uses the Keck Data Reduction Framework (KDRPF; https://keckdrpframework.readthedocs.io/en/latest/)
 
-Copyright © Dr. Josh Walawender (email: jmwalawender@gmail.com). All rights reserved.
-
-
-## Overview
-
-IQMon is a python module which can be used to quickly analyze an image for on the fly reports of image quality (Image Quality Monitor = IQMon).  It was originally written to provide a quick look analysis of data from robotic telescopes.
-
-The base functionality is that it uses SExtractor to find stars in the image and report the typical Full Width at Half Max (FWHM) and ellipticity.  This allows quick and dirty evaluation of the image quality in near real time (a few to tens of seconds on modest hardware circa 2010).
-
-If the image contains a WCS, the module can also compare the WCS coordinates of the central pixel to the pointing coordinates in the image header to determine the pointing error.  If no WCS is present, the module can also attempt to solve the astrometry in the image using the astrometry.net solver.  
-
-In addition, the software can use SCAMP and SWarp to determine a plate solution which includes distortion parameters and then compare the instrumental magnitudes determined by SExtractor to catalog magnitudes to determine the photometric zero point of the image.
-
-
-## Requirements
-
-Python Modules:
-
-* python2.7 or python3
-* astropy (<http://www.astropy.org>)
-* pyephem (<http://rhodesmill.org/pyephem/>)
-* astroquery
-* numpy
-* matplotlib
-* subprocess32
-* PyYAML
-* PIL
-* skimage
-
-External Programs:
-
-* SExtractor (<http://www.astromatic.net/software/sextractor>)
-* SCAMP (<http://www.astromatic.net/software/scamp>)
-* SWarp (<http://www.astromatic.net/software/swarp>)
-* MissFITS (<http://www.astromatic.net/software/missfits>)
-* astrometry.net solver (<http://astrometry.net>)
-
-
-## Code Structure
-
-IQMon functionality centers around the use of two objects:  IQMon.Telescope and IQMon.Image.  When used, you must create one of each of these objects.
-
-* IQMon.Telescope object and holds detailed information on the telescope used to take the data and some custom configuration parameters.  The telescope object is passed to the image object on creation of an image object.
-
-* IQMon.Image object holds information about the image and contains the methods which do all of the image analysis which then fills in the object properties.
-
-
-### Example Use
-
-See example_MeasureImage.py file in this repository.  This file may be slightly out of date relative to the main program as it is not updated as often because it is not in use with any real telescopes.
-
-A better example is to look at the MeasureImage.py file in the VYSOStools repository (<https://github.com/joshwalawender/VYSOStools>).  This is a repository of programs for the VYSOS robotic telescopes and is always updated to use the very latest commit of IQMon.  It is a bit more complex than the example included in this repository because it handles two telescopes.
-
-
-## License Terms
-
-Please see LICENSE file.
+```
+> db.images.findOne( {'telescope': 'V5'} )
+{
+    "_id" : ObjectId("6161346bb780ebdf55874858"),
+    "filename" : "V5_AS353A-PSr3-20211009at050106.fts",
+    "telescope" : "V5",
+    "compressed" : false,
+    "target name" : "V5_AS353A",
+    "exptime" : "100.0",
+    "date" : ISODate("2021-10-09T05:01:11Z"),
+    "az" : 216.0082,
+    "alt" : 78.9609,
+    "airmass" : 1.01918938497,
+    "header_RA" : 291.18749999999994,
+    "header_DEC" : 10.5,
+    "moon_alt" : 14.023852963855044,
+    "moon_separation" : 66.63240318988049,
+    "moon_illumination" : 9.96456815169346,
+    "FWHM_pix" : 5.006289586221885,
+    "ellipticity" : 1.2798003112449319,
+    "n_stars" : 5474,
+    "zero point" : 22.74422572531131,
+    "throughput" : 7.611131294360541,
+    "sky background" : 2372.3722751214323,
+    "perr_arcmin" : 52.13182009729838,
+    "wcs" : "WCSAXES =                    2 / Number of coordinate axes                      CRPIX1  =        3003.41778564 / Pixel coordinate of reference point            CRPIX2  =        1310.08117676 / Pixel coordinate of reference point            PC1_1   =   -4.69284792725E-05 / Coordinate transformation matrix element       PC1_2   =    0.000695371629704 / Coordinate transformation matrix element       PC2_1   =    -0.00069458536881 / Coordinate transformation matrix element       PC2_2   =   -4.15398212941E-05 / Coordinate transformation matrix element       CDELT1  =                  1.0 / [deg] Coordinate increment at reference point  CDELT2  =                  1.0 / [deg] Coordinate increment at reference point  CUNIT1  = 'deg'                / Units of coordinate increment and value        CUNIT2  = 'deg'                / Units of coordinate increment and value        CTYPE1  = 'RA---TAN'           / TAN (gnomonic) projection + SIP distortions    CTYPE2  = 'DEC--TAN'           / TAN (gnomonic) projection + SIP distortions    CRVAL1  =         291.50558067 / [deg] Coordinate value at reference point      CRVAL2  =        9.81502190238 / [deg] Coordinate value at reference point      LONPOLE =                180.0 / [deg] Native longitude of celestial pole       LATPOLE =        9.81502190238 / [deg] Native latitude of celestial pole        RADESYS = 'FK5'                / Equatorial coordinate system                   EQUINOX =               2000.0 / [yr] Equinox of equatorial coordinates         END",
+    "jpegs" : [
+        "V5_AS353A-PSr3-20211009at050106.jpg"
+    ]
+}
+```

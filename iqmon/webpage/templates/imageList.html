@@ -1,0 +1,203 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+
+<html>
+<head>
+    <title>IQMon Results for {{ subject }} for {{ telescope }}</title>
+    <meta http-equiv="content-type"
+    content="text/html;">
+
+    <style>
+        h2
+        {
+        text-align:center;
+        }
+        table
+        {
+        border-collapse:collapse;
+        margin-left: auto;
+        margin-right: auto;
+        }
+        table,th,td
+        {
+        border:1px solid black;
+        vertical-align: top;
+        padding-top: 5px;
+        padding-right: 5px;
+        padding-bottom: 5px;
+        padding-left: 5px;
+        }
+    </style>
+
+</head>
+
+<body>
+
+<h2>Image List for {{ subject }} for {{ telescope }}</h2>
+
+<center><p>Found {{ image_list|length }} images in database 
+({{ flat_count }} flats, {{ cal_count }} cals, {{ object_count }} science images)
+</p></center>
+
+<table>
+<tr>
+    <th style="width:150px">Exposure Start<br>(Date and Time UT)</th>
+    <th style="width:60px">Image Type</th>
+    <th style="width:420px">Image File Name</th>
+    <th style="width:50px">Alt (deg)</th>
+    <th style="width:50px">Az (deg)</th>
+    <th style="width:50px">Airmass</th>
+    <th style="width:70px">Pointing Error (arcmin)</th>
+    <th style="width:50px">Moon Sep (deg)</th>
+    <th style="width:50px">Moon Illum. (%)</th>
+    <th style="width:50px">Sky Bkg.</th>
+    <th style="width:50px">N Stars</th>
+    <th style="width:50px">Ellip.</th>
+    <th style="width:60px">FWHM (pix)</th>
+    <th style="width:50px">Focus Pos</th>
+    <th style="width:50px">Focus Temp</th>
+    <th style="width:50px">Proc. Time</th>
+</tr>
+
+{% for image in image_list %}
+<tr>
+    <td style='text-align:left;'>
+    {% if 'date' in image.keys() %}
+        {{ image['date'].strftime('%Y%m%dUT %H:%M:%S') }}
+    {% endif %}
+    </td>
+
+    <td style='text-align:left;'>
+    {% if 'imtype' in image.keys() %}
+        {{ image['imtype'] }}
+    {% endif %}
+    </td>
+
+    <td style='text-align:left;'>
+    {% if 'fitsfile' in image.keys() %}
+        {% if 'jpegfile' in image.keys() %}
+            <a href="/static/plots/{{ telescope }}/{{ image['jpegfile'] }}">{{ image['fitsfile'] }}</a>
+        {% else %}
+            {{ image['fitsfile'] }}
+        {% endif %}
+    {% endif %}
+    </td>
+
+    <td style='text-align:right;'>
+    {% if 'alt' in image.keys() %}
+        {{ "{:.1f}".format(image['alt']) }}
+    {% endif %}
+    </td>
+
+    <td style='text-align:right;'>
+    {% if 'az' in image.keys() %}
+        {{ "{:.1f}".format(image['az']) }}
+    {% endif %}
+    </td>
+
+    <td style='text-align:right;'>
+    {% if 'airmass' in image.keys() %}
+        {{ "{:.2f}".format(image['airmass']) }}
+    {% endif %}
+    </td>
+
+    {% if 'perr flag' in image.keys() %}
+    <td style='text-align:right;background-color:#FF5C33;'>
+    {% elif 'perr' in image.keys() %}
+    <td style='text-align:right;background-color:#70DB70;'>
+    {% else %}
+    <td style='text-align:right;'>
+    {% endif %}
+    {% if 'perr' in image.keys() %}
+        {{ "{:.1f}".format(image['perr']) }}
+    {% endif %}
+    </td>
+
+    <td style='text-align:right;'>
+    {% if 'moon_separation' in image.keys() %}
+        {% if 'moon_alt' in image.keys() %}
+            {% if image['moon_alt'] < 0 %}
+                down
+            {% else %}
+                {{ "{:.1f}".format(image['moon_separation']) }}
+            {% endif %}
+        {% endif %}
+    {% endif %}
+    </td>
+
+    <td style='text-align:right;'>
+    {% if 'moon_illum' in image.keys() %}
+        {% if 'moon_alt' in image.keys() %}
+            {% if image['moon_alt'] < 0 %}
+                down
+            {% else %}
+                {{ "{:.1f}".format(image['moon_illum']) }}
+            {% endif %}
+        {% endif %}
+    {% endif %}<br>
+    </td>
+
+    <td style='text-align:right;'>
+    {% if 'sky_background' in image.keys() %}
+        {{ "{:.0f}".format(image['sky_background']) }}
+    {% endif %}<br>
+    </td>
+
+    <td>
+    {% if 'n_objects' in image.keys() %}
+        {{ "{:d}".format(image['n_objects']) }}
+    {% endif %}
+    </td>
+
+    {% if 'ellipticity flag' in image.keys() %}
+    <td style='text-align:right;background-color:#FF5C33;'>
+    {% elif 'ellipticity' in image.keys() %}
+    <td style='text-align:right;background-color:#70DB70;'>
+    {% else %}
+    <td style='text-align:right;'>
+    {% endif %}
+    {% if 'ellipticity' in image.keys() %}
+        {{ "{:.2f}".format(image['ellipticity']) }}
+    {% endif %}
+    </td>
+
+    {% if 'fwhm flag' in image.keys() %}
+    <td style='text-align:right;background-color:#FF5C33;'>
+    {% elif 'fwhm' in image.keys() %}
+    <td style='text-align:right;background-color:#70DB70;'>
+    {% else %}
+    <td style='text-align:right;'>
+    {% endif %}
+    {% if 'fwhm' in image.keys() %}
+        {{ "{:.2f}".format(image['fwhm']) }}
+    {% endif %}
+    </td>
+
+    <td>
+    {% if 'focus_position' in image.keys() %}
+        {{ "{:.0f}".format(image['focus_position']) }}
+    {% endif %}
+    </td>
+
+    <td>
+    {% if 'focus_temperature' in image.keys() %}
+        {{ "{:.0f}".format(image['focus_temperature']) }}
+    {% endif %}
+    </td>
+
+    <td style={{ 'text-align:right;' }}>
+    {% if 'processing_time' in image.keys() %}
+        {{ "{:.0f}".format(image['processing_time']) }}
+    {% endif %}
+    </td>
+
+</tr>
+{% endfor %}
+
+</table>
+
+<center><p>
+total processing time = {{ '{:.1f} min'.format(total_processing_time/60) }}
+</p></center>
+
+</body>
+</html>
