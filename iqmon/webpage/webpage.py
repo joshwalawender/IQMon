@@ -33,17 +33,15 @@ def base():
     log.info(f'Building {__name__} base')
     webcfg, cfgs = get_all_configs()
     
-    if len(cfgs.keys()) == 0:
-        log.info(f'Building {__name__} nightWeather')
-        date = flask.request.args.get('date', None)
-        span_hours = float(flask.request.args.get('span_hours', 24))
-        return nightWeather(date=date, span_hours=span_hours)
-    else:
+    if len(cfgs.keys()) != 0:
         if 'primary' in cfgs.keys():
             telescope = cfgs['primary']
             return status(telescope)
-        else:
-            return 'Hello World'
+
+    log.info(f'Building {__name__} nightWeather')
+    date = flask.request.args.get('date', None)
+    span_hours = float(flask.request.args.get('span_hours', 24))
+    return nightWeather(date=date, span_hours=span_hours)
 
 
 ##-------------------------------------------------------------------------
