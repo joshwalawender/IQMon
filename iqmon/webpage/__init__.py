@@ -91,8 +91,8 @@ def get_twilights(start, end, webcfg, nsample=256):
 ##-------------------------------------------------------------------------
 ## Function: overplot_twilights
 ##-------------------------------------------------------------------------
-def overplot_twilights(plot_list, plot_end, webcfg, plot_ndays=1, log=None):
-    for days in range(1,plot_ndays+1):
+def overplot_twilights(plot_list, plot_end, webcfg, ndays=1, log=None):
+    for days in range(1,ndays+1):
         if log is not None: log.info(f'Getting twilights for {days} days ago')
         twilights = get_twilights(plot_end-timedelta(days=days),
                                   plot_end-timedelta(days=days-1),

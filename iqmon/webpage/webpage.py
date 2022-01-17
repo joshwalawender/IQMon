@@ -35,15 +35,9 @@ def base():
     
     if len(cfgs.keys()) == 0:
         log.info(f'Building {__name__} nightWeather')
-        script, div = generate_weather_plot(webcfg, None, date=None)
-        log.info(f"Rendering template")
-        return flask.render_template('nightPlot.html',
-                                     telescope=None,
-                                     date=datetime.utcnow().strftime('%Y%m%dUT'),
-                                     title='Weather',
-                                     script=script,
-                                     div=div,
-                                     )
+        date = flask.request.args.get('date', None)
+        span_hours = float(flask.request.args.get('span_hours', 24))
+        return nightWeather(date=date, span_hours=span_hours)
     else:
         if 'primary' in cfgs.keys():
             telescope = cfgs['primary']
@@ -65,7 +59,7 @@ def status(telescope):
     if telescope not in cfgs.keys():
         return f'Could not find config for "{telescope}"'
     telcfg = cfgs[telescope]
-    script, div = generate_weather_plot(webcfg, telcfg, plot_ndays=2, span_hours=12)
+    script, div = generate_weather_plot(webcfg, telcfg, query_ndays=2, span_hours=12)
 
     ## Format currentweather
     log.info(f"Querying weather limits")
@@ -217,16 +211,23 @@ def status(telescope):
 
 
 ##-------------------------------------------------------------------------
-## nightWeather: /<string:telescope>/weather/<string:date>
+## nightWeather: /weather
 ##-------------------------------------------------------------------------
-@app.route("/<string:telescope>/weather/<string:date>")
-def nightWeather(telescope, date):
-    log.info(f'Building {__name__} nightWeather {telescope}')
+@app.route("/weather")
+def nightWeather(telescope=None, date=None, span_hours=24):
+    log.info(f'Building {__name__} nightWeather')
+    telescope = flask.request.args.get('telescope', None)
     webcfg, cfgs = get_all_configs()
     if telescope not in cfgs.keys():
-        return f'Could not find config for "{telescope}"'
-    telcfg = cfgs[telescope]
-    script, div = generate_weather_plot(webcfg, telcfg, date=date)
+        telcfg = None
+    else:
+        telcfg = cfgs[telescope]
+    date = flask.request.args.get('date', None)
+    span_hours = float(flask.request.args.get('span_hours', 24))
+
+    log.info(f"  date={date}, telescope={telescope}")
+    script, div = generate_weather_plot(webcfg, telcfg, date=date,
+                                        span_hours=span_hours)
 
     log.info(f"Rendering template")
     return flask.render_template('nightPlot.html',

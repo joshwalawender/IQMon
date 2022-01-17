@@ -34,13 +34,16 @@ class DavisWeatherLink():
     def __init__(self, IP='192.168.4.76',
                  mongoIP='192.168.4.49', mongoport=49153,
                  dbname='weather', tzoffset=0,
-                 temperature_units='F', wind_speed_units='mph'):
+                 temperature_units='F',
+                 wind_speed_units='mph',
+                 pressure_units='inHg'):
         self.IP = IP
         self.name = 'DavisWeatherLink'
         self.url = f'http://{self.IP}/v1/current_conditions'
         self.tzoffset = tzoffset
         self.temperature_units = temperature_units
         self.wind_speed_units = wind_speed_units
+        self.pressure_units = pressure_units
 
         self.log = logging.getLogger(self.name)
         if len(self.log.handlers) < 1:
@@ -139,6 +142,7 @@ class DavisWeatherLink():
         # Add units
         mongodata['temperature units'] = self.temperature_units
         mongodata['wind speed units'] = self.wind_speed_units
+        mongodata['pressure units'] = self.pressure_units
 
         return mongodata
 

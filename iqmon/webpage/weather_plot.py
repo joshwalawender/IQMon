@@ -20,16 +20,24 @@ log = logging.getLogger('FlaskLogger')
 ##-------------------------------------------------------------------------
 ## Function: generate_weather_plot
 ##-------------------------------------------------------------------------
-def generate_weather_plot(webcfg, telcfg, date=None, plot_ndays=1, span_hours=24):
+def generate_weather_plot(webcfg, telcfg, date=None, querybuffer_ndays=1, span_hours=24):
     log.info(f"Querying weather limits")
     weather_limits = mongo_query('weather_limits', {}, webcfg)[0]
 
     if date is None:
         end = datetime.utcnow()
-        start = end - timedelta(days=plot_ndays)
+        query_end = end
+        start = end - timedelta(hours=span_hours)
+        query_start = end - timedelta(days=querybuffer_ndays)
+        query_days = querybuffer_ndays
     else:
+        if span_hours > 24*querybuffer_ndays:
+            querybuffer_ndays = int(np.ceil(span_hours/24))
         start = datetime.strptime(date, '%Y%m%dUT')
-        end = start + timedelta(days=plot_ndays)
+        end = start + timedelta(hours=span_hours)
+        query_start = start - timedelta(days=querybuffer_ndays)
+        query_end = end + timedelta(days=querybuffer_ndays)
+        query_days = 2*querybuffer_ndays
 
     markersize = 2
 
@@ -45,7 +53,7 @@ def generate_weather_plot(webcfg, telcfg, date=None, plot_ndays=1, span_hours=24
                                   x_range=(end - timedelta(hours=span_hours), end),
                                   )
         plot_values = webcfg['Weather'].get('plot_temperature').split(',')
-        query_dict = {'date': {'$gt': start, '$lt': end}}
+        query_dict = {'date': {'$gt': query_start, '$lt': query_end}}
         colors = ["blue", "black", "black"]
         alphas = [0.8, 0.4, 0.4]
         for i,plot_value in enumerate(plot_values):
@@ -103,7 +111,7 @@ def generate_weather_plot(webcfg, telcfg, date=None, plot_ndays=1, span_hours=24
                                  x_range=(end - timedelta(hours=span_hours), end),
                                  )
         plot_values = webcfg['Weather'].get('plot_humidity').split(',')
-        query_dict = {'date': {'$gt': start, '$lt': end}}
+        query_dict = {'date': {'$gt': query_start, '$lt': query_end}}
         for i,plot_value in enumerate(plot_values):
             collection, name = plot_value.split(':')
             log.debug(f'  Querying mongo collection {collection}')
@@ -165,7 +173,7 @@ def generate_weather_plot(webcfg, telcfg, date=None, plot_ndays=1, span_hours=24
                                  x_range=(end - timedelta(hours=span_hours), end),
                                  )
         plot_values = webcfg['Weather'].get('plot_cloudiness').split(',')
-        query_dict = {'date': {'$gt': start, '$lt': end}}
+        query_dict = {'date': {'$gt': query_start, '$lt': query_end}}
         for plot_value in plot_values:
             collection, name = plot_value.split(':')
             log.debug(f'  Querying mongo collection {collection}')
@@ -207,7 +215,7 @@ def generate_weather_plot(webcfg, telcfg, date=None, plot_ndays=1, span_hours=24
                                  x_range=(end - timedelta(hours=span_hours), end),
                                  )
         plot_values = webcfg['Weather'].get('plot_wind_speed').split(',')
-        query_dict = {'date': {'$gt': start, '$lt': end}}
+        query_dict = {'date': {'$gt': query_start, '$lt': query_end}}
         for plot_value in plot_values:
             collection, name = plot_value.split(':')
             log.debug(f'  Querying mongo collection {collection}')
@@ -250,7 +258,7 @@ def generate_weather_plot(webcfg, telcfg, date=None, plot_ndays=1, span_hours=24
 
         if webcfg['Weather'].get('plot_wind_gust', None) is not None:
             plot_values = webcfg['Weather'].get('plot_wind_gust').split(',')
-            query_dict = {'date': {'$gt': start, '$lt': end}}
+            query_dict = {'date': {'$gt': query_start, '$lt': query_end}}
             for plot_value in plot_values:
                 collection, name = plot_value.split(':')
                 log.debug(f'  Querying mongo collection {collection}')
@@ -288,7 +296,7 @@ def generate_weather_plot(webcfg, telcfg, date=None, plot_ndays=1, span_hours=24
                            x_range=(end - timedelta(hours=span_hours), end),
                            )
         plot_values = webcfg['Weather'].get('plot_rain').split(',')
-        query_dict = {'date': {'$gt': start, '$lt': end}}
+        query_dict = {'date': {'$gt': query_start, '$lt': query_end}}
         for plot_value in plot_values:
             collection, name = plot_value.split(':')
             log.debug(f'  Querying mongo collection {collection}')
@@ -319,6 +327,61 @@ def generate_weather_plot(webcfg, telcfg, date=None, plot_ndays=1, span_hours=24
         plot_rain.xaxis.visible = False
 
     ##-------------------------------------------------------------------------
+    ## Pressure Plot
+    if webcfg['Weather'].get('plot_pressure', None) is not None:
+        log.info('Build pressure plot')
+        limit_string = webcfg['Weather'].get(f'plot_pressure_limits', '800,1050')
+        ymin,ymax = limit_string.split(',')
+        height = webcfg['Weather'].getint('plot_pressure_height', 120)
+        plot_pressure = figure(width=900, height=height, x_axis_type="datetime",
+                               y_range=(float(ymin),float(ymax)),
+                               x_range=(end - timedelta(hours=span_hours), end),
+                               )
+        plot_values = webcfg['Weather'].get('plot_pressure').split(',')
+        query_dict = {'date': {'$gt': query_start, '$lt': query_end}}
+        colors = ["blue", "black", "black"]
+        alphas = [0.8, 0.4, 0.4]
+        for i,plot_value in enumerate(plot_values):
+            collection, name = plot_value.split(':')
+            log.debug(f'  Querying mongo collection {collection}')
+            query_result = mongo_query(collection, query_dict, webcfg)
+
+            plot_vals = []
+            for d in query_result:
+                if name in d.keys():
+                    if d.get(f"{name} units", None) == 'mbar':
+                        plot_vals.append((d['date'], d[name]))
+                    elif d.get(f"{name} units", None) == 'inHg':
+                        plot_vals.append((d['date'], d[name]*33.86389))
+                    else:
+                        plot_vals.append((d['date'], d[name]*33.86389))
+            plot_vals = np.array(plot_vals)
+
+            if len(plot_vals) == 0:
+                log.warning(f'Found 0 data points for {collection}:{name}')
+
+            log.debug(f'  Got {len(plot_vals)} entries')
+            if len(plot_vals) > 0:
+                plot_pressure.circle(plot_vals[:,0],
+                                     plot_vals[:,1],
+                                     legend_label=f"{plot_value}",
+                                     color=colors[i],
+                                     fill_alpha=alphas[i],
+                                     line_alpha=alphas[i],
+                                     size=markersize)
+        if len(plot_values) > 1:
+            plot_pressure.legend.location = "top_left"
+            plot_pressure.legend.margin = 0
+            plot_pressure.legend.padding = 0
+            plot_pressure.legend.spacing = 0
+            plot_pressure.legend.label_text_font_size = '8pt'
+        else:
+            plot_pressure.legend.visible = False
+        plot_pressure.yaxis.axis_label = 'Pressure (mbar)'
+        plot_pressure.yaxis.formatter = NumeralTickFormatter(format="0,0")
+        plot_pressure.xaxis.visible = False
+
+    ##-------------------------------------------------------------------------
     ## Safe Plot
     if webcfg['Weather'].get('plot_safe', None) is not None:
         log.info('Build safe plot')
@@ -328,7 +391,7 @@ def generate_weather_plot(webcfg, telcfg, date=None, plot_ndays=1, span_hours=24
                            x_range=(end - timedelta(hours=span_hours), end),
                            )
         plot_values = webcfg['Weather'].get('plot_safe').split(',')
-        query_dict = {'date': {'$gt': start, '$lt': end}}
+        query_dict = {'date': {'$gt': query_start, '$lt': query_end}}
 
         for plot_value in plot_values:
             collection, name = plot_value.split(':')
@@ -360,7 +423,7 @@ def generate_weather_plot(webcfg, telcfg, date=None, plot_ndays=1, span_hours=24
         telescope = telcfg['Telescope'].get('name')
         ## Telescope Status Query
         log.info(f"Querying dome status database")
-        query_dict = {'date': {'$gt': start, '$lt': end}}
+        query_dict = {'date': {'$gt': query_start, '$lt': query_end}}
         domestatus = mongo_query(f'{telescope}_dome', query_dict, telcfg)
         log.info(f"  Got {len(domestatus)} data points")
         # 0=open, 1=closed, 2=opening, 3=closing
@@ -374,7 +437,7 @@ def generate_weather_plot(webcfg, telcfg, date=None, plot_ndays=1, span_hours=24
         ## IQMon Query
         log.info(f"Querying IQMon results database")
         query_dict = {'telescope': telescope,
-                      'date': {'$gt': start, '$lt': end}}
+                      'date': {'$gt': query_start, '$lt': query_end}}
         iqmon = mongo_query('iqmon', query_dict, telcfg)
         log.info(f"  Got {len(iqmon)} data points")
         iqmon_obj_dates = [d['date'] for d in iqmon if d['imtype'] == 'OBJECT']
@@ -422,7 +485,7 @@ def generate_weather_plot(webcfg, telcfg, date=None, plot_ndays=1, span_hours=24
     ## Render
     log.info(f"Overplotting twilights")
     plot_names = ['plot_temperature', 'plot_humidity', 'plot_cloudiness',
-                  'plot_wind_speed', 'plot_rain', 'plot_safe']
+                  'plot_wind_speed', 'plot_rain', 'plot_pressure', 'plot_safe']
     plot_info_list = []
     for name in plot_names:
         if webcfg['Weather'].get(name, None) is not None:
@@ -442,7 +505,7 @@ def generate_weather_plot(webcfg, telcfg, date=None, plot_ndays=1, span_hours=24
                 plot_info[1].x_range = plot_info_list[0][1].x_range
             plot_column_list.append(plot_info[1])
             plot_twilights_list.append(plot_info)
-    overplot_twilights(plot_twilights_list, end, webcfg, plot_ndays=plot_ndays, log=log)
+    overplot_twilights(plot_twilights_list, query_end, webcfg, ndays=query_days, log=log)
 
     if webcfg['Weather'].getboolean('plot_dome', False) is True and telcfg is not None:
         plot_column_list.append(dome_plot)
