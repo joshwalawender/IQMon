@@ -215,7 +215,9 @@ def status(telescope):
 ##-------------------------------------------------------------------------
 @app.route("/weather")
 def nightWeather(telescope=None, date=None, span_hours=24):
+    log.info(f'')
     log.info(f'Building {__name__} nightWeather')
+    tick = datetime.utcnow()
     telescope = flask.request.args.get('telescope', None)
     webcfg, cfgs = get_all_configs()
     if telescope not in cfgs.keys():
@@ -230,6 +232,9 @@ def nightWeather(telescope=None, date=None, span_hours=24):
                                         span_hours=span_hours)
 
     log.info(f"Rendering template")
+    tock = datetime.utcnow()
+    duration = (tock-tick).total_seconds()
+    log.info(f'Page built in {duration:.2f} s')
     return flask.render_template('nightPlot.html',
                                  telescope=telescope,
                                  date=date,
@@ -244,13 +249,18 @@ def nightWeather(telescope=None, date=None, span_hours=24):
 ##-------------------------------------------------------------------------
 @app.route("/<string:telescope>/report/<string:date>")
 def nightReport(telescope, date):
-    log.info(f'Building {__name__} iqmonReport {telescope}')
+    log.info(f'')
+    log.info(f'Building {__name__} nightReport {telescope}')
+    tick = datetime.utcnow()
     webcfg, cfgs = get_all_configs()
     if telescope not in cfgs.keys():
         return f'Could not find config for "{telescope}"'
     script, div = generate_iqmon_plot(cfgs[telescope], date=date)
 
     log.info(f"Rendering template")
+    tock = datetime.utcnow()
+    duration = (tock-tick).total_seconds()
+    log.info(f'Page built in {duration:.2f} s')
     return flask.render_template('nightPlot.html',
                                  telescope=telescope,
                                  date=date,
@@ -265,7 +275,9 @@ def nightReport(telescope, date):
 ##-------------------------------------------------------------------------
 @app.route("/<string:telescope>/images/<string:date>")
 def imageList(telescope, date):
+    log.info(f'')
     log.info(f'Building {__name__} imageList {telescope} {date}')
+    tick = datetime.utcnow()
     subject = date
     webcfg, cfgs = get_all_configs()
     if telescope not in cfgs.keys():
@@ -297,6 +309,9 @@ def imageList(telescope, date):
                     image_list[i][f"{key} flag"] = True
 
     log.info(f"Rendering template")
+    tock = datetime.utcnow()
+    duration = (tock-tick).total_seconds()
+    log.info(f'Page built in {duration:.2f} s')
     return flask.render_template('imageList.html',
                                  telescope=telescope,
                                  subject=subject,
