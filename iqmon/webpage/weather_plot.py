@@ -98,7 +98,7 @@ def generate_weather_plot(webcfg, telcfg, date=None, querybuffer_ndays=1, span_h
             plot_temperature.legend.visible = False
         plot_temperature.yaxis.axis_label = 'Temp (F)'
         plot_temperature.yaxis.formatter = NumeralTickFormatter(format="0,0")
-        plot_temperature.yaxis.ticker = [10,30, 50, 70, 90, 110]
+        plot_temperature.yaxis.ticker = [val for val in range(-50, 130, 20)]
         plot_temperature.xaxis.visible = False
 
     ##-------------------------------------------------------------------------
@@ -160,7 +160,7 @@ def generate_weather_plot(webcfg, telcfg, date=None, querybuffer_ndays=1, span_h
             plot_humidity.legend.visible = False
         plot_humidity.yaxis.axis_label = 'Humidity (%)'
         plot_humidity.yaxis.formatter = NumeralTickFormatter(format="0,0")
-        plot_humidity.yaxis.ticker = [0, 20, 40, 60, 80, 100]
+        plot_humidity.yaxis.ticker = [val for val in range(0, 120, 20)]
         plot_humidity.xaxis.visible = False
 
     ##-------------------------------------------------------------------------
@@ -283,7 +283,7 @@ def generate_weather_plot(webcfg, telcfg, date=None, querybuffer_ndays=1, span_h
             plot_wind_speed.legend.visible = False
         plot_wind_speed.yaxis.axis_label = 'Wind (mph)'
         plot_wind_speed.yaxis.formatter = NumeralTickFormatter(format="0,0")
-        plot_wind_speed.yaxis.ticker = [0, 20, 40, 60, 80]
+        plot_wind_speed.yaxis.ticker = [val for val in range(0, 120, 20)]
         plot_wind_speed.xaxis.visible = False
 
     ##-------------------------------------------------------------------------
@@ -326,6 +326,7 @@ def generate_weather_plot(webcfg, telcfg, date=None, querybuffer_ndays=1, span_h
                                  line_alpha=0.8, fill_alpha=0.8)
         plot_rain.yaxis.axis_label = 'Rain'
         plot_rain.yaxis.formatter = NumeralTickFormatter(format="0.0a")
+        plot_rain.yaxis.ticker = [val for val in range(500, 3000, 1000)]
         plot_rain.xaxis.visible = False
 
     ##-------------------------------------------------------------------------

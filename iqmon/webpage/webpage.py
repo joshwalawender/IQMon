@@ -55,11 +55,15 @@ def status(telescope):
     log.info(f'Building {__name__} status')
     tick = datetime.utcnow()
 
+    date = flask.request.args.get('date', None)
+    span_hours = float(flask.request.args.get('span_hours', 24))
+
     webcfg, cfgs = get_all_configs()
     if telescope not in cfgs.keys():
-        return f'Could not find config for "{telescope}"'
+        telescope = None
     telcfg = cfgs[telescope]
-    script, div = generate_weather_plot(webcfg, telcfg, query_ndays=2, span_hours=12)
+    script, div = generate_weather_plot(webcfg, telcfg, date=date,
+                                        span_hours=span_hours)
 
     ## Format currentweather
     log.info(f"Querying weather limits")
