@@ -25,10 +25,12 @@ def generate_weather_plot(webcfg, telcfg, date=None, querybuffer_ndays=1, span_h
     weather_limits = mongo_query('weather_limits', {}, webcfg)[0]
 
     if date is None:
+        if span_hours > 24*querybuffer_ndays:
+            querybuffer_ndays = int(np.ceil(span_hours/24))
         end = datetime.utcnow()
         query_end = end
         start = end - timedelta(hours=span_hours)
-        query_start = end - timedelta(days=querybuffer_ndays)
+        query_start = start - timedelta(days=querybuffer_ndays)
         query_days = querybuffer_ndays
     else:
         if span_hours > 24*querybuffer_ndays:
@@ -495,7 +497,8 @@ def generate_weather_plot(webcfg, telcfg, date=None, querybuffer_ndays=1, span_h
                 ymin,ymax = limit_string.split(',')
             else:
                 ymin,ymax = 0,1
-            plot_info_list.append([name, eval(name), float(ymax), float(ymin)])
+            yrange = float(ymax)-float(ymin)
+            plot_info_list.append([name, eval(name), float(ymax)+yrange, float(ymin)-yrange])
 
     plot_column_list = []
     plot_twilights_list = []
