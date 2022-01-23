@@ -29,6 +29,7 @@ entry_points = {
         # Ingest Pipeline
         "iqmon_ingest_monitor = iqmon.scripts.ingest_script:watch_directory",
         "iqmon_ingest_one = iqmon.scripts.ingest_script:analyze_one",
+        "iqmon_ingest_all = iqmon.scripts.ingest_script:analyze_directory",
         "iqmon_ingest_cd = iqmon.scripts.ingest_script:change_directory",
         "iqmon_ingest_clear = iqmon.scripts.ingest_script:clear_queue",
         "iqmon_ingest_list = iqmon.scripts.ingest_script:list_queue",

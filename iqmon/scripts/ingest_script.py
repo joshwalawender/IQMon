@@ -34,6 +34,9 @@ def _parseArguments(in_args):
     parser.add_argument("-O", "--overwrite", dest="overwrite",
            default=False, action="store_true",
            help="Reprocess files if they already exist in database?  Only works for analyzeone.")
+    parser.add_argument("--fz", "--fpack", dest="fpack",
+           default=False, action="store_true",
+           help="Accept fpack'd files (.fz extension) instead of .fts")
     parser.add_argument('input', type=str, nargs='?',
            help="input image file (full path)", default='')
     args = parser.parse_args(in_args[1:])
@@ -92,6 +95,12 @@ def analyze_one():
         return
     args.name = f"{p}"
 
+    framework = setup_framework(args, pipeline=IngestPipeline)
+    if args.fpack is True:
+        framework.config['DEFAULT']['file_type'] = '*.fz'
+    else:
+        framework.config['DEFAULT']['file_type'] = '*.fts'
+
     pkg = 'iqmon'
     framework_config_file = "configs/framework.cfg"
     framework_config_fullpath = pkg_resources.resource_filename(pkg, framework_config_file)
@@ -103,14 +112,47 @@ def analyze_one():
         print("Failed to connect to Queue Manager")
         return
 
-    if args.overwrite is True:
-        pending = queue.get_pending()
-        event = Event("set_overwrite", args)
-        queue.put(event)
-
     pending = queue.get_pending()
     event = Event("next_file", args)
     queue.put(event)
+    framework.config['DEFAULT']['file_type'] = '*.fts'
+
+
+##-----------------------------------------------------------------------------
+## Analyze All Files in a Directory
+##-----------------------------------------------------------------------------
+def analyze_directory():
+    args = _parseArguments(sys.argv)
+    data_path = Path(args.input).expanduser().absolute()
+    if data_path.exists() is False:
+        print(f'Unable to find directory: {data_path}')
+        return
+
+    framework = setup_framework(args, pipeline=IngestPipeline)
+    if args.fpack is True:
+        framework.config['DEFAULT']['file_type'] = '*.fz'
+    else:
+        framework.config['DEFAULT']['file_type'] = '*.fts'
+
+    pkg = 'iqmon'
+    framework_config_file = "configs/framework.cfg"
+    framework_config_fullpath = pkg_resources.resource_filename(pkg, framework_config_file)
+    cfg = ConfigClass(framework_config_fullpath)
+    queue = queues.get_event_queue(cfg.queue_manager_hostname,
+                                   cfg.queue_manager_portnr,
+                                   cfg.queue_manager_auth_code)
+    if queue is None:
+        print("Failed to connect to Queue Manager")
+        return
+    pending = queue.get_pending()
+
+    infiles = [f for f in data_path.glob(framework.config['DEFAULT']['file_type'])]
+    for infile in infiles:
+        print(f"Ingesting {infile.name}")
+        args.name = f"{infile}"
+        event = Event("next_file", args)
+        queue.put(event)
+        framework.config['DEFAULT']['file_type'] = '*.fts'
 
 
 ##-----------------------------------------------------------------------------
@@ -119,7 +161,10 @@ def analyze_one():
 def watch_directory():
     args = _parseArguments(sys.argv)
     framework = setup_framework(args, pipeline=IngestPipeline)
-
+    if args.fpack is True:
+        framework.config['DEFAULT']['file_type'] = '*.fz'
+    else:
+        framework.config['DEFAULT']['file_type'] = '*.fts'
     now = datetime.utcnow()
     data_path = framework.config.instrument.get('FileHandling', 'ingest_dir')
     data_path = data_path.replace('YYYY', f'{now.year:4d}')
@@ -134,43 +179,6 @@ def watch_directory():
     infiles = data_path.glob(framework.config['DEFAULT']['file_type'])
     framework.ingest_data(str(data_path), infiles, True)
     framework.start(False, False, False, True)
-
-
-##-----------------------------------------------------------------------------
-## Change Watched Directory
-##-----------------------------------------------------------------------------
-def change_directory():
-    args = _parseArguments(sys.argv)
-    if args.input is not '':
-        newdir = Path(args.input).expanduser().absolute()
-    else:
-        now = datetime.utcnow()
-        data_path = framework.config.instrument.get('FileHandling', 'ingest_dir')
-        data_path = data_path.replace('YYYY', f'{now.year:4d}')
-        data_path = data_path.replace('MM', f'{now.month:02d}')
-        data_path = data_path.replace('DD', f'{now.day:02d}')
-        newdir = Path(data_path).expanduser()
-
-    args.input = str(newdir)
-    if newdir.exists() is False:
-        newdir.mkdir(parents=True)
-
-    pkg = 'iqmon'
-    framework_config_file = "configs/framework.cfg"
-    framework_config_fullpath = pkg_resources.resource_filename(pkg, framework_config_file)
-    cfg = ConfigClass(framework_config_fullpath)
-    queue = queues.get_event_queue(cfg.queue_manager_hostname,
-                                   cfg.queue_manager_portnr,
-                                   cfg.queue_manager_auth_code)
-
-    if queue is None:
-        print("Failed to connect to Queue Manager")
-    else:
-        pending = queue.get_pending()
-        event = Event("set_file_type", args)
-        queue.put(event)
-        event = Event("update_directory", args)
-        queue.put(event)
 
 
 ##-----------------------------------------------------------------------------
@@ -199,10 +207,12 @@ def list_queue():
 ##-----------------------------------------------------------------------------
 def clear_queue():
     args = _parseArguments(sys.argv)
+
     pkg = 'iqmon'
     framework_config_file = "configs/framework.cfg"
     framework_config_fullpath = pkg_resources.resource_filename(pkg, framework_config_file)
     cfg = ConfigClass(framework_config_fullpath)
+
     drpif = FrameworkInterface(cfg)
     # Print pending Events
     if drpif.is_queue_ok():

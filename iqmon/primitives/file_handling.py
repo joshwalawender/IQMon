@@ -324,11 +324,17 @@ class CopyFile(BasePrimitive):
         BasePrimitive.__init__(self, action, context)
         self.log = context.pipeline_logger
         self.cfg = self.context.config.instrument
+        # Set values for destination
+        self.action.args.destination_dir = Path(get_destination_dir(self.cfg,
+                                           date=self.action.args.meta['date']))
+        self.action.args.destination_file = self.action.args.destination_dir / self.action.args.fitsfilepath.name
 
     def _pre_condition(self):
         """Check for conditions necessary to run this process"""
         checks = [pre_condition(self, 'FITS file exists',
                                 self.action.args.fitsfilepath.exists()),
+                  pre_condition(self, 'Destination file does not exist',
+                                self.action.args.destination_file.exists() is False),
                  ]
         return np.all(checks)
 
@@ -344,14 +350,10 @@ class CopyFile(BasePrimitive):
         Returns an Argument() with the parameters that depends on this operation.
         """
         self.log.info(f"Running {self.__class__.__name__} action")
-        self.action.args.destination_dir = Path(get_destination_dir(self.cfg))
         self.action.args.destination_dir.mkdir(parents=True, exist_ok=True)
-        
         overwrite = self.cfg['FileHandling'].getboolean('overwrite', False)
         
-        if self.action.args.fitsfilepath.suffix in ['.fits', '.fts', '.fz']:
-            self.action.args.destination_file = self.action.args.destination_dir / self.action.args.fitsfilepath.name
-        else:
+        if self.action.args.fitsfilepath.suffix not in ['.fits', '.fts', '.fz']:
             msg = f'File extension not handled: {self.action.args.fitsfilepath.suffix}'
             self.log.error(msg)
             self.action.args.skip = True
@@ -400,6 +402,8 @@ class DeleteOriginal(BasePrimitive):
                   self.cfg['FileHandling'].getboolean('delete_original', False) is True),
                   pre_condition(self, 'destination copy exists',
                   self.action.args.destination_file.exists() is True),
+                  pre_condition(self, 'Original and destination are different',
+                  self.action.args.destination_file != self.action.args.fitsfilepath),
                   ]
         return np.all(checks)
 

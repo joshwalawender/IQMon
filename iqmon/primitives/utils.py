@@ -32,12 +32,13 @@ def get_memory_size(input_obj):
 ##-----------------------------------------------------------------------------
 ## Function: get_destination_dir
 ##-----------------------------------------------------------------------------
-def get_destination_dir(cfg):
+def get_destination_dir(cfg, date=None):
     raw_string = cfg['FileHandling'].get('destination_dir')
-    nowut = datetime.utcnow()
-    y = f'{nowut.year:4d}'
-    m = f'{nowut.month:02d}'
-    d = f'{nowut.day:02d}'
+    if date is None:
+        date = datetime.utcnow()
+    y = f'{date.year:4d}'
+    m = f'{date.month:02d}'
+    d = f'{date.day:02d}'
     result = raw_string.replace('YYYY', y).replace('MM', m).replace('DD', d)
     return result
 

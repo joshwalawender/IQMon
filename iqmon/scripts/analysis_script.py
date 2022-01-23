@@ -141,14 +141,57 @@ def watch_directory():
 ##-----------------------------------------------------------------------------
 def analyze_one():
     args = _parseArguments(sys.argv)
-    framework = setup_framework(args, pipeline=AnalysisPipeline)
     p = Path(args.input).expanduser().absolute()
     if p.exists() is False:
         print(f'Unable to find file: {p}')
         return
+    args.name = f"{p}"
 
-    print(f"Triggering ingest of {p}")
-    framework.ingest_data(path=None, files=[str(p)], monitor=False)
+    pkg = 'iqmon'
+    framework_config_file = "configs/framework.cfg"
+    framework_config_fullpath = pkg_resources.resource_filename(pkg, framework_config_file)
+    cfg = ConfigClass(framework_config_fullpath)
+    queue = queues.get_event_queue(cfg.queue_manager_hostname,
+                                   cfg.queue_manager_portnr,
+                                   cfg.queue_manager_auth_code)
+    if queue is None:
+        print("Failed to connect to Queue Manager")
+        return
+
+    pending = queue.get_pending()
+    event = Event("next_file", args)
+    queue.put(event)
+
+
+##-----------------------------------------------------------------------------
+## Analyze All Files in a Directory
+##-----------------------------------------------------------------------------
+def analyze_directory():
+    args = _parseArguments(sys.argv)
+    data_path = Path(args.input).expanduser().absolute()
+    if data_path.exists() is False:
+        print(f'Unable to find directory: {data_path}')
+        return
+
+    pkg = 'iqmon'
+    framework_config_file = "configs/framework.cfg"
+    framework_config_fullpath = pkg_resources.resource_filename(pkg, framework_config_file)
+    cfg = ConfigClass(framework_config_fullpath)
+    queue = queues.get_event_queue(cfg.queue_manager_hostname,
+                                   cfg.queue_manager_portnr,
+                                   cfg.queue_manager_auth_code)
+    if queue is None:
+        print("Failed to connect to Queue Manager")
+        return
+    pending = queue.get_pending()
+
+    infiles = [f for f in data_path.glob(framework.config['DEFAULT']['file_type'])]
+    for infile in infiles:
+        print(f"Ingesting {infile.name}")
+        args.name = f"{infile}"
+        event = Event("next_file", args)
+        queue.put(event)
+        framework.config['DEFAULT']['file_type'] = '*.fts'
 
 
 ##-----------------------------------------------------------------------------
