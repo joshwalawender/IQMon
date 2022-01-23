@@ -59,3 +59,4 @@ def get_all_configs():
                         cfgs['primary'] = name
     
     return webcfg, cfgs
+

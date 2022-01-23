@@ -18,6 +18,24 @@ from glob import glob
 from iqmon.pipelines.analyze import AnalysisPipeline
 
 
+import sys
+import gc
+
+def actualsize(input_obj):
+    memory_size = 0
+    ids = set()
+    objects = [input_obj]
+    while objects:
+        new = []
+        for obj in objects:
+            if id(obj) not in ids:
+                ids.add(id(obj))
+                memory_size += sys.getsizeof(obj)
+                new.append(obj)
+        objects = gc.get_referents(*new)
+    return memory_size/1024/1024
+
+
 ##-----------------------------------------------------------------------------
 ## Parse Arguments
 ##-----------------------------------------------------------------------------
@@ -57,7 +75,7 @@ def setup_framework(args, pipeline=AnalysisPipeline):
         pipeline_config_fullpath = pkg_resources.resource_filename(pkg, pipeline_config_file)
         pipeline_config = ConfigClass(pipeline_config_fullpath, default_section='DEFAULT')
     else:
-        pipeline_config = ConfigClass(args.pipeline_config_file, default_section='DEFAULT')
+        pipeline_config = ConfigClass(args.config_file, default_section='DEFAULT')
 
     if args.overwrite is True:
         pipeline_config.set('mongo', 'overwrite', value='True')
@@ -172,6 +190,10 @@ def list_queue():
     else:
         print ("Pending events: Queue not available", drpif.queue)
 
+    # Memory Size
+    framework = setup_framework(args, pipeline=AnalysisPipeline)
+    print(f"drpif = {actualsize(drpif):.1f} MB")
+    print(f"framework = {actualsize(framework):.1f} MB")
 
 ##-----------------------------------------------------------------------------
 ## Clear Queue
@@ -198,6 +220,27 @@ def clear_queue():
     else:
         print ("Queue manager already stopped")
 
-if __name__ == "__main__":
-    analyze_one()
 
+##-----------------------------------------------------------------------------
+if __name__ == "__main__":
+    args = _parseArguments(sys.argv)
+
+    framework = setup_framework(args, pipeline=AnalysisPipeline)
+
+    pkg = 'iqmon'
+    framework_config_file = "configs/framework_analysis.cfg"
+    framework_config_fullpath = pkg_resources.resource_filename(pkg, framework_config_file)
+    cfg = ConfigClass(framework_config_fullpath)
+    drpif = FrameworkInterface(cfg)
+
+    # Print pending Events
+    if drpif.is_queue_ok():
+        events = drpif.pending_events()
+        print(f'Found {len(events)} in queue')
+        if args.verbose is True:
+            for event in events:
+                print(event)
+    else:
+        print ("Pending events: Queue not available", drpif.queue)
+
+    print(framework.context.data_set)

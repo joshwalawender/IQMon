@@ -6,7 +6,7 @@ import pymongo
 
 from keckdrpframework.primitives.base_primitive import BasePrimitive
 
-from .utils import pre_condition, post_condition
+from .utils import pre_condition, post_condition, get_memory_size
 
 
 ##-----------------------------------------------------------------------------
@@ -85,6 +85,7 @@ class RecordFile(BasePrimitive):
             self.log.error(e)
         self.mongoclient.close()
 
+#         self.log.info(f"Memory Size after {self.__class__.__name__} action: {get_memory_size(self):.1f} MB")
         return self.action.args
 
 

@@ -13,7 +13,7 @@ from astropy.time import Time
 
 from keckdrpframework.primitives.base_primitive import BasePrimitive
 
-from .utils import pre_condition, post_condition, get_destination_dir
+from .utils import pre_condition, post_condition, get_memory_size, get_destination_dir
 
 
 ##-----------------------------------------------------------------------------
@@ -38,6 +38,7 @@ class ReadFITS(BasePrimitive):
         self.cfg = self.context.config.instrument
         # initialize values in the args for general use
         self.action.args.fitsfilepath = Path(self.action.args.name).expanduser().absolute()
+        self.log.info(f"--> Input FITS file: {self.action.args.fitsfilepath}")
         self.action.args.skip = False
         self.action.args.ccddata = None
         self.action.args.destination_dir = None
@@ -80,6 +81,9 @@ class ReadFITS(BasePrimitive):
         checks = [pre_condition(self, 'FITS file exists',
                                 self.action.args.fitsfilepath.exists()),
                  ]
+        if np.all(checks) is False:
+            self.log.ERROR('Skipping this file')
+            self.action.args.skip = True
         return np.all(checks)
 
     def _post_condition(self):
@@ -219,6 +223,7 @@ class ReadFITS(BasePrimitive):
         if self.mongoclient is not None:
             self.mongoclient.close()
 
+        self.log.info(f"Memory Size after {self.__class__.__name__} action: {get_memory_size(self):.1f} MB")
         return self.action.args
 
 
@@ -300,6 +305,7 @@ class PopulateAdditionalMetaData(BasePrimitive):
             self.action.args.meta['median adu'] = med
             self.action.args.meta['std dev adu'] = std
 
+#         self.log.info(f"Memory Size after {self.__class__.__name__} action: {get_memory_size(self):.1f} MB")
         return self.action.args
 
 
@@ -410,5 +416,42 @@ class DeleteOriginal(BasePrimitive):
         """
         self.log.info(f"Running {self.__class__.__name__} action")
         self.action.args.fitsfilepath.unlink()
+        return self.action.args
+
+
+##-----------------------------------------------------------------------------
+## Primitive: ReleaseMemory
+##-----------------------------------------------------------------------------
+class ReleaseMemory(BasePrimitive):
+    """
+    """
+    def __init__(self, action, context):
+        BasePrimitive.__init__(self, action, context)
+        self.log = context.pipeline_logger
+        self.cfg = self.context.config.instrument
+
+    def _pre_condition(self):
+        """Check for conditions necessary to run this process"""
+        return True
+
+    def _post_condition(self):
+        """
+        Check for conditions necessary to verify that the process ran
+        correctly.
+        """
+        return True
+
+    def _perform(self):
+        """
+        Returns an Argument() with the parameters that depend on this
+        operation.
+        """
+        self.log.info(f"Running {self.__class__.__name__} action")
+        self.action.args = None
+        self.action.event.args = None
+#         self.log.info(f"Memory Size after {self.__class__.__name__} action: {get_memory_size(self):.1f} MB")
+#         self.log.info(f"  Memory size of self.action.event.set_recurrent = {get_memory_size(self.action.event.set_recurrent):.1f} MB")
+#         self.log.info(type(self.action.event.set_recurrent))
+#         self.log.info(dir(self.action.event.set_recurrent))
         return self.action.args
 

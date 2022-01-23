@@ -14,7 +14,7 @@ from astropy import stats
 
 from keckdrpframework.primitives.base_primitive import BasePrimitive
 
-from .utils import pre_condition, post_condition, get_jpeg_dir
+from .utils import pre_condition, post_condition, get_memory_size, get_jpeg_dir
 
 
 
@@ -380,5 +380,6 @@ class RenderJPEG(BasePrimitive):
         plt.savefig(jpeg_file_path, dpi=dpi)
         self.log.debug(f'  Done')
 
+#         self.log.info(f"Memory Size after {self.__class__.__name__} action: {get_memory_size(self):.1f} MB")
         return self.action.args
 

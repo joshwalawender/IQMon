@@ -12,7 +12,7 @@ import sep
 
 from keckdrpframework.primitives.base_primitive import BasePrimitive
 
-from .utils import pre_condition, post_condition, mode
+from .utils import pre_condition, post_condition, mode, get_memory_size
 
 
 ##-----------------------------------------------------------------------------
@@ -60,6 +60,7 @@ class MakeSourceMask(BasePrimitive):
                                 snr, npixels)
         self.action.args.source_mask = source_mask
 
+#         self.log.info(f"Memory Size after {self.__class__.__name__} action: {get_memory_size(self):.1f} MB")
         return self.action.args
 
 
@@ -109,6 +110,7 @@ class CreateBackground(BasePrimitive):
                                      sigma_clip=stats.SigmaClip())
         self.action.args.background = bkg
 
+#         self.log.info(f"Memory Size after {self.__class__.__name__} action: {get_memory_size(self):.1f} MB")
         return self.action.args
 
 
@@ -275,6 +277,7 @@ class ExtractStars(BasePrimitive):
         self.action.args.meta['n_fluxes'] = len(self.action.args.objects)
         self.log.info(f'  Fluxes for {self.action.args.meta["n_fluxes"]:d} stars')
 
+#         self.log.info(f"Memory Size after {self.__class__.__name__} action: {get_memory_size(self):.1f} MB")
         return self.action.args
 
 
@@ -309,6 +312,7 @@ class GetCalibrationStars(BasePrimitive):
         """
         self.log.info(f"Running {self.__class__.__name__} action")
 
+#         self.log.info(f"Memory Size after {self.__class__.__name__} action: {get_memory_size(self):.1f} MB")
         return self.action.args
 
 
@@ -343,5 +347,6 @@ class AssociateCalibratorStars(BasePrimitive):
         """
         self.log.info(f"Running {self.__class__.__name__} action")
 
+#         self.log.info(f"Memory Size after {self.__class__.__name__} action: {get_memory_size(self):.1f} MB")
         return self.action.args
 

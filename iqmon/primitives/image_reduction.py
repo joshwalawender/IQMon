@@ -11,7 +11,7 @@ import ccdproc
 
 from keckdrpframework.primitives.base_primitive import BasePrimitive
 
-from .utils import pre_condition, post_condition, find_master
+from .utils import pre_condition, post_condition, find_master, get_memory_size
 
 
 ##-----------------------------------------------------------------------------
@@ -58,6 +58,7 @@ class SubtractBias(BasePrimitive):
         self.action.args.ccddata = ccdproc.subtract_bias(self.action.args.ccddata,
                                                          master_bias_ccddata)
 
+#         self.log.info(f"Memory Size after {self.__class__.__name__} action: {get_memory_size(self):.1f} MB")
         return self.action.args
 
 
@@ -105,6 +106,7 @@ class SubtractDark(BasePrimitive):
         self.action.args.ccddata = ccdproc.subtract_bias(self.action.args.ccddata,
                                                          master_dark_ccddata)
 
+#         self.log.info(f"Memory Size after {self.__class__.__name__} action: {get_memory_size(self):.1f} MB")
         return self.action.args
 
 
@@ -152,6 +154,7 @@ class GainCorrect(BasePrimitive):
                                            gain,
                                            gain_unit=u.electron/u.adu)
 
+#         self.log.info(f"Memory Size after {self.__class__.__name__} action: {get_memory_size(self):.1f} MB")
         return self.action.args
 
 
@@ -197,6 +200,7 @@ class CreateDeviation(BasePrimitive):
         self.action.args.ccddata = ccdproc.create_deviation(self.action.args.ccddata,
                                            readnoise=read_noise*u.electron)
 
+#         self.log.info(f"Memory Size after {self.__class__.__name__} action: {get_memory_size(self):.1f} MB")
         return self.action.args
 
 
@@ -274,5 +278,6 @@ class MakeMasterCalFrame(BasePrimitive):
             self.log.info(f"  Saving: {combined_file}")
             combined.write(combined_file)
 
-            return self.action.args
+#         self.log.info(f"Memory Size after {self.__class__.__name__} action: {get_memory_size(self):.1f} MB")
+        return self.action.args
 

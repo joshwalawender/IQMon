@@ -13,8 +13,7 @@ from astropy.table import Table, Column
 
 from keckdrpframework.primitives.base_primitive import BasePrimitive
 
-from .utils import pre_condition, post_condition
-
+from .utils import pre_condition, post_condition, get_memory_size
 
 
 ##-----------------------------------------------------------------------------
@@ -148,5 +147,6 @@ class SolveAstrometry(BasePrimitive):
                                         self.action.args.header_pointing).to(u.arcmin).value
         self.log.info(f'Pointing error = {self.action.args.meta.get("perr"):.1f}')
 
+#         self.log.info(f"Memory Size after {self.__class__.__name__} action: {get_memory_size(self):.1f} MB")
         return self.action.args
 
