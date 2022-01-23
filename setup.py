@@ -27,18 +27,18 @@ scripts = []
 entry_points = {
     'console_scripts': [
         # Ingest Pipeline
-        "iqmon_ingest_monitor = iqmon.scripts.ingest_script:watch_directory",
-        "iqmon_ingest_one = iqmon.scripts.ingest_script:analyze_one",
-        "iqmon_ingest_all = iqmon.scripts.ingest_script:analyze_directory",
-        "iqmon_ingest_cd = iqmon.scripts.ingest_script:change_directory",
-        "iqmon_ingest_clear = iqmon.scripts.ingest_script:clear_queue",
-        "iqmon_ingest_list = iqmon.scripts.ingest_script:list_queue",
+        "iqmon_ingest_monitor = iqmon.scripts.scripts:ingest_start_queue",
+        "iqmon_ingest_one = iqmon.scripts.scripts:ingest_one",
+        "iqmon_ingest_all = iqmon.scripts.scripts:ingest_all",
+        "iqmon_ingest_clear = iqmon.scripts.scripts:ingest_clear",
+        "iqmon_ingest_list = iqmon.scripts.scripts:ingest_list",
         # Analysis Pipeline
-        "iqmon_analyze_monitor = iqmon.scripts.analysis_script:watch_directory",
-        "iqmon_analyze_one = iqmon.scripts.analysis_script:analyze_one",
-        "iqmon_analyze_cd = iqmon.scripts.analysis_script:change_directory",
-        "iqmon_analyze_clear = iqmon.scripts.analysis_script:clear_queue",
-        "iqmon_analyze_list = iqmon.scripts.analysis_script:list_queue",
+        "iqmon_analyze_monitor = iqmon.scripts.scripts:analyze_start_queue",
+        "iqmon_analyze_one = iqmon.scripts.scripts:analyze_one",
+        "iqmon_analyze_all = iqmon.scripts.scripts:analyze_all",
+        "iqmon_analyze_cd = iqmon.scripts.scripts:analyze_cd",
+        "iqmon_analyze_clear = iqmon.scripts.scripts:analyze_clear",
+        "iqmon_analyze_list = iqmon.scripts.scripts:analyze_list",
         # Analysis Pipeline
         "monitor_aag = iqmon.devices.aag:monitor_aag",
         "monitor_weatherlink = iqmon.devices.weatherlink:monitor_davis_weather_link",
