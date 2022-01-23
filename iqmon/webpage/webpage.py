@@ -233,6 +233,8 @@ def nightWeather(telescope=None, date=None, span_hours=24):
     script, div = generate_weather_plot(webcfg, telcfg, date=date,
                                         span_hours=span_hours)
 
+    weather_limits = mongo_query('weather_limits', {}, webcfg)[0]
+    
     log.info(f"Rendering template")
     tock = datetime.utcnow()
     duration = (tock-tick).total_seconds()
@@ -243,6 +245,7 @@ def nightWeather(telescope=None, date=None, span_hours=24):
                                  title='Weather',
                                  script=script,
                                  div=div,
+                                 weather_limits=weather_limits,
                                  )
 
 

@@ -41,6 +41,18 @@
 
 {{ div|safe }}
 
+<h4>Weather Limits</h5>
+<table>
+    {% for key in weather_limits.keys() %}
+        {% if key != '_id' %}
+            <tr>
+                <td>{{ key }}</td>
+                <td>{{ weather_limits[key] }}</td>
+            </tr>
+        {% endif %}
+    {% endfor %}
+</table>
+
 </center>
 </body>
 </html>
