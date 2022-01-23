@@ -50,7 +50,7 @@
         </td>
         <td>{{ night['n images'] }}</td>
         <td>
-            <a href="{{ '/{}/weather/{}'.format(telescope, night['date']) }}">Weather for {{ night['date'] }}</a>
+            <a href="{{ '/weather?date={}&telescope={}'.format(night['date'], telescope) }}">Weather for {{ night['date'] }}</a>
         </td>
         <td>
             <a href="{{ '/{}/report/{}'.format(telescope, night['date']) }}">IQMon Report for {{ night['date'] }}</a>
