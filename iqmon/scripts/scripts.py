@@ -17,7 +17,7 @@ from glob import glob
 
 # the preferred way to import the pipeline is a direct import
 
-from iqmon import get_webpage_config
+from iqmon import get_webpage_config, get_all_configs
 from iqmon.pipelines.ingest import IngestPipeline
 from iqmon.pipelines.analyze import AnalysisPipeline
 
@@ -212,7 +212,8 @@ def watch_directory(pipeline=IngestPipeline,
 ##-----------------------------------------------------------------------------
 ## Change Watched Directory
 ##-----------------------------------------------------------------------------
-def change_directory(pipeline=IngestPipeline,
+def change_directory(newdir='~',
+                     pipeline=IngestPipeline,
                      framework_config_file="configs/framework.cfg",
                      framework_logcfg_file='configs/logger_ingest.cfg',
                      pipeline_config_file = 'configs/pipeline.cfg',):
@@ -225,8 +226,7 @@ def change_directory(pipeline=IngestPipeline,
     if args.input is not '':
         newdir = Path(args.input).expanduser().absolute()
     else:
-        date_string = datetime.utcnow().strftime('%Y%m%dUT')
-        newdir = Path(f'/Volumes/VYSOSData/V5/Images/{date_string[:4]}/{date_string}')
+        newdir = Path(newdir).expanduser()
 
     args.input = str(newdir)
     if newdir.exists() is False:
@@ -352,8 +352,18 @@ def analyze_clear(framework_config_file="configs/framework_analysis.cfg"):
     clear_queue(framework_config_file=framework_config_file)
 
 def analyze_cd():
-    webcfg = get_webpage_config()
+    webcfg, cfgs = get_all_configs()
     pipeline_config_file = webcfg['Telescopes'].get('pipeline_config_files').split(',')[0]
+    if len(cfgs.keys()) != 0:
+        if 'primary' in cfgs.keys():
+            pipeline_cfg = cfgs['primary']
+
+    if args.input == '':
+        now = datetime.utcnow()
+        args.input = pipeline_cfg['FileHandling'].get('destination_dir')
+        args.input = data_path.replace('YYYY', f'{now.year:4d}')
+        args.input = data_path.replace('MM', f'{now.month:02d}')
+        args.input = data_path.replace('DD', f'{now.day:02d}')
     change_directory(pipeline=AnalysisPipeline,
                      framework_config_file="configs/framework_analysis.cfg",
                      framework_logcfg_file='configs/logger_analysis.cfg',
