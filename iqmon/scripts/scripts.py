@@ -80,12 +80,10 @@ def setup_framework(args, pipeline=IngestPipeline,
     framework.context.pipeline_logger = getLogger(framework_logcfg_fullpath, name="pipeline")
     framework.logger = getLogger(framework_logcfg_fullpath, name="DRPF")
     framework.logger.info("Framework initialized")
-    framework.logger.info(f"  Framework config file: {framework_config_file}")
-    framework.logger.info(f"  {framework_config_fullpath}")
-    framework.logger.info(f"  Pipeline config file: {pipeline_config_file}")
-    framework.logger.info(f"  {pipeline_config_fullpath}")
-
-    framework.logger.info(framework.config.instrument.sections())
+    framework.logger.debug(f"  Framework config file: {framework_config_file}")
+    framework.logger.debug(f"  {framework_config_fullpath}")
+    framework.logger.debug(f"  Pipeline config file: {pipeline_config_file}")
+    framework.logger.debug(f"  {pipeline_config_fullpath}")
 
     return framework
 
