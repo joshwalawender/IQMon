@@ -140,7 +140,7 @@ class ReadFITS(BasePrimitive):
         self.action.args.imtype = f"unknown ({self.action.args.meta['imtype']})"
         for key, val in self.cfg.items('Header'):
             if key[:11] == 'type_string':
-                if self.action.args.meta['imtype'] == val:
+                if self.action.args.meta['imtype'] in val.split(','):
                     self.action.args.imtype = key[12:].upper()
         self.action.args.meta['imtype'] = self.action.args.imtype
         self.log.info(f"  Image type is {self.action.args.imtype}")
@@ -162,8 +162,7 @@ class ReadFITS(BasePrimitive):
             self.log.info('Check for previous analysis of this file')
             already_processed = [d for d in self.mongo_iqmon.find( {'fitsfile': self.action.args.meta['fitsfile']} )]
             if len(already_processed) != 0\
-               and self.cfg['mongo'].getboolean('overwrite', False) is False\
-               and 'n_objects' in already_processed[-1].keys():
+               and self.cfg['mongo'].getboolean('overwrite', False) is False:
                 self.log.info(f"overwrite is {self.cfg['FileHandling'].getboolean('overwrite')}")
                 self.log.info('  File is already in the database, skipping further processing')
                 self.action.args.skip = True
