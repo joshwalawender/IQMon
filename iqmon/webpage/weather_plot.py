@@ -512,6 +512,7 @@ def generate_weather_plot(webcfg, telcfg, date=None, querybuffer_ndays=1, span_h
     overplot_twilights(plot_twilights_list, query_end, webcfg, ndays=query_days, log=log)
 
     if webcfg['Weather'].getboolean('plot_dome', False) is True and telcfg is not None:
+        dome_plot.x_range = plot_info_list[0][1].x_range
         plot_column_list.append(dome_plot)
 
     # Add time log
