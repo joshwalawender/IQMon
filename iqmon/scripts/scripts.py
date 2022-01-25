@@ -91,10 +91,10 @@ def setup_framework(args, pipeline=IngestPipeline,
 ##-----------------------------------------------------------------------------
 ## Analyze One File
 ##-----------------------------------------------------------------------------
-def analyze_one(pipeline=IngestPipeline,
-                framework_config_file="configs/framework.cfg",
-                framework_logcfg_file='configs/logger_ingest.cfg',
-                pipeline_config_file = 'configs/pipeline.cfg'):
+def analyze_onefile(pipeline=IngestPipeline,
+                    framework_config_file="configs/framework.cfg",
+                    framework_logcfg_file='configs/logger_ingest.cfg',
+                    pipeline_config_file = 'configs/pipeline.cfg'):
     args = _parseArguments(sys.argv)
     p = Path(args.input).expanduser().absolute()
     if p.exists() is False:
@@ -164,7 +164,7 @@ def analyze_directory(pipeline=IngestPipeline,
         pending = queue.get_pending()
         infiles = [f for f in data_path.glob(framework.config['DEFAULT']['file_type'])]
         for infile in infiles:
-            print(f"Ingesting {infile.name}")
+#             print(f"Ingesting {infile.name}")
             args.name = f"{infile}"
             event = Event("next_file", args)
             queue.put(event)
@@ -291,11 +291,11 @@ def ingest_start_queue():
 def ingest_one():
     webcfg = get_webpage_config()
     pipeline_config_file = webcfg['Telescopes'].get('pipeline_config_files').split(',')[0]
-    analyze_one(pipeline=IngestPipeline,
-                framework_config_file="configs/framework_ingest.cfg",
-                framework_logcfg_file='configs/logger_ingest.cfg',
-                pipeline_config_file=pipeline_config_file,
-                )
+    analyze_onefile(pipeline=IngestPipeline,
+                    framework_config_file="configs/framework_ingest.cfg",
+                    framework_logcfg_file='configs/logger_ingest.cfg',
+                    pipeline_config_file=pipeline_config_file,
+                    )
 
 def ingest_all():
     webcfg = get_webpage_config()
@@ -328,11 +328,11 @@ def analyze_start_queue():
 def analyze_one():
     webcfg = get_webpage_config()
     pipeline_config_file = webcfg['Telescopes'].get('pipeline_config_files').split(',')[0]
-    analyze_one(pipeline=AnalysisPipeline,
-                framework_config_file="configs/framework_analysis.cfg",
-                framework_logcfg_file='configs/logger_analysis.cfg',
-                pipeline_config_file=pipeline_config_file,
-                )
+    analyze_onefile(pipeline=AnalysisPipeline,
+                    framework_config_file="configs/framework_analysis.cfg",
+                    framework_logcfg_file='configs/logger_analysis.cfg',
+                    pipeline_config_file=pipeline_config_file,
+                    )
 
 def analyze_all():
     webcfg = get_webpage_config()
