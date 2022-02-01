@@ -365,5 +365,38 @@ def nightList(telescope):
                                  )
 
 
+##-------------------------------------------------------------------------
+## nightList: /<string:telescope>/targets/
+##-------------------------------------------------------------------------
+@app.route("/<string:telescope>/targets/")
+def targetsList(telescope):
+    log.info(f'Building {__name__} targetsList {telescope}')
+    webcfg, cfgs = get_all_configs()
+    if telescope not in cfgs.keys():
+        return f'Could not find config for "{telescope}"'
+    telcfg = cfgs[telescope]
+
+    log.info(f"Querying image database")
+    query_dict = 'target name'
+    query_result = mongo_query('iqmon', query_dict, telcfg, distinct=True)
+    target_list = sorted(query_result, reverse=True)
+    log.info(f"  Found {len(target_list)} targets")
+
+    targets = []
+    for i,target in enumerate(target_list):
+        log.info(f"Querying image database for {target} ({i+1}/{len(target_list)})")
+        query_result = mongo_query('iqmon', {'target name': target}, telcfg)
+        image_list = [d for d in query_result]
+        targets.append([target, len(image_list)])
+    targets = sorted(targets, key=lambda t: t[1], reverse=True)
+
+    log.info(f"Rendering template")
+    return flask.render_template('targetList.html',
+                                 telescope=telescope,
+                                 targets=targets,
+                                 )
+
+
+
 if __name__ == "__main__":
     app.run()
