@@ -277,6 +277,31 @@ class MakeMasterCalFrame(BasePrimitive):
                 combined_file.unlink()
             self.log.info(f"  Saving: {combined_file}")
             combined.write(combined_file)
+#         imtype = self.action.args.imtype
+#         date_string = self.action.args.meta['UT date string']
+#         self.context[date_string][self.action.args.imtype].append(self.action.args.ccddata)
+# 
+#         n_cals = len(self.context[date_string][imtype])
+#         self.log.info(f"Found {n_cals} {imtype} files for {date_string}")
+#         if n_cals >= self.cfg['Calibrations'].getint(f"min_{imtype}_frames"):
+#             self.log.info(f"Stacking {n_cals} {imtype} files")
+#             combined = ccdproc.combine(self.context[date_string][imtype],
+#                                        method='average',
+#                                        sigma_clip=True, sigma_clip_low_thresh=5, sigma_clip_high_thresh=5,
+#                                        sigma_clip_func=np.ma.median, sigma_clip_dev_func=stats.mad_std,
+#                                       )
+#             self.log.info(f"  Combined.")
+#             combined_bias.meta['combined'] = True
+#             combined_bias.meta['ncomb'] = n_cals
+# 
+#             combined_filename = f'Master{imtype}_{date_string}.fits'
+#             combined_filepath = Path(self.cfg['Calibrations'].get('directory_for_masters'))
+#             combined_file = combined_filepath.joinpath(combined_filename)
+#             if combined_file.exists() is True:
+#                 self.log.debug(f"  Deleting existing: {combined_file}")
+#                 combined_file.unlink()
+#             self.log.info(f"  Saving: {combined_file}")
+#             combined.write(combined_file)
 
 #         self.log.info(f"Memory Size after {self.__class__.__name__} action: {get_memory_size(self):.1f} MB")
         return self.action.args

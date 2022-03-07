@@ -40,6 +40,11 @@ class ReadFITS(BasePrimitive):
         self.action.args.fitsfilepath = Path(self.action.args.name).expanduser().absolute()
         self.log.info(f"--> Input FITS file: {self.action.args.fitsfilepath}")
         self.action.args.skip = False
+
+        if self.action.args.fitsfilepath.exists() != True:
+            self.log.error('Skipping this file')
+            self.action.args.skip = True
+
         self.action.args.ccddata = None
         self.action.args.destination_dir = None
         self.action.args.destination_file = None
@@ -106,14 +111,21 @@ class ReadFITS(BasePrimitive):
 
         # Read FITS file
         self.log.info(f'Reading: {self.action.args.fitsfilepath}')
-        if self.action.args.fitsfilepath.suffix == '.fz':
-            self.action.args.ccddata = CCDData.read(self.action.args.fitsfilepath,
-                                                    unit="adu", hdu=1)
-        else:
-            self.action.args.ccddata = CCDData.read(self.action.args.fitsfilepath,
-                                                    unit="adu")
+        try:
+            if self.action.args.fitsfilepath.suffix == '.fz':
+                self.action.args.ccddata = CCDData.read(self.action.args.fitsfilepath,
+                                                        unit="adu", hdu=1)
+            else:
+                self.action.args.ccddata = CCDData.read(self.action.args.fitsfilepath,
+                                                        unit="adu")
+        except Exception as err:
+            self.log.error(f"Failed to read file!")
+            self.log.error(err)
+            self.action.args.skip = True
+            return self.action.args
+
         # Read header metadata
-        self.log.info('Reading FITS header')
+        self.log.info(f'Reading FITS header: Memory Size of ccddata.meta: {get_memory_size(self.action.args.ccddata.meta):.1f} MB')
         hdr = self.action.args.ccddata.header
         for key, raw_read in self.cfg.items('Header'):
             raw_read = raw_read.split(',')
@@ -155,7 +167,12 @@ class ReadFITS(BasePrimitive):
                                                               unit=(u.hourangle, u.deg))
             except:
                 self.action.args.header_pointing = None
-            self.log.info(f'  {self.action.args.header_pointing.to_string("hmsdms", precision=1)}')
+            if self.action.args.header_pointing is not None:
+                self.log.info(f'  {self.action.args.header_pointing.to_string("hmsdms", precision=1)}')
+            else:
+                self.log.warning(f"  Could not parse header RA and Dec")
+                self.log.warning(f"  {self.action.args.meta.get('header_ra')}")
+                self.log.warning(f"  {self.action.args.meta.get('header_dec')}")
 
         # Should we skip a previously processed file?
         if self.mongo_iqmon is not None:
@@ -166,7 +183,6 @@ class ReadFITS(BasePrimitive):
                 self.log.info(f"overwrite is {self.cfg['FileHandling'].getboolean('overwrite')}")
                 self.log.info('  File is already in the database, skipping further processing')
                 self.action.args.skip = True
-                return self.action.args
 
             # Read previously solved WCS if available
             if len(already_processed) != 0 and self.action.args.imtype == 'OBJECT':
@@ -189,7 +205,7 @@ class ReadFITS(BasePrimitive):
                     self.log.info(f'  Pointing error = {self.action.args.meta.get("perr"):.1f}')
 
         ## VYSOS Specific Code:
-        if self.cfg['Telescope'].get('name') in ['V5', 'V20']:
+        if self.cfg['Telescope'].get('name') in ['V5', 'V20'] and self.action.args.skip is False:
             # Manually set filter for V5A
             if self.action.args.meta.get('filter', None) is None:
                 self.action.args.meta['filter'] = 'PSr'
@@ -223,6 +239,10 @@ class ReadFITS(BasePrimitive):
             self.mongoclient.close()
 
         self.log.info(f"Memory Size after {self.__class__.__name__} action: {get_memory_size(self):.1f} MB")
+#         self.log.info(f"Memory Size after {self.__class__.__name__} action on {self.action.args.meta['fitsfile']}: {get_memory_size(self):.1f} MB")
+#         self.log.info(f"  Memory Size of self.action.args.ccddata.meta: {get_memory_size(self.action.args.ccddata.meta):.1f} MB")
+#         self.log.info(f"  Memory Size of self.action.args.ccddata.header: {get_memory_size(self.action.args.ccddata.header):.1f} MB")
+
         return self.action.args
 
 
@@ -240,7 +260,7 @@ class PopulateAdditionalMetaData(BasePrimitive):
     def _pre_condition(self):
         """Check for conditions necessary to run this process"""
         checks = [pre_condition(self, 'Skip image is not set',
-                                not self.action.args.skip),
+                                self.action.args.skip != True),
                  ]
         return np.all(checks)
 
@@ -292,12 +312,14 @@ class PopulateAdditionalMetaData(BasePrimitive):
             self.action.args.meta['median adu'] = med
             self.action.args.meta['std dev adu'] = std
         elif self.action.args.imtype == 'DARK':
+            self.log.info('Determine image stats')
             mean, med, std = stats.sigma_clipped_stats(self.action.args.ccddata.data)
             self.log.info(f"  mean, med, std = {mean:.0f}, {med:.0f}, {std:.0f} (adu)")
             self.action.args.meta['mean adu'] = mean
             self.action.args.meta['median adu'] = med
             self.action.args.meta['std dev adu'] = std
         elif self.action.args.imtype in ['DOMEFLAT', 'TWIFLAT']:
+            self.log.info('Determine image stats')
             mean, med, std = stats.sigma_clipped_stats(self.action.args.ccddata.data)
             self.log.info(f"  mean, med, std = {mean:.0f}, {med:.0f}, {std:.0f} (adu)")
             self.action.args.meta['mean adu'] = mean
@@ -452,6 +474,10 @@ class ReleaseMemory(BasePrimitive):
         self.log.info(f"Running {self.__class__.__name__} action")
         self.action.args = None
         self.action.event.args = None
+        self.action.config = None
+        self.action.cfg = None
+        self.action.mongoclient = None
+        self.action.mongo_iqmon = None
 #         self.log.info(f"Memory Size after {self.__class__.__name__} action: {get_memory_size(self):.1f} MB")
 #         self.log.info(f"  Memory size of self.action.event.set_recurrent = {get_memory_size(self.action.event.set_recurrent):.1f} MB")
 #         self.log.info(type(self.action.event.set_recurrent))
