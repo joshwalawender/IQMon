@@ -187,10 +187,23 @@ def watch_directory(pipeline=IngestPipeline,
                                 framework_logcfg_file=framework_logcfg_file,
                                 pipeline_config_file=pipeline_config_file,
                                 )
+    nevents1 = list_queue(framework_config_file=framework_config_file)
+    framework.logger.info(f"  Found {nevents1} events in queue before ingesting input dir")
+    if nevents1 > 0:
+        framework.logger.info(f"  Clearing queue")
+        clear_queue(pipeline=pipeline,
+                    framework_config_file=framework_config_file,
+                    framework_logcfg_file=framework_logcfg_file,
+                    pipeline_config_file=pipeline_config_file,
+                    )
+        nevents2 = list_queue(framework_config_file=framework_config_file)
+        framework.logger.info(f"  Found {nevents2} events in queue before ingesting input dir")
+
     if args.fpack is True:
         framework.config['DEFAULT']['file_type'] = '*.fz'
     else:
         framework.config['DEFAULT']['file_type'] = '*.fts'
+
     now = datetime.utcnow()
     data_path = framework.config.instrument.get('FileHandling', 'ingest_dir')
     data_path = data_path.replace('YYYY', f'{now.year:4d}')
@@ -200,10 +213,11 @@ def watch_directory(pipeline=IngestPipeline,
     data_path = Path(data_path).expanduser()
     if data_path.exists() is False:
         data_path.mkdir(parents=True, exist_ok=True)
-
     framework.logger.info(f'Ingesting files from {data_path}')
-    infiles = data_path.glob(framework.config['DEFAULT']['file_type'])
-    framework.ingest_data(str(data_path), infiles, True)
+#     infiles = data_path.glob(framework.config['DEFAULT']['file_type'])
+    framework.ingest_data(path=str(data_path), files=None, monitor=True)
+    nevents3 = list_queue(framework_config_file=framework_config_file)
+    framework.logger.info(f"  Found {nevents3} events in queue")
     framework.start(False, False, False, True)
 
 
@@ -249,31 +263,49 @@ def list_queue(framework_config_file="configs/framework.cfg"):
         if args.verbose is True:
             for event in events:
                 print(event)
+        return len(events)
     else:
         print ("Pending events: Queue not available", drpif.queue)
+        return None
 
 
 ##-----------------------------------------------------------------------------
 ## Clear Queue
 ##-----------------------------------------------------------------------------
-def clear_queue(framework_config_file="configs/framework.cfg"):
+def clear_queue(pipeline=IngestPipeline,
+                framework_config_file="configs/framework.cfg",
+                framework_logcfg_file='configs/logger_ingest.cfg',
+                pipeline_config_file = 'configs/pipeline.cfg',
+                ):
     args = _parseArguments(sys.argv)
     pkg = 'iqmon'
     framework_config_fullpath = pkg_resources.resource_filename(pkg, framework_config_file)
     cfg = ConfigClass(framework_config_fullpath)
     drpif = FrameworkInterface(cfg)
+
+    framework = setup_framework(args, pipeline=pipeline,
+                                framework_config_file=framework_config_file,
+                                framework_logcfg_file=framework_logcfg_file,
+                                pipeline_config_file=pipeline_config_file,
+                                )
+
     # Print pending Events
     if drpif.is_queue_ok():
         events = drpif.pending_events()
         print(f'Found {len(events)} in queue')
+        for i in range(len(events)):
+            e = framework.get_event()
+        events = drpif.pending_events()
+        print(f'Found {len(events)} in queue')
+
     else:
         print ("Pending events: Queue not available", drpif.queue)
 
-    if drpif.is_queue_ok():
-        drpif.stop_event_queue()
-        print ("Queue manager stopped")
-    else:
-        print ("Queue manager already stopped")
+#     if drpif.is_queue_ok():
+#         drpif.stop_event_queue()
+#         print ("Queue manager stopped")
+#     else:
+#         print ("Queue manager already stopped")
 
 
 ##-----------------------------------------------------------------------------
@@ -310,7 +342,14 @@ def ingest_list(framework_config_file="configs/framework_ingest.cfg"):
     list_queue(framework_config_file=framework_config_file)
 
 def ingest_clear(framework_config_file="configs/framework_ingest.cfg"):
-    clear_queue(framework_config_file=framework_config_file)
+    webcfg = get_webpage_config()
+    pipeline_config_file = webcfg['Telescopes'].get('pipeline_config_files').split(',')[0]
+    clear_queue(pipeline=IngestPipeline,
+                framework_config_file="configs/framework_ingest.cfg",
+                framework_logcfg_file='configs/logger_ingest.cfg',
+                pipeline_config_file=pipeline_config_file,
+                )
+
 
 
 ##-----------------------------------------------------------------------------
