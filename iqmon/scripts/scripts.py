@@ -394,7 +394,7 @@ def analyze_cd():
     if len(cfgs.keys()) != 0:
         if 'primary' in cfgs.keys():
             pipeline_cfg = cfgs['primary']
-
+    args = _parseArguments(sys.argv)
     if args.input == '':
         now = datetime.utcnow()
         args.input = pipeline_cfg['FileHandling'].get('destination_dir')
