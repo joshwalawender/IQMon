@@ -29,6 +29,18 @@ def get_memory_size(input_obj):
     return memory_size/1024/1024
 
 
+##-------------------------------------------------------------------------
+## Function: get_orientation_angles
+##-------------------------------------------------------------------------
+def get_orientation_angles(w):
+    dx, dy = np.dot(w.wcs.get_pc(), [0,1])
+    north = np.arctan(dx/dy)*180/np.pi
+
+    dx, dy = np.dot(w.wcs.get_pc(), [1,0])
+    east = np.arctan(dx/dy)*180/np.pi
+    return north, east
+
+
 ##-----------------------------------------------------------------------------
 ## Function: get_destination_dir
 ##-----------------------------------------------------------------------------

@@ -14,7 +14,7 @@ from astropy import stats
 
 from keckdrpframework.primitives.base_primitive import BasePrimitive
 
-from .utils import pre_condition, post_condition, get_memory_size, get_jpeg_dir
+from .utils import pre_condition, post_condition, get_memory_size, get_jpeg_dir, get_orientation_angles
 
 
 
@@ -88,6 +88,31 @@ def overlay_pointing(ax, cfg, meta, imagewcs, header_pointing, x0, nx, y0, ny):
     ax.plot([x, x], [y-0.6*radius, y-1.4*radius], 'g', alpha=0.7)
     ax.plot([x-0.6*radius, x-1.4*radius], [y, y], 'g', alpha=0.7)
     ax.plot([x+0.6*radius, x+1.4*radius], [y, y], 'g', alpha=0.7)
+
+    # Overlay Compass Rose
+    corner_factor = 0.88
+    arrow_length = (nx-x0)*0.060
+    north, east = get_orientation_angles(imagewcs)
+    arrow_x0 = nx*(1-corner_factor)
+    arrow_y0 = ny*corner_factor
+
+    trim = 10
+    arrow_dx = arrow_length*np.sin(north*np.pi/180)
+    arrow_dy = arrow_length*np.cos(north*np.pi/180)
+    plt.arrow(arrow_x0, arrow_y0, arrow_dx, arrow_dy,
+              width=5, head_width=25,
+              color='g', alpha=0.5)
+    plt.annotate('N', (arrow_x0+1.1*arrow_dx-trim, arrow_y0+1.1*arrow_dy-trim),
+                 color='g')
+
+    arrow_dx = arrow_length*np.sin(east*np.pi/180)
+    arrow_dy = arrow_length*np.cos(east*np.pi/180)
+    plt.arrow(arrow_x0, arrow_y0, arrow_dx, arrow_dy,
+              width=5, head_width=25,
+              color='g', alpha=0.5)
+    plt.annotate('E', (arrow_x0+1.1*arrow_dx-trim, arrow_y0+1.1*arrow_dy-trim),
+                 color='g')
+
 
 
 ##-----------------------------------------------------------------------------
