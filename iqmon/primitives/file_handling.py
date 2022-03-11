@@ -214,7 +214,7 @@ class ReadFITS(BasePrimitive):
                 self.action.args.meta['filter'] = 'PSr'
             # Pull focus info from status database
             try:
-                self.log.info(f'  Reading focus data from DB')
+                self.log.info(f'Reading focus data from DB')
                 status_collection = self.mongoclient[self.cfg['mongo'].get('db')]['V5_focuser']
                 date_obs = self.action.args.meta.get('date')
                 querydict = {"date": {"$gt": date_obs,
