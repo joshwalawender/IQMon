@@ -178,11 +178,17 @@ class ReadFITS(BasePrimitive):
         if self.mongo_iqmon is not None:
             self.log.info('Check for previous analysis of this file')
             already_processed = [d for d in self.mongo_iqmon.find( {'fitsfile': self.action.args.meta['fitsfile']} )]
-            if len(already_processed) != 0\
-               and self.cfg['mongo'].getboolean('overwrite', False) is False:
-                self.log.info(f"overwrite is {self.cfg['FileHandling'].getboolean('overwrite')}")
-                self.log.info('  File is already in the database, skipping further processing')
-                self.action.args.skip = True
+#             if len(already_processed) != 0\
+#                and self.cfg['mongo'].getboolean('overwrite', False) is False:
+#                 if self.cfg['mongo'].getboolean('overwrite', False) is True:
+#                     self.action.args.skip = True
+            
+            # Set skip if image has analysis values
+            if len(already_processed) != 0 and self.action.args.imtype == 'OBJECT':
+                n_objects = already_processed[0].get('n_objects', 0)
+                if n_objects > 0:
+                    self.log.info('  File is already in the database, skipping further processing')
+                    self.action.args.skip = True
 
             # Read previously solved WCS if available
             if len(already_processed) != 0 and self.action.args.imtype == 'OBJECT':
