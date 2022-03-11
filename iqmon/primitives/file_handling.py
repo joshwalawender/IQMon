@@ -178,15 +178,11 @@ class ReadFITS(BasePrimitive):
         if self.mongo_iqmon is not None:
             self.log.info('Check for previous analysis of this file')
             already_processed = [d for d in self.mongo_iqmon.find( {'fitsfile': self.action.args.meta['fitsfile']} )]
-#             if len(already_processed) != 0\
-#                and self.cfg['mongo'].getboolean('overwrite', False) is False:
-#                 if self.cfg['mongo'].getboolean('overwrite', False) is True:
-#                     self.action.args.skip = True
             
             # Set skip if image has analysis values
             if len(already_processed) != 0 and self.action.args.imtype == 'OBJECT':
                 n_objects = already_processed[0].get('n_objects', 0)
-                if n_objects > 0:
+                if n_objects > 0 and self.cfg['mongo'].getboolean('overwrite', False) is False:
                     self.log.info('  File is already in the database, skipping further processing')
                     self.action.args.skip = True
 
@@ -200,6 +196,7 @@ class ReadFITS(BasePrimitive):
                     from astropy.wcs import WCS
                     self.log.info('  Found Previously Solved WCS')
                     self.action.args.wcs = WCS(db_wcs)
+                    self.action.args.meta['wcs_header'] = self.action.args.wcs.to_header_string()
                     nx, ny = self.action.args.ccddata.data.shape
                     r, d = self.action.args.wcs.all_pix2world([nx/2.], [ny/2.], 1)
                     self.action.args.wcs_pointing = c.SkyCoord(r[0], d[0],
