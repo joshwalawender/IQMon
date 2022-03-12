@@ -114,10 +114,10 @@ class ReadFITS(BasePrimitive):
         try:
             if self.action.args.fitsfilepath.suffix == '.fz':
                 self.action.args.ccddata = CCDData.read(self.action.args.fitsfilepath,
-                                                        unit="adu", hdu=1)
+                                                        unit="adu", hdu=1, memmap=False)
             else:
                 self.action.args.ccddata = CCDData.read(self.action.args.fitsfilepath,
-                                                        unit="adu")
+                                                        unit="adu", memmap=False)
         except Exception as err:
             self.log.error(f"Failed to read file!")
             self.log.error(err)
@@ -126,12 +126,11 @@ class ReadFITS(BasePrimitive):
 
         # Read header metadata
         self.log.info(f'Reading FITS header: Memory Size of ccddata.meta: {get_memory_size(self.action.args.ccddata.meta):.1f} MB')
-        hdr = self.action.args.ccddata.header
         for key, raw_read in self.cfg.items('Header'):
             raw_read = raw_read.split(',')
             if key != 'default_section' and key[:11] != 'type_string':
                 hdr_key = raw_read[0]
-                val = hdr.get(hdr_key, None)
+                val = self.action.args.ccddata.header.get(hdr_key, None)
                 if len(raw_read) == 2 and val is not None:
                     type_string = raw_read[1]
                     if type_string == 'datetime':
@@ -475,12 +474,15 @@ class ReleaseMemory(BasePrimitive):
         operation.
         """
         self.log.info(f"Running {self.__class__.__name__} action")
-        self.action.args = None
-        self.action.event.args = None
-        self.action.config = None
-        self.action.cfg = None
-        self.action.mongoclient = None
-        self.action.mongo_iqmon = None
+#         self.log.debug('Running self.action.args.ccddata.__del__()')
+#         self.action.args.ccddata.__del__()
+#         self.log.debug('Running self.action.args.__del__()')
+#         self.action.args.__del__()
+#         self.action.event.__del__()
+#         self.action.config.__del__()
+#         self.action.cfg.__del__()
+#         self.action.mongoclient.__del__()
+#         self.action.mongo_iqmon.__del__()
 #         self.log.info(f"Memory Size after {self.__class__.__name__} action: {get_memory_size(self):.1f} MB")
 #         self.log.info(f"  Memory size of self.action.event.set_recurrent = {get_memory_size(self.action.event.set_recurrent):.1f} MB")
 #         self.log.info(type(self.action.event.set_recurrent))

@@ -152,14 +152,16 @@ class RenderJPEG(BasePrimitive):
         """
         self.log.info(f"Running {self.__class__.__name__} action")
 
-        im = self.action.args.ccddata.data
+#         im = self.action.args.ccddata.data
 
         plt.rcParams.update({'font.size': self.cfg['jpeg'].getint('font_size', 12)})
         binning = self.cfg['jpeg'].getint('binning', 1)
-        vmin = np.percentile(im, self.cfg['jpeg'].getfloat('vmin_percent', 0.5))
-        vmax = np.percentile(im, self.cfg['jpeg'].getfloat('vmax_percent', 99))
+        vmin = np.percentile(self.action.args.ccddata.data,
+                             self.cfg['jpeg'].getfloat('vmin_percent', 0.5))
+        vmax = np.percentile(self.action.args.ccddata.data,
+                             self.cfg['jpeg'].getfloat('vmax_percent', 99))
         dpi = self.cfg['jpeg'].getint('dpi', 72)
-        nx, ny = im.shape
+        nx, ny = self.action.args.ccddata.data.shape
         sx = nx/dpi/binning
         sy = ny/dpi/binning
         FWHM_pix = self.action.args.meta.get('fwhm', 8)
@@ -186,7 +188,9 @@ class RenderJPEG(BasePrimitive):
         # Show JPEG of Image
         self.log.debug(f'  Rendering JPEG of image')
         jpeg_axes = plt.axes(plotpos[0][0])
-        jpeg_axes.imshow(im, cmap=plt.cm.gray_r, vmin=vmin, vmax=vmax, origin='lower')
+        jpeg_axes.imshow(self.action.args.ccddata.data,
+                         cmap=plt.cm.gray_r, vmin=vmin, vmax=vmax,
+                         origin='lower')
         jpeg_axes.set_xticks([])
         jpeg_axes.set_yticks([])
         titlestr = f'{self.action.args.meta.get("fitsfile")}: '
@@ -256,9 +260,9 @@ class RenderJPEG(BasePrimitive):
         jpeg_axes2.set_yticks([])
         dx = 1000
         dy = 650
-        x0 = int(im.shape[1] / 2) - int(dx/2)
-        y0 = int(im.shape[0] / 2) - int(dy/2)
-        central_im = im[y0:y0+dy,x0:x0+dx]
+        x0 = int(self.action.args.ccddata.data.shape[1] / 2) - int(dx/2)
+        y0 = int(self.action.args.ccddata.data.shape[0] / 2) - int(dy/2)
+        central_im = self.action.args.ccddata.data[y0:y0+dy,x0:x0+dx]
         jpeg_axes2.set_title(f"Central {dx:d}x{dy:d} pixels")
         jpeg_axes2.imshow(central_im, cmap=plt.cm.gray_r, vmin=vmin, vmax=vmax, origin='lower')
         self.log.debug(f'  Done')
@@ -299,10 +303,12 @@ class RenderJPEG(BasePrimitive):
         if self.action.args.calibration_catalog is None and self.action.args.objects is None:
             self.log.debug(f'  Generating histogram of pixel values')
             pixel_axes = plt.axes(plotpos[1][1])
-            mean, med, std = stats.sigma_clipped_stats(im)
-            p1, p99 = np.percentile(im, 1), np.percentile(im, 99)
+            mean, med, std = stats.sigma_clipped_stats(self.action.args.ccddata.data)
+            p1 = np.percentile(self.action.args.ccddata.data, 1)
+            p99 = np.percentile(self.action.args.ccddata.data, 99)
             pixel_axes.set_title(f"Histogram of Pixel Values (median = {med:.0f})")
-            npix, bins, p = pixel_axes.hist(im.ravel(), color='b', alpha=0.5,
+            npix, bins, p = pixel_axes.hist(self.action.args.ccddata.data.ravel(),
+                                            color='b', alpha=0.5,
                                             bins=np.linspace(p1,p99,50))
             pixel_axes.plot([med, med], [0,max(npix)*1.2], 'r-', alpha=0.5)
             pixel_axes.set_xlabel('e-/s')
