@@ -112,12 +112,10 @@ class ReadFITS(BasePrimitive):
         # Read FITS file
         self.log.info(f'Reading: {self.action.args.fitsfilepath}')
         try:
-            if self.action.args.fitsfilepath.suffix == '.fz':
-                self.action.args.ccddata = CCDData.read(self.action.args.fitsfilepath,
-                                                        unit="adu", hdu=1, memmap=False)
-            else:
-                self.action.args.ccddata = CCDData.read(self.action.args.fitsfilepath,
-                                                        unit="adu", memmap=False)
+            hduno = 1 if self.action.args.fitsfilepath.suffix == '.fz' else 0
+            self.action.args.ccddata = CCDData.read(self.action.args.fitsfilepath,
+                                                    unit="adu", hdu=hduno,
+                                                    memmap=False)
         except Exception as err:
             self.log.error(f"Failed to read file!")
             self.log.error(err)
@@ -474,15 +472,13 @@ class ReleaseMemory(BasePrimitive):
         operation.
         """
         self.log.info(f"Running {self.__class__.__name__} action")
-#         self.log.debug('Running self.action.args.ccddata.__del__()')
-#         self.action.args.ccddata.__del__()
-#         self.log.debug('Running self.action.args.__del__()')
-#         self.action.args.__del__()
-#         self.action.event.__del__()
-#         self.action.config.__del__()
-#         self.action.cfg.__del__()
-#         self.action.mongoclient.__del__()
-#         self.action.mongo_iqmon.__del__()
+        self.action.args.ccddata = None
+        self.action.args = None
+#         self.action.event = None
+#         self.action.config = None
+#         self.action.cfg = None
+#         self.action.mongoclient = None
+#         self.action.mongo_iqmon = None
 #         self.log.info(f"Memory Size after {self.__class__.__name__} action: {get_memory_size(self):.1f} MB")
 #         self.log.info(f"  Memory size of self.action.event.set_recurrent = {get_memory_size(self.action.event.set_recurrent):.1f} MB")
 #         self.log.info(type(self.action.event.set_recurrent))
