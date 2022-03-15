@@ -13,8 +13,9 @@ from astropy.time import Time
 
 from keckdrpframework.primitives.base_primitive import BasePrimitive
 
-from .utils import pre_condition, post_condition, get_memory_size, get_destination_dir
+from .utils import pre_condition, post_condition, get_destination_dir
 
+from .utils import get_memory_size, analyze_object_memory
 
 ##-----------------------------------------------------------------------------
 ## Primitive: ReadFITS
@@ -123,7 +124,6 @@ class ReadFITS(BasePrimitive):
             return self.action.args
 
         # Read header metadata
-        self.log.info(f'Reading FITS header: Memory Size of ccddata.meta: {get_memory_size(self.action.args.ccddata.meta):.1f} MB')
         for key, raw_read in self.cfg.items('Header'):
             raw_read = raw_read.split(',')
             if key != 'default_section' and key[:11] != 'type_string':
@@ -238,10 +238,7 @@ class ReadFITS(BasePrimitive):
         if self.mongoclient is not None:
             self.mongoclient.close()
 
-        self.log.info(f"Memory Size after {self.__class__.__name__} action: {get_memory_size(self):.1f} MB")
-#         self.log.info(f"Memory Size after {self.__class__.__name__} action on {self.action.args.meta['fitsfile']}: {get_memory_size(self):.1f} MB")
-#         self.log.info(f"  Memory Size of self.action.args.ccddata.meta: {get_memory_size(self.action.args.ccddata.meta):.1f} MB")
-#         self.log.info(f"  Memory Size of self.action.args.ccddata.header: {get_memory_size(self.action.args.ccddata.header):.1f} MB")
+#         self.log.info(f"Memory Size after {self.__class__.__name__} action: {get_memory_size(self):.1f} MB")
 
         return self.action.args
 
@@ -472,16 +469,8 @@ class ReleaseMemory(BasePrimitive):
         operation.
         """
         self.log.info(f"Running {self.__class__.__name__} action")
-        self.action.args.ccddata = None
-        self.action.args = None
-#         self.action.event = None
-#         self.action.config = None
-#         self.action.cfg = None
-#         self.action.mongoclient = None
-#         self.action.mongo_iqmon = None
-#         self.log.info(f"Memory Size after {self.__class__.__name__} action: {get_memory_size(self):.1f} MB")
-#         self.log.info(f"  Memory size of self.action.event.set_recurrent = {get_memory_size(self.action.event.set_recurrent):.1f} MB")
-#         self.log.info(type(self.action.event.set_recurrent))
-#         self.log.info(dir(self.action.event.set_recurrent))
-        return self.action.args
+
+        self.log.info(f"Memory Size after {self.__class__.__name__} action: {get_memory_size(self):.1f} MB")
+#         self.log.info(analyze_object_memory(self))
+        return None
 

@@ -30,6 +30,19 @@ def get_memory_size(input_obj):
 
 
 ##-------------------------------------------------------------------------
+## Function: analyze_object_memory
+##-------------------------------------------------------------------------
+def analyze_object_memory(input_obj):
+    output_string = "\n"
+    elements = dir(input_obj)
+    for element in elements:
+        mem = get_memory_size(getattr(input_obj, element))
+        output_string += f"Memory size of {element} = {mem:.1f} MB\n"
+    return output_string
+
+
+
+##-------------------------------------------------------------------------
 ## Function: get_orientation_angles
 ##-------------------------------------------------------------------------
 def get_orientation_angles(w):

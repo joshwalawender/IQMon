@@ -14,12 +14,31 @@ import logging.config
 from pathlib import Path
 from datetime import datetime
 from glob import glob
+import gc
 
 # the preferred way to import the pipeline is a direct import
 
 from iqmon import get_webpage_config, get_all_configs
 from iqmon.pipelines.ingest import IngestPipeline
 from iqmon.pipelines.analyze import AnalysisPipeline
+
+
+##-------------------------------------------------------------------------
+## Function: get_memory_size
+##-------------------------------------------------------------------------
+def get_memory_size(input_obj):
+    memory_size = 0
+    ids = set()
+    objects = [input_obj]
+    while objects:
+        new = []
+        for obj in objects:
+            if id(obj) not in ids:
+                ids.add(id(obj))
+                memory_size += sys.getsizeof(obj)
+                new.append(obj)
+        objects = gc.get_referents(*new)
+    return memory_size/1024/1024
 
 
 ##-----------------------------------------------------------------------------
@@ -308,6 +327,28 @@ def clear_queue(pipeline=IngestPipeline,
 #         print ("Queue manager already stopped")
 
 
+def examine_memory_use(pipeline=IngestPipeline,
+                framework_config_file="configs/framework.cfg",
+                framework_logcfg_file='configs/logger_ingest.cfg',
+                pipeline_config_file = 'configs/pipeline.cfg',
+                ):
+    args = _parseArguments(sys.argv)
+    pkg = 'iqmon'
+    framework_config_fullpath = pkg_resources.resource_filename(pkg, framework_config_file)
+    cfg = ConfigClass(framework_config_fullpath)
+    drpif = FrameworkInterface(cfg)
+
+    framework = setup_framework(args, pipeline=pipeline,
+                                framework_config_file=framework_config_file,
+                                framework_logcfg_file=framework_logcfg_file,
+                                pipeline_config_file=pipeline_config_file,
+                                )
+
+    print(f"framework = {get_memory_size(framework):.1f} MB")
+    print(f"drpif = {get_memory_size(drpif):.1f} MB")
+
+
+
 ##-----------------------------------------------------------------------------
 ## Ingest Scripts
 ##-----------------------------------------------------------------------------
@@ -409,13 +450,10 @@ def analyze_cd():
 
 
 if __name__ == "__main__":
-    args = _parseArguments(sys.argv)
     webcfg = get_webpage_config()
     pipeline_config_file = webcfg['Telescopes'].get('pipeline_config_files').split(',')[0]
-    f = setup_framework(args, pipeline=IngestPipeline,
-                        framework_config_file="configs/framework_ingest.cfg",
-                        framework_logcfg_file='configs/logger_ingest.cfg',
-                        pipeline_config_file=pipeline_config_file,
-                        )
-    print(f.config.sections())
-    print(f.pipeline.config.sections())
+    examine_memory_use(pipeline=AnalysisPipeline,
+                       framework_config_file="configs/framework_analysis.cfg",
+                       framework_logcfg_file='configs/logger_analysis.cfg',
+                       pipeline_config_file=pipeline_config_file,
+                       )

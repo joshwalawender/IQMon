@@ -11,7 +11,8 @@ import ccdproc
 
 from keckdrpframework.primitives.base_primitive import BasePrimitive
 
-from .utils import pre_condition, post_condition, find_master, get_memory_size
+from .utils import pre_condition, post_condition, find_master
+from .utils import get_memory_size, analyze_object_memory
 
 
 ##-----------------------------------------------------------------------------
