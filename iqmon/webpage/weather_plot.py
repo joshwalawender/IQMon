@@ -291,8 +291,10 @@ def generate_weather_plot(webcfg, telcfg, date=None, querybuffer_ndays=1, span_h
     if webcfg['Weather'].get('plot_rain', None) is not None:
         log.info('Build rain plot')
         limit_string = webcfg['Weather'].get(f'plot_rain_limits', '500,2800')
+        flip = webcfg['Weather'].get(f'plot_rain_flip', False)
         ymin,ymax = limit_string.split(',')
         height = webcfg['Weather'].getint('plot_rain_height', 60)
+        formatter = webcfg['Weather'].get('plot_rain_formatter', '0.00a')
         plot_rain = figure(width=900, height=height, x_axis_type="datetime",
                                   y_range=(float(ymin),float(ymax)),
                            x_range=(end - timedelta(hours=span_hours), end),
@@ -306,27 +308,32 @@ def generate_weather_plot(webcfg, telcfg, date=None, querybuffer_ndays=1, span_h
             plot_vals = np.array([(d['date'], d[name]) for d in query_result if name in d.keys()])
             log.debug(f'  Got {len(plot_vals)} entries')
             if len(plot_vals) > 0:
-                where_dry = np.where(plot_vals[:,1] >= weather_limits['dry'])
+                if flip is True:
+                    where_dry = np.where(plot_vals[:,1] > weather_limits.get('dry',0.01))
+                    where_wet = np.where((plot_vals[:,1] <= weather_limits.get('dry',0.01))\
+                                         & (plot_vals[:,1] >= weather_limits.get('wet',0.05)))
+                    where_rain = np.where(plot_vals[:,1] < weather_limits.get('wet',0.05))
+                else:
+                    where_dry = np.where(plot_vals[:,1] < weather_limits.get('dry',0.01))
+                    where_wet = np.where((plot_vals[:,1] >= weather_limits.get('dry',0.01))\
+                                         & (plot_vals[:,1] <= weather_limits.get('wet',0.05)))
+                    where_rain = np.where(plot_vals[:,1] > weather_limits.get('wet',0.05))
+
                 plot_rain.circle(plot_vals[where_dry][:,0],
                                  plot_vals[where_dry][:,1],
                                  size=markersize, color="green",
                                  line_alpha=0.8, fill_alpha=0.8)
-
-                where_wet = np.where((plot_vals[:,1] < weather_limits['dry'])\
-                                     & (plot_vals[:,1] >= weather_limits['wet']))
                 plot_rain.circle(plot_vals[where_wet][:,0],
                                  plot_vals[where_wet][:,1],
                                  size=markersize, color="orange",
                                  line_alpha=0.8, fill_alpha=0.8)
-
-                where_rain = np.where(plot_vals[:,1] < weather_limits['wet'])
                 plot_rain.circle(plot_vals[where_rain][:,0],
                                  plot_vals[where_rain][:,1],
                                  size=markersize, color="red",
                                  line_alpha=0.8, fill_alpha=0.8)
         plot_rain.yaxis.axis_label = 'Rain'
-        plot_rain.yaxis.formatter = NumeralTickFormatter(format="0.0a")
-        plot_rain.yaxis.ticker = [val for val in range(500, 3000, 1000)]
+        plot_rain.yaxis.formatter = NumeralTickFormatter(format=formatter)
+#         plot_rain.yaxis.ticker = [val for val in range(500, 3000, 1000)]
         plot_rain.xaxis.visible = False
 
     ##-------------------------------------------------------------------------
