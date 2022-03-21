@@ -301,7 +301,7 @@ def generate_weather_plot(webcfg, telcfg, date=None, querybuffer_ndays=1, span_h
                            )
         plot_values = webcfg['Weather'].get('plot_rain').split(',')
         query_dict = {'date': {'$gt': query_start, '$lt': query_end}}
-        for plot_value in plot_values:
+        for i,plot_value in enumerate(plot_values):
             collection, name = plot_value.split(':')
             log.debug(f'  Querying mongo collection {collection}')
             query_result = mongo_query(collection, query_dict, webcfg)
@@ -319,21 +319,38 @@ def generate_weather_plot(webcfg, telcfg, date=None, querybuffer_ndays=1, span_h
                                          & (plot_vals[:,1] <= weather_limits.get('wet',0.05)))
                     where_rain = np.where(plot_vals[:,1] > weather_limits.get('wet',0.05))
 
-                plot_rain.circle(plot_vals[where_dry][:,0],
-                                 plot_vals[where_dry][:,1],
-                                 size=markersize, color="green",
-                                 line_alpha=0.8, fill_alpha=0.8)
-                plot_rain.circle(plot_vals[where_wet][:,0],
-                                 plot_vals[where_wet][:,1],
-                                 size=markersize, color="orange",
-                                 line_alpha=0.8, fill_alpha=0.8)
-                plot_rain.circle(plot_vals[where_rain][:,0],
-                                 plot_vals[where_rain][:,1],
-                                 size=markersize, color="red",
-                                 line_alpha=0.8, fill_alpha=0.8)
+                if i == 0:
+                    plot_rain.circle(plot_vals[where_dry][:,0],
+                                     plot_vals[where_dry][:,1],
+                                     size=markersize, color="green",
+                                     legend_label=f"{plot_value}",
+                                     line_alpha=0.8, fill_alpha=0.8)
+                    plot_rain.circle(plot_vals[where_wet][:,0],
+                                     plot_vals[where_wet][:,1],
+                                     size=markersize, color="orange",
+                                     line_alpha=0.8, fill_alpha=0.8)
+                    plot_rain.circle(plot_vals[where_rain][:,0],
+                                     plot_vals[where_rain][:,1],
+                                     size=markersize, color="red",
+                                     line_alpha=0.8, fill_alpha=0.8)
+                else:
+                    plot_rain.circle(plot_vals[:,0],
+                                     plot_vals[:,1],
+                                     size=markersize, color="black",
+                                     legend_label=f"{plot_value}",
+                                     line_alpha=0.1, fill_alpha=0.1)
+
+        if len(plot_values) > 1:
+            plot_rain.legend.location = "top_left"
+            plot_rain.legend.margin = 0
+            plot_rain.legend.padding = 0
+            plot_rain.legend.spacing = 0
+            plot_rain.legend.label_text_font_size = '8pt'
+        else:
+            plot_rain.legend.visible = False
+
         plot_rain.yaxis.axis_label = 'Rain'
         plot_rain.yaxis.formatter = NumeralTickFormatter(format=formatter)
-#         plot_rain.yaxis.ticker = [val for val in range(500, 3000, 1000)]
         plot_rain.xaxis.visible = False
 
     ##-------------------------------------------------------------------------
