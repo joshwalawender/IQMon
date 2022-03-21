@@ -291,7 +291,7 @@ def generate_weather_plot(webcfg, telcfg, date=None, querybuffer_ndays=1, span_h
     if webcfg['Weather'].get('plot_rain', None) is not None:
         log.info('Build rain plot')
         limit_string = webcfg['Weather'].get(f'plot_rain_limits', '500,2800')
-        flip = webcfg['Weather'].get(f'plot_rain_flip', False)
+        flip = webcfg['Weather'].getboolean(f'plot_rain_flip', False)
         ymin,ymax = limit_string.split(',')
         height = webcfg['Weather'].getint('plot_rain_height', 60)
         formatter = webcfg['Weather'].get('plot_rain_formatter', '0.00a')
