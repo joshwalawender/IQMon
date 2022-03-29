@@ -278,29 +278,33 @@ class PopulateAdditionalMetaData(BasePrimitive):
 
         if self.action.args.imtype == 'OBJECT':
             if self.action.args.header_pointing is not None:
-                self.log.info('Determine Moon info')
-                site_lat = c.Latitude(self.cfg['Telescope'].getfloat('site_lat'), unit=u.degree)
-                site_lon = c.Longitude(self.cfg['Telescope'].getfloat('site_lon'), unit=u.degree)
-                site_elevation = self.cfg['Telescope'].getfloat('site_elevation') * u.meter
-                loc = c.EarthLocation(site_lon, site_lat, site_elevation)
-                pressure = self.cfg['Telescope'].getfloat('pressure', 700)*u.mbar
-                obstime = Time(self.action.args.meta.get('date'), location=loc)
-                altazframe = c.AltAz(location=loc, obstime=obstime, pressure=pressure)
-                moon = c.get_moon(obstime)
-                sun = c.get_sun(obstime)
-                moon_alt = ((moon.transform_to(altazframe).alt).to(u.degree)).value
-                moon_separation = (moon.separation(self.action.args.header_pointing).to(u.degree)).value\
-                            if self.action.args.header_pointing is not None else None
-                # Moon illumination formula from Meeus, ÒAstronomical 
-                # Algorithms". Formulae 46.1 and 46.2 in the 1991 edition, 
-                # using the approximation cos(psi) \approx -cos(i). Error 
-                # should be no more than 0.0014 (p. 316). 
-                moon_illum = 50*(1 - np.sin(sun.dec.radian)*np.sin(moon.dec.radian)\
-                             - np.cos(sun.dec.radian)*np.cos(moon.dec.radian)\
-                             * np.cos(sun.ra.radian-moon.ra.radian))
-                self.action.args.meta['moon_alt'] = moon_alt
-                self.action.args.meta['moon_separation'] = moon_separation
-                self.action.args.meta['moon_illum'] = moon_illum
+                try:
+                    self.log.info('Determine Moon info')
+                    site_lat = c.Latitude(self.cfg['Telescope'].getfloat('site_lat'), unit=u.degree)
+                    site_lon = c.Longitude(self.cfg['Telescope'].getfloat('site_lon'), unit=u.degree)
+                    site_elevation = self.cfg['Telescope'].getfloat('site_elevation') * u.meter
+                    loc = c.EarthLocation(site_lon, site_lat, site_elevation)
+                    pressure = self.cfg['Telescope'].getfloat('pressure', 700)*u.mbar
+                    obstime = Time(self.action.args.meta.get('date'), location=loc)
+                    altazframe = c.AltAz(location=loc, obstime=obstime, pressure=pressure)
+                    moon = c.get_moon(obstime)
+                    sun = c.get_sun(obstime)
+                    moon_alt = ((moon.transform_to(altazframe).alt).to(u.degree)).value
+                    moon_separation = (moon.separation(self.action.args.header_pointing).to(u.degree)).value\
+                                if self.action.args.header_pointing is not None else None
+                    # Moon illumination formula from Meeus, ÒAstronomical 
+                    # Algorithms". Formulae 46.1 and 46.2 in the 1991 edition, 
+                    # using the approximation cos(psi) \approx -cos(i). Error 
+                    # should be no more than 0.0014 (p. 316). 
+                    moon_illum = 50*(1 - np.sin(sun.dec.radian)*np.sin(moon.dec.radian)\
+                                 - np.cos(sun.dec.radian)*np.cos(moon.dec.radian)\
+                                 * np.cos(sun.ra.radian-moon.ra.radian))
+                    self.action.args.meta['moon_alt'] = moon_alt
+                    self.action.args.meta['moon_separation'] = moon_separation
+                    self.action.args.meta['moon_illum'] = moon_illum
+                except Exception as err:
+                    self.log.error(f'Unable to determine moon info')
+                    self.log.error(err)
         elif self.action.args.imtype == 'BIAS':
             self.log.info('Determine image stats')
             mean, med, std = stats.sigma_clipped_stats(self.action.args.ccddata.data)
