@@ -4,7 +4,6 @@ import pymongo
 from datetime import datetime, timedelta
 from time import sleep
 
-from astroplan import Observer
 from astropy import coordinates as c
 from astropy.time import Time
 
@@ -54,6 +53,9 @@ def mongo_query(collection, query_dict, cfg,
 ##-------------------------------------------------------------------------
 def get_twilights(start, end, webcfg, nsample=256):
     """ Determine sunrise and sunset times """
+
+    from astroplan import Observer
+
     location = c.EarthLocation(
         lat=webcfg['site'].getfloat('site_lat'),
         lon=webcfg['site'].getfloat('site_lon'),
@@ -94,15 +96,19 @@ def get_twilights(start, end, webcfg, nsample=256):
 def overplot_twilights(plot_list, plot_end, webcfg, ndays=1, log=None):
     for days in range(1,ndays+1):
         if log is not None: log.info(f'Getting twilights for {days} days ago')
-        twilights = get_twilights(plot_end-timedelta(days=days),
-                                  plot_end-timedelta(days=days-1),
-                                  webcfg)
-        for plot_info in plot_list:
-            for j in range(len(twilights)-1):
-                name, plot, top, bottom = plot_info
-                plot.quad(top=[top], bottom=[bottom],
-                           left=[twilights[j][0]], right=[twilights[j+1][0]],
-                           color="blue", alpha=twilights[j+1][2])
-        if log is not None: log.info(f'  Added twilights for {days} days ago')
+        try:
+            twilights = get_twilights(plot_end-timedelta(days=days),
+                                      plot_end-timedelta(days=days-1),
+                                      webcfg)
+            for plot_info in plot_list:
+                for j in range(len(twilights)-1):
+                    name, plot, top, bottom = plot_info
+                    plot.quad(top=[top], bottom=[bottom],
+                               left=[twilights[j][0]], right=[twilights[j+1][0]],
+                               color="blue", alpha=twilights[j+1][2])
+            if log is not None: log.info(f'  Added twilights for {days} days ago')
+        except Exception as err:
+            if log is not None: log.error(err)
+            pass
     return
 
