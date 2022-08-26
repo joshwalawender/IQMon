@@ -7,6 +7,7 @@ import argparse
 import requests
 import json
 import pymongo
+import numpy as np
 
 import socket
 import struct
@@ -44,6 +45,24 @@ class DavisWeatherLink():
         self.temperature_units = temperature_units
         self.wind_speed_units = wind_speed_units
         self.pressure_units = pressure_units
+        self.keys = [('temp', 'outside temperature', float),
+                     ('hum', 'outside humidity', float),
+                     ('dew_point', 'outside dew point', float),
+                     ('wet_bulb', 'wet bulb', float),
+                     ('heat_index', 'heat index', float),
+                     ('wind_chill', 'wind chill', float),
+                     ('wind_speed_last', 'wind speed', float),
+                     ('wind_dir_last', 'wind direction', float),
+                     ('wind_speed_avg_last_10_min', 'wind speed (10 min avg)', float),
+                     ('wind_dir_scalar_avg_last_10_min', 'wind direction (10 min avg)', float),
+                     ('wind_speed_hi_last_10_min', 'wind gust', float),
+                     ('wind_dir_at_hi_speed_last_10_min', 'wind gust direction', float),
+                     ('temp_in', 'inside temperature', float),
+                     ('hum_in', 'inside humidity', float),
+                     ('bar_sea_level', 'bar sea level', float),
+                     ('bar_trend', 'bar trend', float),
+                     ('bar_absolute', 'bar absolute', float),
+                     ]
 
         self.log = logging.getLogger(self.name)
         if len(self.log.handlers) < 1:
@@ -68,6 +87,7 @@ class DavisWeatherLink():
                 self.client = pymongo.MongoClient(mongoIP, mongoport)
                 self.db = self.client[dbname]
                 self.collection = self.db[self.name]
+                self.decimated_collection = self.db[f"decimated_{self.name}"]
                 self.log.info(f'Connected to mongoDB at {self.mongoIP}:{self.mongoport}')
             except Exception as err:
                 self.log.error(f'ERROR: failed to connect to mongoDB at {self.mongoIP}:{self.mongoport}')
@@ -101,25 +121,7 @@ class DavisWeatherLink():
 
         mongodata = {'date': datetime.fromtimestamp(data.get('ts'))\
                              - timedelta(hours=self.tzoffset)}
-        keys = [('temp', 'outside temperature', float),
-                ('hum', 'outside humidity', float),
-                ('dew_point', 'outside dew point', float),
-                ('wet_bulb', 'wet bulb', float),
-                ('heat_index', 'heat index', float),
-                ('wind_chill', 'wind chill', float),
-                ('wind_speed_last', 'wind speed', float),
-                ('wind_dir_last', 'wind direction', float),
-                ('wind_speed_avg_last_10_min', 'wind speed (10 min avg)', float),
-                ('wind_dir_scalar_avg_last_10_min', 'wind direction (10 min avg)', float),
-                ('wind_speed_hi_last_10_min', 'wind gust', float),
-                ('wind_dir_at_hi_speed_last_10_min', 'wind gust direction', float),
-                ('temp_in', 'inside temperature', float),
-                ('hum_in', 'inside humidity', float),
-                ('bar_sea_level', 'bar sea level', float),
-                ('bar_trend', 'bar trend', float),
-                ('bar_absolute', 'bar absolute', float),
-                ]
-        for key, mongokey, datatype in keys:
+        for key, mongokey, datatype in self.keys:
             if conditions.get(key, None) is not None:
                 mongodata[mongokey] = datatype(conditions.get(key, None))
         # Handle rain units
@@ -163,8 +165,40 @@ class DavisWeatherLink():
                 except Exception as e:
                     self.log.error(f"  Failed to insert mongo document")
                     self.log.error(e)
+            self.decimate()
             self.log.info(f"Sleeping {sleep:.0f} s")
             time.sleep(sleep)
+
+
+    def decimate(self, time_window=600):
+        query_result = list(self.collection.find({},
+                            sort=[('date', pymongo.DESCENDING)]).limit(1))
+        most_recent = query_result[-1]['date']
+        self.log.debug(f"  Most recent value is {most_recent}")
+
+        query_result = list(self.decimated_collection.find({},
+                            sort=[('date', pymongo.DESCENDING)]).limit(1))
+        most_recent_decimated = query_result[-1]['date']
+        age = (most_recent - most_recent_decimated).total_seconds()
+        self.log.debug(f"  Most recent value is {most_recent_decimated} ({age:.0f} s old)")
+
+        if age > time_window:
+            self.log.info(f"Decimating data using time window of {time_window} s")
+            query_result = list(self.collection.find({"date": {"$gt": most_recent-timedelta(seconds=time_window)}}))
+            self.log.debug(f"  Found {len(query_result)} records in last {time_window} s")
+            mongodict = {'date': most_recent}
+            for key, mongokey, datatype in self.keys:
+                data = [x[mongokey] for x in query_result]
+                mongodict[f"{mongokey} min"] = np.min(data)
+                mongodict[f"{mongokey} max"] = np.max(data)
+                mongodict[f"{mongokey} avg"] = np.mean(data)
+                mongodict[f"{mongokey} std"] = np.std(data)
+            try:
+                inserted_id = self.decimated_collection.insert_one(mongodict).inserted_id
+                self.log.info(f"  Inserted decimated mongo document {inserted_id}")
+            except Exception as e:
+                self.log.error(f"  Failed to insert decimated mongo document")
+                self.log.error(e)
 
 
 def monitor_davis_weather_link():
