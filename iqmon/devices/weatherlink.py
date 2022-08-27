@@ -165,7 +165,13 @@ class DavisWeatherLink():
                 except Exception as e:
                     self.log.error(f"  Failed to insert mongo document")
                     self.log.error(e)
-            self.decimate()
+
+            try:
+                self.decimate()
+            except Error as e:
+                self.log.error('Decimate failed')
+                self.log.error(e)
+
             self.log.info(f"Sleeping {sleep:.0f} s")
             time.sleep(sleep)
 
@@ -193,6 +199,14 @@ class DavisWeatherLink():
                 mongodict[f"{mongokey} max"] = np.max(data)
                 mongodict[f"{mongokey} avg"] = np.mean(data)
                 mongodict[f"{mongokey} std"] = np.std(data)
+            # rain rate
+            data = [x['rain rate'] for x in query_result]
+            mongodict['rain rate min'] = np.min(data)
+            mongodict['rain rate max'] = np.max(data)
+            mongodict['rain rate avg'] = np.mean(data)
+            mongodict['rain rate std'] = np.std(data)
+
+            # Insert decimated data entry
             try:
                 inserted_id = self.decimated_collection.insert_one(mongodict).inserted_id
                 self.log.info(f"  Inserted decimated mongo document {inserted_id}")
