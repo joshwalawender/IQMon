@@ -220,6 +220,7 @@ def generate_weather_plot(webcfg, telcfg, date=None, querybuffer_ndays=1, span_h
         query_dict = {'date': {'$gt': query_start, '$lt': query_end}}
         for plot_value in plot_values:
             collection, name = plot_value.split(':')
+            decimated = (collection[:10] == 'decimated_')
             log.debug(f'  Querying mongo collection {collection}')
             query_result = mongo_query(collection, query_dict, webcfg)
 
@@ -234,6 +235,11 @@ def generate_weather_plot(webcfg, telcfg, date=None, querybuffer_ndays=1, span_h
                         plot_vals.append((d['date'], d[name]*1.61))
                     else:
                         plot_vals.append((d['date'], d[name]))
+                elif decimated is True and f"{name} avg" in d.keys():
+                    plot_vals.append((d['date'], d[f"{name} avg"],
+                                      d[f"{name} min"], d[f"{name} max"],
+                                      d[f"{name} std"]))
+
             plot_vals = np.array(plot_vals)
 
             log.debug(f'  Got {len(plot_vals)} entries')
@@ -257,15 +263,32 @@ def generate_weather_plot(webcfg, telcfg, date=None, querybuffer_ndays=1, span_h
                                        legend_label=f"{plot_value}",
                                        size=markersize, color="green",
                                        line_alpha=0.8, fill_alpha=0.8)
+            if plot_vals.shape[1] > 2:
+                plot_wind_speed.line(plot_vals[:,0],
+                                     plot_vals[:,2],
+                                     color="black",
+                                     line_alpha=0.5)
+                plot_wind_speed.line(plot_vals[:,0],
+                                     plot_vals[:,3],
+                                     color="black",
+                                     line_alpha=0.5)
 
         if webcfg['Weather'].get('plot_wind_gust', None) is not None:
             plot_values = webcfg['Weather'].get('plot_wind_gust').split(',')
             query_dict = {'date': {'$gt': query_start, '$lt': query_end}}
             for plot_value in plot_values:
                 collection, name = plot_value.split(':')
+                decimated = (collection[:10] == 'decimated_')
                 log.debug(f'  Querying mongo collection {collection}')
                 query_result = mongo_query(collection, query_dict, webcfg)
-                plot_vals = np.array([(d['date'], d[name]) for d in query_result if name in d.keys()])
+                if decimated is False:
+                    plot_vals = np.array([(d['date'], d[name]) for d in query_result if name in d.keys()])
+                else:
+                    log.debug('Using decimated data')
+                    plot_vals = np.array([(d['date'], d[f"{name} max"],
+                                           d[f"{name} min"], d[f"{name} max"],
+                                           d[f"{name} std"])\
+                                         for d in query_result if f"{name} avg" in d.keys()])
                 log.debug(f'  Got {len(plot_vals)} entries')
                 if len(plot_vals) > 0:
                     plot_wind_speed.line(plot_vals[:,0],
@@ -273,6 +296,18 @@ def generate_weather_plot(webcfg, telcfg, date=None, querybuffer_ndays=1, span_h
                                          legend_label=f"{plot_value}",
                                          line_width=markersize, color="black",
                                          line_alpha=0.3)
+
+#                 if plot_vals.shape[1] > 2:
+#                     plot_wind_speed.line(plot_vals[:,0],
+#                                          plot_vals[:,2],
+#                                          color="black",
+#                                          line_alpha=0.5)
+#                     plot_wind_speed.line(plot_vals[:,0],
+#                                          plot_vals[:,3],
+#                                          color="black",
+#                                          line_alpha=0.5)
+
+
         if len(plot_values) > 1 or webcfg['Weather'].get('plot_wind_gust', None) is not None:
             plot_wind_speed.legend.location = "top_left"
             plot_wind_speed.legend.margin = 0
@@ -303,9 +338,17 @@ def generate_weather_plot(webcfg, telcfg, date=None, querybuffer_ndays=1, span_h
         query_dict = {'date': {'$gt': query_start, '$lt': query_end}}
         for i,plot_value in enumerate(plot_values):
             collection, name = plot_value.split(':')
+            decimated = (collection[:10] == 'decimated_')
             log.debug(f'  Querying mongo collection {collection}')
             query_result = mongo_query(collection, query_dict, webcfg)
-            plot_vals = np.array([(d['date'], d[name]) for d in query_result if name in d.keys()])
+            if decimated is False:
+                plot_vals = np.array([(d['date'], d[name]) for d in query_result if name in d.keys()])
+            else:
+                log.debug('Using decimated data')
+                plot_vals = np.array([(d['date'], d[f"{name} avg"],
+                                       d[f"{name} min"], d[f"{name} max"],
+                                       d[f"{name} std"])\
+                                     for d in query_result if f"{name} avg" in d.keys()])
             log.debug(f'  Got {len(plot_vals)} entries')
             if len(plot_vals) > 0:
                 if flip is True:
@@ -339,6 +382,16 @@ def generate_weather_plot(webcfg, telcfg, date=None, querybuffer_ndays=1, span_h
                                      size=markersize, color="black",
                                      legend_label=f"{plot_value}",
                                      line_alpha=0.1, fill_alpha=0.1)
+                if plot_vals.shape[1] > 2:
+                    plot_wind_speed.line(plot_vals[:,0],
+                                         plot_vals[:,2],
+                                         color="black",
+                                         line_alpha=0.5)
+                    plot_wind_speed.line(plot_vals[:,0],
+                                         plot_vals[:,3],
+                                         color="black",
+                                         line_alpha=0.5)
+
 
         if len(plot_values) > 1:
             plot_rain.legend.location = "top_left"
@@ -490,7 +543,8 @@ def generate_weather_plot(webcfg, telcfg, date=None, querybuffer_ndays=1, span_h
 #         dome_plot.line(closed_date, closed_dome, line_width=4, color="black")
 #         dome_plot.line(open_date, open_dome, line_width=4, color="green")
 
-        dome_plot.line(dome_date, dome, line_width=4, color="black", line_alpha=0.8)
+        dome_plot.circle(dome_date, dome, line_width=0, color="black")
+        dome_plot.line(dome_date, dome, line_width=4, color="black", line_alpha=0.2)
 
         # IQMon Files
         dome_plot.circle(iqmon_obj_dates, iqmon_obj_alt,

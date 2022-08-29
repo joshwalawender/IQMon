@@ -168,7 +168,7 @@ class DavisWeatherLink():
 
             try:
                 self.decimate()
-            except Error as e:
+            except Exception as e:
                 self.log.error('Decimate failed')
                 self.log.error(e)
 
