@@ -186,7 +186,7 @@ class DavisWeatherLink():
                             sort=[('date', pymongo.DESCENDING)]).limit(1))
         most_recent_decimated = query_result[-1]['date']
         age = (most_recent - most_recent_decimated).total_seconds()
-        self.log.debug(f"  Most recent value is {most_recent_decimated} ({age:.0f} s old)")
+        self.log.debug(f"  Most recent decimated value is {most_recent_decimated} ({age:.0f} s old)")
 
         if age > time_window:
             self.log.info(f"Decimating data using time window of {time_window} s")
