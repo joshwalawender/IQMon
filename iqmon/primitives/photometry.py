@@ -164,7 +164,7 @@ class ExtractStars(BasePrimitive):
         bright_limit_pct = self.cfg['Extract'].getfloat('bright_limit_percentile', 100)
         radius_limit = self.cfg['Extract'].getfloat('radius_limit_pix', 4000)
 
-        bsub = self.action.args.ccddata.data - self.action.args.background.background
+        bsub = self.action.args.ccddata.data - self.action.args.background.background.value
         seperr = self.action.args.ccddata.uncertainty.array
         sepmask = self.action.args.ccddata.mask
 
@@ -256,12 +256,12 @@ class ExtractStars(BasePrimitive):
         phot_table = photutils.aperture_photometry(
                                self.action.args.ccddata,
                                [star_apertures, sky_apertures])
-        phot_table['sky'] = phot_table['aperture_sum_1'] / sky_apertures.area()
+        phot_table['sky'] = phot_table['aperture_sum_1'] / sky_apertures.area
         med_sky = np.median(phot_table['sky'])
-        self.log.info(f'  Median Sky = {med_sky.value:.0f} e-/pix')
+        self.log.info(f'  Median Sky = {med_sky:.0f} e-/pix')
         self.action.args.meta['sky_background'] = med_sky.value
         self.action.args.objects.add_column(phot_table['sky'])
-        bkg_sum = phot_table['aperture_sum_1'] / sky_apertures.area() * star_apertures.area()
+        bkg_sum = phot_table['aperture_sum_1'] / sky_apertures.area * star_apertures.area
         final_sum = (phot_table['aperture_sum_0'] - bkg_sum)
         final_uncert = (bkg_sum + final_sum)**0.5 * u.electron**0.5
         phot_table['apflux'] = final_sum/exptime
