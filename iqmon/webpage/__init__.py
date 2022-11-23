@@ -51,7 +51,84 @@ def mongo_query(collection, query_dict, cfg,
 ##-------------------------------------------------------------------------
 ## Function: get_twilights
 ##-------------------------------------------------------------------------
+def get_sun_alt(now, loc):
+    obj = c.get_sun(now)
+    altaz = c.AltAz(location=loc, obstime=now,
+                    pressure=0*u.mbar,
+                    temperature=5*u.Celsius,
+                    obswl=0.5*u.micron,
+                    relative_humidity=10,
+                   )
+    alt = obj.transform_to(altaz).alt
+    return alt
+
+
 def get_twilights(start, end, webcfg, nsample=256):
+    """ Determine sunrise and sunset times """
+    location = c.EarthLocation(
+        lat=webcfg['site'].getfloat('site_lat'),
+        lon=webcfg['site'].getfloat('site_lon'),
+        height=webcfg['site'].getfloat('site_elevation'),
+    )
+    UTdate_string = start.strftime('%Y%m%dUT')
+    now = Time(datetime.strptime(UTdate_string, '%Y%m%dUT'))
+    alt = get_sun_alt(now, loc)
+    now += TimeDelta(np.floor(alt.value/15)*u.hour)
+    alt = get_sun_alt(now, loc=loc)
+    assert alt.value > 0
+    # Sunset
+    while alt.value > 0:
+        now += TimeDelta(precision)
+        alt = get_sun_alt(now, loc)
+    sunset = now + TimeDelta(10*u.minute) # Add 10 minute fudge factor for refraction
+    # Civil Dusk
+    while alt.value > -6:
+        now += TimeDelta(precision)
+        alt = get_sun_alt(now, loc)
+    civil_dusk = now
+    # Nautical Dusk
+    while alt.value > -12:
+        now += TimeDelta(precision)
+        alt = get_sun_alt(now, loc)
+    nautical_dusk = now
+    # Astronomincal Dusk
+    while alt.value > -18:
+        now += TimeDelta(precision)
+        alt = get_sun_alt(now, loc)
+    astronomical_dusk = now
+
+    # Larger steps through night
+    while alt.value < -18:
+        now += TimeDelta(60*u.minute)
+        alt = get_sun_alt(now, loc)
+    now -= TimeDelta(60*u.minute)
+    alt = get_sun_alt(now, loc=loc)
+    
+    # Astronomical Dawn
+    while alt.value < -18:
+        now += TimeDelta(precision)
+        alt = get_sun_alt(now, loc)
+    astronomical_dawn = now
+    # Nautical Dawn
+    while alt.value < -12:
+        now += TimeDelta(precision)
+        alt = get_sun_alt(now, loc)
+    nautical_dawn = now
+    # Civil Dawn
+    while alt.value < -6:
+        now += TimeDelta(precision)
+        alt = get_sun_alt(now, loc)
+    civil_dawn = now
+    # Sunrise
+    while alt.value < 0:
+        now += TimeDelta(precision)
+        alt = get_sun_alt(now, loc)
+    sunrise = now - TimeDelta(10*u.minute) # Subtract 10 minute fudge factor for refraction
+
+    return sunset, civil_dusk, nautical_dusk, astronomical_dusk, astronomical_dawn, nautical_dawn, civil_dawn, sunrise
+
+
+def old_get_twilights(start, end, webcfg, nsample=256):
     """ Determine sunrise and sunset times """
 
     from astroplan import Observer
