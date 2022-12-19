@@ -474,7 +474,16 @@ class ReleaseMemory(BasePrimitive):
         """
         self.log.info(f"Running {self.__class__.__name__} action")
 
-        self.log.info(f"Memory Size after {self.__class__.__name__} action: {get_memory_size(self):.1f} MB")
-#         self.log.info(analyze_object_memory(self))
-        return None
+        self.action.args = None
+        self.action.event.args = None
+        self.output = None
+#         self.logger = None
+#         self.log = None
+#         self.apply = None
+#         self.config = None
+#         self.context = None
+
+        self.log.info(f"Memory Size after {self.__class__.__name__}: {get_memory_size(self):.1f} MB")
+        self.log.info(analyze_object_memory(self))
+        return self.action.args
 
