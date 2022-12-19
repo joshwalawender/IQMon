@@ -96,7 +96,7 @@ class DavisWeatherLink():
 
     def get_data(self):
         try:
-            r = requests.get(self.url)
+            r = requests.get(self.url, timeout=10)
         except Exception as err:
             self.log.error(f'Exception getting data from {self.name}')
             self.log.error(err)
